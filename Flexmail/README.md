@@ -7,7 +7,7 @@
 
 ## Scripts
 
-1. Open the file "flexmail__00__create_settings.ps1" and change your settings, especially your Flexmail client id, which is in the login object, currently written as <clientid>
+1. Open the file "flexmail__00__create_settings.ps1" and change your settings, especially your Flexmail client id, which is in the login object, currently written as "<clientid>"
 1. Run that file and you will be asked for the Flexmail token. This one will be encrypted and only accessible by the server that runs that script. A "settings.json" file will be created in that directory as well as a "aes.key" file.
 
 ## Channel Editor
