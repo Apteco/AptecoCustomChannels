@@ -48,7 +48,7 @@ $token = Read-Host -AsSecureString "Please enter the token for flexmail"
 $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password)
 
 $login = @{
-    user = 12345
+    user = <clientid>
     token = $tokenEncrypted
 }
 
