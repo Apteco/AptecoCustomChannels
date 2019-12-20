@@ -8,17 +8,28 @@ Param(
     [hashtable] $params
 )
 
-<#
-$params = [hashtable]@{
-scriptPath= "C:\FastStats\scripts\flexmail"
-MessageName= "1631416 | Testmail_2"
-abc= "def"
-ListName= "252060"
-Password= "def"
-Username= "abc"
+#-----------------------------------------------
+# DEBUG SWITCH
+#-----------------------------------------------
+
+$debug = $false
+
+#-----------------------------------------------
+# INPUT PARAMETERS, IF DEBUG IS TRUE
+#-----------------------------------------------
+
+if ( $debug ) {
+    $params = [hashtable]@{
+        scriptPath= "C:\FastStats\scripts\flexmail"
+        MessageName= "1631416 | Testmail_2"
+        abc= "def"
+        ListName= "252060"
+        Password= "def"
+        Username= "abc" 
+    }
 }
 
-#>
+
 
 ################################################
 #
@@ -27,8 +38,6 @@ Username= "abc"
 ################################################
 
 
-# TODO [ ] abc
-
 
 ################################################
 #
@@ -36,15 +45,16 @@ Username= "abc"
 #
 ################################################
 
-<#
-# Load scriptpath
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-} else {
-    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+if ( $debug ) {
+    # Load scriptpath
+    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    } else {
+        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    }
 }
-#>
-$scriptPath = "$( $params.scriptPath )" #"C:\FastStats\scripts\flexmail"
+
+$scriptPath = "$( $params.scriptPath )" 
 Set-Location -Path $scriptPath
 
 
@@ -132,14 +142,14 @@ $campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
 #-----------------------------------------------
 
 
-# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is working
+# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is fixed
 $recipients = 1
 
 # return the campaign id because this will be the reference for the response data
 $transactionId = $campaignId
 
 # build return object
-[Hashtable]$return = @{
+$return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
 }
