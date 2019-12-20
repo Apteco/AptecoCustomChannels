@@ -52,6 +52,7 @@ $login = @{
     token = $tokenEncrypted
 }
 
+# sometimes the language field is not filled per uploaded row, than it is better to remove it from this array and set it through the default language
 $uploadFields = @("emailAddress","title","name","surname","city","province","country","phone","fax","mobile","website","language","gender","birthday","company","market","activities","employees","nace","turnover","vat","keywords","free_field_1","free_field_2","free_field_3","free_field_4","free_field_5","free_field_6","custom","barcode","referenceId","zipcode","address","function")
 
 $importSettings = @{
