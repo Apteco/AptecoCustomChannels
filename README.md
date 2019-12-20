@@ -8,17 +8,17 @@ Custom Channels made for usage in the Apteco Marketing Suite
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
 Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast|[Flexmail Integration Guideline](Flexmail)
-Deutsche Post TriggerDialog|
-Mailingwork|Standard
-Mailingwork|Campaign
-CleverReach|
-EpiServer Campaign|Closed Loop Smart Campaigns|
-EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|
-Optilyz|S3
-Optilyz|REST
-Syniverse|SMS
-Syniverse|Number Verification
-Syniverse|Wallets
+Deutsche Post|TriggerDialog|REST
+Mailingwork|Standard|REST
+Mailingwork|Campaign|REST
+CleverReach||REST
+EpiServer Campaign|Closed Loop Smart Campaigns|SOAP
+EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP
+Optilyz|S3|AWS-S3/REST
+Optilyz|REST|REST
+Syniverse|SMS|REST
+Syniverse|Number Verification|REST
+Syniverse|Wallets|REST
 
 
 Legend:
