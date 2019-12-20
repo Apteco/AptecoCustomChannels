@@ -8,6 +8,24 @@ Param(
     [hashtable] $params
 )
 
+#-----------------------------------------------
+# DEBUG SWITCH
+#-----------------------------------------------
+
+$debug = $false
+
+#-----------------------------------------------
+# INPUT PARAMETERS, IF DEBUG IS TRUE
+#-----------------------------------------------
+
+if ( $debug ) {
+    $params = [hashtable]@{
+	    Password= "def"
+	    scriptPath= "C:\FastStats\scripts\flexmail"
+	    abc= "def"
+	    Username= "abc"
+    }
+}
 
 
 ################################################
@@ -32,7 +50,7 @@ if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
     $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
 }
 #>
-$scriptPath = "$( $params.scriptPath )" #"C:\FastStats\scripts\flexmail"
+$scriptPath = "$( $params.scriptPath )" 
 Set-Location -Path $scriptPath
 
 
@@ -101,9 +119,6 @@ $messages = $messagesReturn | select @{name="id";expression={ $_.messageId }}, @
 # RETURN
 #
 ################################################
-
-# dummy values
-#return $settings.messages | select id, name
 
 # real messages
 return $messages
