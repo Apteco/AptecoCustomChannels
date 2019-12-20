@@ -8,6 +8,31 @@ Param(
     [hashtable] $params
 )
 
+#-----------------------------------------------
+# DEBUG SWITCH
+#-----------------------------------------------
+
+$debug = $false
+
+#-----------------------------------------------
+# INPUT PARAMETERS, IF DEBUG IS TRUE
+#-----------------------------------------------
+
+if ( $debug ) {
+    $params = [hashtable]@{
+        scriptPath= "C:\FastStats\scripts\flexmail"
+        TestRecipient= '{"Email":"florian.von.bracht@apteco.de","Sms":null,"Personalisation":{"voucher_1":"voucher no 1","voucher_2":"voucher no 2","voucher_3":"voucher no 3","Kunden ID":"Kunden ID","title":"title","name":"name","surname":"surname","language":"language","Communication Key":"e48c3fd3-7317-4637-aeac-4fa1505273ac"}}'
+        MessageName= "1631416 | Testmail_2"
+        abc= "def"
+        ListName= ""
+        Password= "def"
+        Username= "abc"  
+    }
+}
+
+
+
+
 
 ################################################
 #
@@ -23,15 +48,7 @@ Param(
 #
 ################################################
 
-<#
-# Load scriptpath
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-} else {
-    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-}
-#>
-$scriptPath = "$( $params.scriptPath )" #"C:\FastStats\scripts\flexmail"
+$scriptPath = "$( $params.scriptPath )"
 Set-Location -Path $scriptPath
 
 
@@ -64,6 +81,7 @@ $logfile = $settings.logfile
 #
 ################################################
 
+# Please note this path is relative to the $scriptPath
 Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
 }
@@ -106,7 +124,7 @@ $html = Invoke-RestMethod -Method Get -Uri $messageUrl -Verbose
 #
 ################################################
 
-[Hashtable]$return = @{
+$return = [Hashtable]@{
     "Type" = $settings.previewSettings.Type
     "FromAddress"=$settings.previewSettings.FromAddress
     "FromName"=$settings.previewSettings.FromName
