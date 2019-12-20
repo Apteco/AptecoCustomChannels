@@ -1,2 +1,49 @@
 # AptecoCustomChannels
+
 Custom Channels made for usage in the Apteco Marketing Suite
+
+## Current Status
+
+
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast|[Flexmail Integration Guideline](Flexmail)
+Deutsche Post TriggerDialog|
+Mailingwork|Standard
+Mailingwork|Campaign
+CleverReach|
+EpiServer Campaign|Closed Loop Smart Campaigns|
+EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|
+Optilyz|S3
+Optilyz|REST
+Syniverse|SMS
+Syniverse|Number Verification
+Syniverse|Wallets
+
+
+Legend:
+* The icons mean if functionalities are Available/Implemented
+* :heavy_check_mark: = "done"
+* :x: = "not implemented"
+* :question: = "not checked yet"
+
+## Requirements
+
+* An Apteco server with an FastStats Service
+* Make sure PS Version 5.1 is installed at Minimum
+  * You can see it in Powershell if you type in ```$PSVersionTable```
+  * If PSVersion < 5.1, then install this one: https://www.microsoft.com/en-us/download/details.aspx?id=54616
+  * And restart the machine
+
+## Description
+
+The custom channels can trigger those functionalities
+
+1.	GetMessagesScript: used to return an array of string pairs of <id>,<name> of the messages
+2.	GetListsScript: used to return an array of string pairs of <id>,<name> of the lists
+3.	TestScript: used to test if the broadcaster api is available
+4.	SendTestEmailScript: used to send a test send to the broadcaster, given a recipient
+5.	PreviewMessageScript: used to return a html view of the message given a recipient and content values
+6.	UploadScript: used to upload a list to the broadcaster, given a tab delimited file
+7.	BroadcastScript: used to send a list a message
+  
