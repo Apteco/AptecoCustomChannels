@@ -1,3 +1,12 @@
+# Dependencies
+
+* Make sure PS Version 5.1 is installed at Minimum (which is normally pre-installed with Windows Server)
+  * You can see it in Powershell if you type in ```$PSVersionTable```
+  * If PSVersion < 5.1, then install this one: https://www.microsoft.com/en-us/download/details.aspx?id=54616
+  * And restart the machine
+
+
+
 # Getting Started
 
 1. Download all the files in a directoy
