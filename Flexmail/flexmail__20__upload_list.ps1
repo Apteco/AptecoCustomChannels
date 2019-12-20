@@ -138,7 +138,10 @@ $params.Keys | ForEach {
 # CHECK UPLOAD FOLDER
 #-----------------------------------------------
 
-if ( !(Test-Path -Path $uploadsSubfolder) ) {    New-Item -Path ".\$( $uploadsSubfolder )" -ItemType Directory}Set-Location -Path $uploadsSubfolder
+if ( !(Test-Path -Path $uploadsSubfolder) ) {
+    New-Item -Path ".\$( $uploadsSubfolder )" -ItemType Directory
+}
+Set-Location -Path $uploadsSubfolder
 
 
 #-----------------------------------------------
@@ -170,12 +173,30 @@ $customFields = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNo
 # DATA MAPPING
 #-----------------------------------------------
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile<#custom fieldsid                label             type
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
+
+<#
+
+custom fields
+
+id                label             type
 --                -----             ----
 custom_salutation Custom_Salutation Text
 voucher_1         Voucher_1         Text
 voucher_2         Voucher_2         Text
-voucher_3         Voucher_3         Text#># merge fixed/standard fields with existing custom fields$fields = $settings.uploadFields + $customFields.id$t = Measure-Command {    $fileItem = Get-Item -Path $params.Path    $exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $fields -writeCount $settings.rowsPerUpload -outputDoubleQuotes $true}"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId ) in $( $t.Seconds ) seconds!" >> $logfile
+voucher_3         Voucher_3         Text
+
+#>
+
+# merge fixed/standard fields with existing custom fields
+$fields = $settings.uploadFields + $customFields.id
+
+$t = Measure-Command {
+    $fileItem = Get-Item -Path $params.Path
+    $exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $fields -writeCount $settings.rowsPerUpload -outputDoubleQuotes $true
+}
+
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId ) in $( $t.Seconds ) seconds!" >> $logfile
 
 
 #-----------------------------------------------
@@ -283,3 +304,4 @@ $transactionId = $params.ListName #$campaignId
 }
 
 $return
+
