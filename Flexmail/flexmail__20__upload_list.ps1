@@ -95,6 +95,8 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
+# more settings
+$uploadsFolder = ".\$( $uploadsSubfolder )"
 $logfile = $settings.logfile
 
 
@@ -138,10 +140,10 @@ $params.Keys | ForEach {
 # CHECK UPLOAD FOLDER
 #-----------------------------------------------
 
-if ( !(Test-Path -Path $uploadsSubfolder) ) {
-    New-Item -Path ".\$( $uploadsSubfolder )" -ItemType Directory
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    New-Item -Path $uploadsFolder -ItemType Directory
 }
-Set-Location -Path $uploadsSubfolder
+Set-Location -Path $uploadsFolder
 
 
 #-----------------------------------------------
@@ -203,7 +205,7 @@ $t = Measure-Command {
 # RECIPIENT LIST ID
 #-----------------------------------------------
 
-$campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
+#$campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
 $recipientListID = $settings.masterListId
 
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
@@ -295,13 +297,18 @@ if ( $debug ) {
 # RETURN VALUES TO PEOPLESTAGE
 #-----------------------------------------------
 
-$recipients = $importResults.count # | where { $_.Result -ne 0} | Select Urn
-$transactionId = $params.ListName #$campaignId
+# count the number of successful upload rows
+$recipients = ( $importResults | where { $_.errorCode -eq 0} ).count
 
-[Hashtable]$return = @{
+# put in the source id as the listname
+$transactionId = $params.ListName
+
+# return object
+$return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
 }
 
+# return the results
 $return
 
