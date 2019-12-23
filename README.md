@@ -4,28 +4,41 @@ Custom Channels made for usage in the Apteco Marketing Suite
 
 ## Current Status
 
-
-Integration|API|Type|Functionalities|Link
--|-|-|-|-
-Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast|[Flexmail Integration Guideline](Flexmail)
-Deutsche Post|TriggerDialog|REST
-Mailingwork|Standard|REST
-Mailingwork|Campaign|REST
-CleverReach||REST
-EpiServer Campaign|Closed Loop Smart Campaigns|SOAP
-EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP
-Optilyz|S3|AWS-S3/REST
-Optilyz|REST|REST
-Syniverse|SMS|REST
-Syniverse|Number Verification|REST
-Syniverse|Wallets|REST
-
-
 Legend:
 * The icons mean if functionalities are Available/Implemented
 * :heavy_check_mark: = "done"
 * :x: = "not implemented"
 * :question: = "not checked yet"
+
+### Email
+
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast|[Flexmail Integration Guideline](Flexmail)
+Mailingwork|Standard|REST
+Mailingwork|Campaign|REST
+CleverReach||REST
+EpiServer Campaign|Closed Loop Smart Campaigns|SOAP
+EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP
+
+
+### Print
+
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+Deutsche Post|TriggerDialog|REST
+Optilyz|S3|AWS-S3/REST
+Optilyz|REST|REST
+
+
+### Mobile
+
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+Syniverse|SMS|REST
+Syniverse|Number Verification|REST
+Syniverse|Wallets|REST
+
 
 ## Requirements
 
