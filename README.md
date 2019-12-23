@@ -39,6 +39,14 @@ Syniverse|SMS|REST
 Syniverse|Number Verification|REST
 Syniverse|Wallets|REST
 
+### Database
+
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+MSSQL / SQL Server||
+sqlite||
+
+
 
 ## Requirements
 
