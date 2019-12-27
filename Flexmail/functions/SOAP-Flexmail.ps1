@@ -172,7 +172,8 @@ Function Invoke-Flexmail {
     param(
          [Parameter(Mandatory=$true)][String]$method
         ,[Parameter(Mandatory=$false)][Hashtable]$param = @{}
-        ,[Parameter(Mandatory=$false)][String]$responseNode = ""
+        ,[Parameter(Mandatory=$false)][String]$responseNode = "" # you should either define responseNode or responseType
+        ,[Parameter(Mandatory=$false)][String]$responseType = "" # you should either define responseNode or responseType
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
         ,[Parameter(Mandatory=$false)][array]$customFields = @()
     )
@@ -238,31 +239,50 @@ Function Invoke-Flexmail {
         write-host $response.OuterXml
     }
 
+    # load namespaces of response
+    $namespacePrefix = "xmlns:"
+    $ns = [HashTable]@{}
+    $response.Envelope.Attributes.name.where({ $_ -like "$( $namespacePrefix )*" }) | ForEach {
+        $attributeName = $_
+        $namespaceName = $attributeName.Substring($namespacePrefix.Length)
+        $nameSpaceUrl = $response.Envelope.Attributes[$attributeName].'#text'
+        $ns.Add($namespaceName,$nameSpaceUrl)
+    }
+
     # load item of xml containing "item"
-    if ( $responseNode -eq "" ) {
+    if ( $responseNode -eq "" -and $responseType -eq "" ) {
         $responseItems = $response.Envelope.Body."$( $method )Response"."$( $method )Resp".SelectNodes("//*[contains(local-name(),'Items')]")
+    } elseif ( $responseType -ne "" ) {
+        $responseItems = $response | Select-Xml -XPath "//item[@xsi:type='ns1:$( $responseType )']" -Namespace $ns | select -expand node
     } else {
         $responseItems = $response.Envelope.Body."$( $method )Response"."$( $method )Resp"."$( $responseNode )"
     }
 
-    # load xml result into array
-    $items = @()
-    if ( $responseItems.ChildNodes -ne $null ) {
-        $responseItems.ChildNodes | ForEach {
+    
+    if ( $responseType -ne "" ) {
+       
+        return $responseItems
 
-            $inputItem = $_
-            $item = New-Object PSCustomObject
-            $inputItem.ChildNodes.Name | ForEach {
-                $name = $_       
-                $item | Add-Member -MemberType NoteProperty -Name $name -Value $inputItem."$( $name )".'#text'
+    } else {
+        
+         # load xml result into array
+        $items = @()
+        if ( $responseItems.ChildNodes -ne $null ) {
+            $responseItems.ChildNodes | ForEach {
+
+                $inputItem = $_
+                $item = New-Object PSCustomObject
+                $inputItem.ChildNodes.Name | ForEach {
+                    $name = $_       
+                    $item | Add-Member -MemberType NoteProperty -Name $name -Value $inputItem."$( $name )".'#text'
+                }
+                $items += $item
+                #$id = $t.item.categoryId.'#text'
+
             }
-            $items += $item
-            #$id = $t.item.categoryId.'#text'
-
         }
-    }
+        # return the results
+        return $items
 
-    # return the results
-    return $items
 
 }
