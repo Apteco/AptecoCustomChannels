@@ -10,3 +10,6 @@ aes.key
 
 # specific folders
 Flexmail/responses
+
+# archive folders
+_archive
