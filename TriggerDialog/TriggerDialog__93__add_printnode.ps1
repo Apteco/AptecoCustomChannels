@@ -95,20 +95,38 @@ $payload = $settings.defaultPayload.PsObject.Copy()
 $payload.iat = Get-Unixtime
 $payload.exp = ( (Get-Unixtime) + 3600 )
 
-
-
 #-----------------------------------------------
 # CREATE JWT 
 #-----------------------------------------------
 
 $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
 
-<#
-$authUri = "$( $settings.base )/triggerdialog/sso/auth?jwt=$( $jwt )"
-$authUri
-#>
 
 #-----------------------------------------------
-# ADD PRINT NODE
+# PREPARE THE CAMPAIGN CREATION
 #-----------------------------------------------
 
+$resource = "campaign/printNode"
+$service = "addCampaignPrintNode"
+$addPrintNodeUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+$contentType = "application/xml" # text/xml, application/xml, application/json
+
+$createCampaignRequest = @{
+    #"masApiVersion" = "1.0.0" # not mandatory
+    "masId" = $settings.defaultPayload.masId # long
+    "masCampaignID" = 12345 # TODO [ ] How to access existing campaigns?
+    "masClientID" = $settings.defaultPayload.masClientId # string 60
+    "printNode" = @{
+        "printNodeID" = "abc" # string 32
+        "description" = "def" # string 30, not allowed < > ? " : | \ / *
+    }
+}
+
+$addPrintnodeBody = Out-HashTableToXml -InputObject $createCampaignRequest -Root "ns2:addCampaignPrintNodeRequest" -namespaces $namespaces -Path ".\last_request.xml"
+
+
+#-----------------------------------------------
+# ADD THE PRINTNODE
+#-----------------------------------------------
+
+$newNode = Invoke-RestMethod -Method Post -Uri $addPrintNodeUri -ContentType $contentType -Body $addPrintnodeBody -Verbose

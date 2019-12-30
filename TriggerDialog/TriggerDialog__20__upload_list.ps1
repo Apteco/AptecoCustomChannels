@@ -64,9 +64,9 @@ if ( $debug ) {
     } else {
         $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
     }
+} else {
+    $scriptPath = "$( $params.scriptPath )"
 }
-
-$scriptPath = "$( $params.scriptPath )"
 Set-Location -Path $scriptPath
 
 
@@ -97,6 +97,10 @@ if ( $settings.changeTLS ) {
 
 $logfile = $settings.logfile
 
+# TODO [ ] maybe put this into the settings
+$namespaces = [hashtable]@{
+    "ns2"="urn:pep-dpdhl-com:triggerdialog/campaign/v_10"
+}
 
 ################################################
 #
@@ -134,23 +138,6 @@ $params.Keys | ForEach {
 ################################################
 
 #-----------------------------------------------
-# CREATE PAYLOAD
-#-----------------------------------------------
-
-$payload = $settings.defaultPayload.PsObject.Copy()
-$payload.iat = Get-Unixtime
-$payload.exp = ( (Get-Unixtime) + 3600 )
-
-
-#-----------------------------------------------
-# CREATE JWT AND AUTH URI
-#-----------------------------------------------
-
-$jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
-$authUri = "$( $settings.base )/triggerdialog/sso/auth?jwt=$( $jwt )"
-#$authUri
-
-#-----------------------------------------------
 # CHECK UPLOAD FOLDER
 #-----------------------------------------------
 
@@ -173,6 +160,51 @@ Set-Location -Path $uploadsSubfolder
 #-----------------------------------------------
 
 # TODO [ ] if needed, create a updateCampaignVariableRequest to add new variables
+
+# CREATE PAYLOAD
+$payload = $settings.defaultPayload.PsObject.Copy()
+$payload.iat = Get-Unixtime
+$payload.exp = ( (Get-Unixtime) + 3600 )
+
+# CREATE JWT 
+$jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
+
+# PREPARE THE VARIABLES CREATION
+$resource = "campaign/variable"
+$service = "updateCampaignVariable"
+$updateVariablesUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+$contentType = "application/xml" # text/xml, application/xml, application/json
+
+# CREATE REQUEST
+$updateVariablesRequest = @{
+    #"masApiVersion" = "1.0.0" # not mandatory
+    "masId" = $settings.defaultPayload.masId # long
+    "masCampaignID" = 12345 # TODO [ ] How to access existing campaigns?
+    "masClientID" = $settings.defaultPayload.masClientId # string 60
+    "variable" = @(
+        @{
+            "name" = "Gutscheincode" # string 60
+            "type" = "string" # boolean, float, integer, string, date, set, zip, countryCode, image
+        },
+        @{
+            "name" = "Postleitzahl" # string 60
+            "type" = "zip" # boolean, float, integer, string, date, set, zip, countryCode, image
+        },
+        @{
+            "name" = "Hobbies" # string 60
+            "description" = "desc 1"
+            "type" = "set" # boolean, float, integer, string, date, set, zip, countryCode, image
+            "option" = @("Segeln auf schönen Seen wie der Mecklenburgischen Seenplatte","Fußball","Schach","Tennis","Lesen")
+                      
+        }
+    )
+}
+
+$updateVariablesBody = Out-HashTableToXml -InputObject $updateVariablesRequest -Root "ns2:updateCampaignVariableRequest" -namespaces $namespaces -Path ".\last_request.xml"
+
+# UPDATE VARIABLES
+$newVariables = Invoke-RestMethod -Method Post -Uri $updateVariablesUri -ContentType $contentType -Body $updateVariablesBody -Verbose
+
 
 #-----------------------------------------------
 # DATA MAPPING
@@ -206,6 +238,55 @@ $partFiles | ForEach {
     $f = $_
 
     $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
+
+    # TODO [ ] Possible to load in batches?
+
+    # CREATE PAYLOAD
+    $payload = $settings.defaultPayload.PsObject.Copy()
+    $payload.iat = Get-Unixtime
+    $payload.exp = ( (Get-Unixtime) + 3600 )
+
+    # CREATE JWT 
+    $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
+
+    # PREPARE THE VARIABLES CREATION
+    $resource = "campaign/campaignTrigger"
+    $service = "createCampaignTrigger"
+    $createTriggerUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+    $contentType = "application/xml" # text/xml, application/xml, application/json
+
+    # CREATE REQUEST
+    $createCampaignTriggerRequest = @{
+        #"masApiVersion" = "1.0.0" # not mandatory
+        "masId" = $settings.defaultPayload.masId # long
+        "masClientID" = $settings.defaultPayload.masClientId # string 60
+        "masCampaignID" = 12345 # TODO [ ] How to access existing campaigns? 
+        "printNodeID" = "PstKart_01"       
+        "variable" = @(
+            @{
+                "name" = "Vorname" # string 60
+                "value" = "Max" # string 255
+            },
+            @{
+                "name" = "Nachname" # string 60
+                "value" = "Mustermann"  # string 255
+            },
+            @{
+                "name" = "Plz"  # string 60
+                "value" = "53113" # string 255
+            },
+            @{
+                "name" = "Hobbies" # string 60
+                "value" = "Lesen"  # string 255   
+            }
+        )
+    }
+
+    $createCampaignTrigger = Out-HashTableToXml -InputObject $createCampaignTriggerRequest -Root "ns2:createCampaignTriggerRequest" -namespaces $namespaces -Path ".\last_request.xml"
+
+    # UPDATE VARIABLES
+    $newTrigger = Invoke-RestMethod -Method Post -Uri $createTriggerUri -ContentType $contentType -Body $createCampaignTrigger -Verbose
+
 
     # TODO [ ] implement the TriggerDialog Campaign Trigger method and check the response data
 
