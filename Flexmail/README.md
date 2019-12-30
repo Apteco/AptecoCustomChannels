@@ -31,6 +31,8 @@
 1. The response download via "FERGE" is not triggered automatically by PeopleStage, by can be done through a "Scheduled Task" in Windows. Just trigger "flexmail__50__responses.ps1" n times a day and the response data will be downloaded.
 1. Triggering FERGE to put the response data into the database is not implemented in this example yet.
 
+Note: The downloaded response with type "unsubscribed", "bounced-out", "blacklisted" don't have a campaign reference in Flexmail, so they have to be selected via FastStats and Orbit.
+
 # First Campaign
 
 1. Create a normal campaign and choose your mailing in the delivery step and enter an ID of a source, that is available in Flexmail. If no source valid value is provided, the campaign will throw an exception and will stop and wait for the users interaction. ![2019-12-19 18_46_08-Apteco PeopleStage - Handel](https://user-images.githubusercontent.com/14135678/71196310-b58bf880-2287-11ea-9348-0bd5497f6e66.png)
