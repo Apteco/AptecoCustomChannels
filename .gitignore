@@ -7,3 +7,6 @@ session.json
 
 # encryption files
 aes.key
+
+# specific folders
+Flexmail/responses
