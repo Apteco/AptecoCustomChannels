@@ -4,7 +4,7 @@ Custom Channels made for usage in the Apteco Marketing Suite
 
 ## Dummy Template / Getting started
 
-To start with your very own first custom channel to use in Apteco PeopleStage, you can use the dummy template without external dependencies. It is pure PowerShell (>=5.1). You can find it here: [Dummy/](Dummy)
+To start with your very own first custom channel to use in Apteco PeopleStage, you can use the dummy template without external dependencies. It is pure PowerShell (>=5.1). You can find it here: [Dummy](Dummy/)
 
 ## Current Status
 
