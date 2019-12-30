@@ -1,0 +1,6 @@
+# settings files
+settings.json
+session.json
+
+# encryption files
+aes.key
