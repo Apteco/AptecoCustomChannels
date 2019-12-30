@@ -31,7 +31,7 @@ EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
-Deutsche Post|TriggerDialog|REST
+Deutsche Post|TriggerDialog|REST|:heavy_check_mark:/:o:Upload<br/>:heavy_check_mark:/:o:Broadcast|[TriggerDialog Integration Guideline](TriggerDialog)
 Optilyz|S3|AWS-S3/REST
 Optilyz|REST|REST
 
