@@ -64,9 +64,9 @@ if ( $debug ) {
     } else {
         $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
     }
+} else {
+    $scriptPath = "$( $params.scriptPath )"
 }
-
-$scriptPath = "$( $params.scriptPath )"
 Set-Location -Path $scriptPath
 
 
