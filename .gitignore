@@ -2,5 +2,8 @@
 settings.json
 session.json
 
+# logfiles
+*.log
+
 # encryption files
 aes.key
