@@ -141,6 +141,8 @@ $campaignArray = $campaignArray.campaignId
 $responseSettings = @{
     "responseFolder"="$( $scriptPath )\responses"
     "campaignsToDownload"=$campaignArray
+    "daysToLoad"=7 # the number of last days to load
+    "dateFormat"="yyyy-MM-ddTHH:mm:ss"
 }
 
 

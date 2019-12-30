@@ -165,6 +165,13 @@ $responseTypes = [HashTable]@{
     "clicks"=$clicksResponseTypes
 }
 
+# Date ranges to load
+$endDate = [datetime]::UtcNow
+$startDate = $endDate.AddDays( -1 * $settings.responseSettings.daysToLoad )
+
+$endDateFormatted = $endDate.ToString($settings.responseSettings.dateFormat)
+$startDateFormatted = $startDate.ToString($settings.responseSettings.dateFormat)
+
 #-----------------------------------------------
 # GET CAMPAIGN HISTORY
 #-----------------------------------------------
@@ -200,7 +207,10 @@ $responseTypes.Keys | ForEach {
                 "value"=$campaign
                 "type"="int"
              }
+             "timestampFrom"=$startDateFormatted
+             "timestampTill"=$endDateFormatted
              "campaignHistoryOptionsType"=@{value=$responseTypeValue;type="campaignHistoryOptionsType"}
+             
         }
 
         $campHistory = Invoke-Flexmail -method "GetCampaignHistory" -param $historyParams -verboseCall -responseType "EmailAddressHistoryActionType"
