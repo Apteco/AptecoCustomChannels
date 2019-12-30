@@ -30,6 +30,3 @@
     return [long]$i
 
 }
-
-$f = "c:\faststats\Publish\Handel\system\Deliveries\PowerShell_252060_08af910e-6381-4b0d-a2bb-73b045eb6b79.txt"
-Count-Rows -inputPath $f -header $true
