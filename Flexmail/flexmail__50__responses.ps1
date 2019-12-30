@@ -87,7 +87,8 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 
 
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`RESPONSE DOWNLOAD" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tRESPONSE DOWNLOAD" >> $logfile
+
 <#
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 $params.Keys | ForEach {
@@ -95,6 +96,9 @@ $params.Keys | ForEach {
     "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
 }
 #>
+
+# is debug mode on?
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDebug mode is $( $debug )" >> $logfile
 
 
 ################################################
@@ -172,6 +176,9 @@ $startDate = $endDate.AddDays( -1 * $settings.responseSettings.daysToLoad )
 $endDateFormatted = $endDate.ToString($settings.responseSettings.dateFormat)
 $startDateFormatted = $startDate.ToString($settings.responseSettings.dateFormat)
 
+# log
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoad responses in timeframe from $( $startDateFormatted ) until $( $endDateFormatted )" >> $logfile
+
 #-----------------------------------------------
 # GET CAMPAIGN HISTORY
 #-----------------------------------------------
@@ -213,7 +220,13 @@ $responseTypes.Keys | ForEach {
              
         }
 
+        # log
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoad campaign $( $campaign ) with response type $( $responseTypeName )" >> $logfile
+
         $campHistory = Invoke-Flexmail -method "GetCampaignHistory" -param $historyParams -verboseCall -responseType "EmailAddressHistoryActionType"
+
+        # log
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoaded $( $campHistory.count ) $( $responseTypeName )" >> $logfile
 
         switch ( $responseTypeName ) {
         
@@ -263,9 +276,15 @@ if ( !(Test-Path -Path $exportFolder) ) {
 # Archive all files in that folder first
 $reponseFiles = Get-ChildItem -Path "$( $exportFolder )" -File
 if ( $reponseFiles.Count -gt 0 ) {
+
     $exportTimestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
+
+    # log
+    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tThere are already $( $reponseFiles.Count ) files in response folder. Archiving them into $( $exportTimestamp )" >> $logfile
+
     New-Item -Path "$( $exportFolder )\$( $exportTimestamp )" -ItemType "Directory"
     $reponseFiles | Move-Item -Destination "$( $exportFolder )\$( $exportTimestamp )"
+
 }
 
 
@@ -273,7 +292,14 @@ if ( $reponseFiles.Count -gt 0 ) {
 # EXPORT DATA
 #-----------------------------------------------
 
+# log
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tExporting response data now" >> $logfile
+
+
 $opens | Export-Csv -Path "$( $exportFolder )\opens.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 $clicks | Export-Csv -Path "$( $exportFolder )\clicks.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 $sents | Export-Csv -Path "$( $exportFolder )\sents.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+
+# log
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tResponse data exported. Done!" >> $logfile
 
