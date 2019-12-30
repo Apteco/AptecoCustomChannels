@@ -13,23 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
-
-#-----------------------------------------------
-# INPUT PARAMETERS, IF DEBUG IS TRUE
-#-----------------------------------------------
-<#
-if ( $debug ) {
-    $params = [hashtable]@{
-        scriptPath= "C:\FastStats\scripts\flexmail"
-        MessageName= "1631416 | Testmail_2"
-        abc= "def"
-        ListName= "252060"
-        Password= "def"
-        Username= "abc" 
-    }
-}
-#>
+$debug = $false
 
 
 ################################################
@@ -81,6 +65,7 @@ if ( $settings.changeTLS ) {
 }
 
 $logfile = $settings.logfile
+$exportFolder = $settings.responseSettings.responseFolder
 
 
 ################################################
@@ -100,9 +85,10 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-<#
+
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`RESPONSE DOWNLOAD" >> $logfile
+<#
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 $params.Keys | ForEach {
     $param = $_
@@ -174,23 +160,26 @@ $clicksResponseTypes = [PSCustomObject]@{
 }
 
 $responseTypes = [HashTable]@{
-    sents=$sentsResponseTypes
-    opens=$opensResponseTypes
-    clicks=$clicksResponseTypes
+    "sents"=$sentsResponseTypes
+    "opens"=$opensResponseTypes
+    "clicks"=$clicksResponseTypes
 }
 
 #-----------------------------------------------
 # GET CAMPAIGN HISTORY
 #-----------------------------------------------
 
+# ask for campaigns to download
 if ( $debug ) {
     $campaigns = Invoke-Flexmail -method "GetCampaigns"
     $campaignArray = $campaigns | Out-GridView -PassThru # example id is: 7275152   
     $campaignArray = $campaignArray.campaignId
+
+    # use the default settings
 } else {
-    $campaignsList = @("7275152")
-    $campaignArray = $campaigns | Out-GridView -PassThru # example id is: 7275152    
+    $campaignArray = $settings.responseSettings.campaignsToDownload  
 }
+
 
 #-----------------------------------------------
 # LOAD RESPONSE DATA
@@ -198,16 +187,17 @@ if ( $debug ) {
 
 
 $responseTypes.Keys | ForEach {
-    
 
     $responseTypeName = $_
     $responseTypeValue = $responseTypes[$responseTypeName]
 
     $campaignArray | ForEach {
+        
+        $campaign = $_
 
         $historyParams = @{
             "campaignId"=@{
-                "value"=$campaign.campaignId
+                "value"=$campaign
                 "type"="int"
              }
              "campaignHistoryOptionsType"=@{value=$responseTypeValue;type="campaignHistoryOptionsType"}
@@ -251,13 +241,29 @@ $responseTypes.Keys | ForEach {
     }
 }
 
+#-----------------------------------------------
+# CHECK EXPORT FOLDER
+#-----------------------------------------------
+
+if ( !(Test-Path -Path $exportFolder) ) {
+    New-Item -Path $exportFolder -ItemType "Directory"
+}
+#Set-Location -Path $exportFolder
+
+# Archive all files in that folder first
+$reponseFiles = Get-ChildItem -Path "$( $exportFolder )" -File
+if ( $reponseFiles.Count -gt 0 ) {
+    $exportTimestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
+    New-Item -Path "$( $exportFolder )\$( $exportTimestamp )" -ItemType "Directory"
+    $reponseFiles | Move-Item -Destination "$( $exportFolder )\$( $exportTimestamp )"
+}
+
 
 #-----------------------------------------------
 # EXPORT DATA
 #-----------------------------------------------
 
-
-$opens | Export-Csv -Path ".\opens.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
-$clicks | Export-Csv -Path ".\clicks.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
-$sents | Export-Csv -Path ".\sents.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+$opens | Export-Csv -Path "$( $exportFolder )\opens.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+$clicks | Export-Csv -Path "$( $exportFolder )\clicks.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+$sents | Export-Csv -Path "$( $exportFolder )\sents.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 
