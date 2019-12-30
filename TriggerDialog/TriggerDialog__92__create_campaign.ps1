@@ -108,7 +108,9 @@ $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-Sec
 
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
-$createCampaignUri = "$( $settings.base )/triggerdialog/campaign/createCampaign?jwt=$( $jwt )"
+$resource = "campaign"
+$service = "createCampaign"
+$createCampaignUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
 $contentType = "application/xml" # text/xml, application/xml, application/json
 
 $createCampaignRequest = @{
