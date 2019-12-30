@@ -231,7 +231,7 @@ $responseTypes.Keys | ForEach {
         switch ( $responseTypeName ) {
         
             "clicks" {
-                $clicks += $campHistory | select @{name="campaignId";expression={ $campaign.campaignId }},
+                $clicks += $campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="linkKey";expression={ $_.link.Key.InnerText }},
@@ -242,7 +242,7 @@ $responseTypes.Keys | ForEach {
 
             "opens" {
                 
-                $opens += $campHistory | select @{name="campaignId";expression={ $campaign.campaignId }},
+                $opens += $campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="flexmailId";expression={ $_.emailAddressType.flexmailId.InnerText }},
@@ -252,7 +252,7 @@ $responseTypes.Keys | ForEach {
 
             "sents" {
                 
-                $sents += $campHistory | select @{name="campaignId";expression={ $campaign.campaignId }},
+                $sents += $campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="flexmailId";expression={ $_.emailAddressType.flexmailId.InnerText }},
