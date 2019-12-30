@@ -289,7 +289,7 @@ if ( $reponseFiles.Count -gt 0 ) {
 
 
 #-----------------------------------------------
-# EXPORT DATA
+# EXPORT RESPONSE DATA
 #-----------------------------------------------
 
 # log
@@ -302,6 +302,53 @@ $sents | Export-Csv -Path "$( $exportFolder )\sents.csv" -Encoding UTF8 -Delimit
 
 # log
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tResponse data exported. Done!" >> $logfile
+
+
+#-----------------------------------------------
+# DOWNLOAD UNSUBSCRIBES, BOUNCES, BLACKLISTED
+#-----------------------------------------------
+# hints: https://flexmail.be/nl/api/manual/service/16-getemailaddresses
+<#
+$recipientListID = $settings.masterListId
+
+# TODO [ ] Implement and test this response download scenario
+
+# TODO [ ] put this into settings
+$stateTypes = [array]@("unsubscribed", "bounced-out", "blacklisted") # unsubscribed, bounced-out, blacklisted, awaiting-opt-in-confirmation
+
+$stateTypes | ForEach {
+    
+    $state = $_
+
+    # TODO [ ] Implement paging
+    $i = 1
+    Do {
+
+        $page = @{
+            "items"=$settings.rowsPerUpload
+            "page"=$i
+        }
+
+        $emailsParams = @{
+            "mailingListIds"=[array]@($recipientListID)  #$mailingList.mailingListId
+            "limit"=@{value=$page;type="Pagination"}
+            "states"=[array]@($state) 
+        }
+
+        $emails = Invoke-Flexmail -method "GetEmailAddresses" -param $emailsParams
+
+        $i += 1
+
+    } While ( $emails.Count -eq $page.items )
+
+}
+#>
+
+#-----------------------------------------------
+# EXPORT LIST DATA
+#-----------------------------------------------
+
+# TODO [ ] Implement export of states
 
 #-----------------------------------------------
 # PUT RESPONSE IN DATABASE
