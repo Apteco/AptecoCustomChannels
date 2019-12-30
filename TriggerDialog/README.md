@@ -36,6 +36,8 @@
 * Execute the file `TriggerDialog__91__create_auth_url_to_login.ps1` to get automatically logged into TriggerDialog and to see if the login with a jwt token is working
 ![TriggerDialog_UI](https://user-images.githubusercontent.com/14135678/71591590-d7f20180-2b24-11ea-9a14-a6010a3ec26e.gif)
 * Create the first campaign via `TriggerDialog__92__create_campaign.ps1`, have a look at it in the browser, put your creative content in there and then you are able to use and automate this campaign via Apteco PeopleStage. 
+![screenshot](https://user-images.githubusercontent.com/14135678/71591964-3f5c8100-2b26-11ea-9fa2-263b7ed00974.png)
+
 
 # Exceptions
 
