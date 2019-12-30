@@ -283,6 +283,6 @@ Function Invoke-Flexmail {
         }
         # return the results
         return $items
-
+    }
 
 }
