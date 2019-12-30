@@ -303,3 +303,8 @@ $sents | Export-Csv -Path "$( $exportFolder )\sents.csv" -Encoding UTF8 -Delimit
 # log
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tResponse data exported. Done!" >> $logfile
 
+#-----------------------------------------------
+# PUT RESPONSE IN DATABASE
+#-----------------------------------------------
+
+# TODO [ ] Trigger FERGE to deduplicate and load response into the database
