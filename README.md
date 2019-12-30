@@ -11,6 +11,7 @@ To start with your very own first custom channel to use in Apteco PeopleStage, y
 Legend:
 * The icons mean if functionalities are Available/Implemented
 * :heavy_check_mark: = "done"
+* :o: = "partially implemented"
 * :x: = "not implemented"
 * :question: = "not checked yet"
 
@@ -18,7 +19,7 @@ Legend:
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
-Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast|[Flexmail Integration Guideline](Flexmail)
+Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Flexmail Integration Guideline](Flexmail)
 Mailingwork|Standard|REST
 Mailingwork|Campaign|REST
 CleverReach||REST
