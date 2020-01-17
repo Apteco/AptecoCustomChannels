@@ -68,7 +68,7 @@ $basicAuth = New-Object Management.Automation.PSCredential ($settings.login.user
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach-Object {
     . $_.FullName
 }
 
@@ -115,7 +115,7 @@ $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-Sec
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 $resource = "campaign"
-$service = "createCampaign"
+#$service = "createCampaign"
 $createCampaignUri = "$( $settings.base )/triggerdialog/$( $resource )/" #$( $service )" #?jwt=$( $jwt )"
 $contentType = "application/xml" # text/xml, application/xml, application/json
 
