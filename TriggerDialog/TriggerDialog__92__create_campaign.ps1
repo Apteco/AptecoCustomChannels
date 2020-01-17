@@ -57,6 +57,11 @@ $namespaces = [hashtable]@{
         "ns2"="urn:pep-dpdhl-com:triggerdialog/campaign/v_10"
 }
 
+# CREATE BASIC AUTH
+$secpass = ConvertTo-SecureString (Get-SecureToPlaintext -String $settings.login.password) -AsPlainText -Force
+$basicAuth = New-Object Management.Automation.PSCredential ($settings.login.user, $secpass)
+
+
 ################################################
 #
 # FUNCTIONS AND ASSEMBLIES
@@ -87,6 +92,7 @@ Add-Type -AssemblyName System.Security
 #
 ################################################
 
+<#
 #-----------------------------------------------
 # CREATE PAYLOAD
 #-----------------------------------------------
@@ -100,7 +106,7 @@ $payload.exp = ( (Get-Unixtime) + 3600 )
 #-----------------------------------------------
 
 $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
-
+#>
 
 #-----------------------------------------------
 # PREPARE THE CAMPAIGN CREATION
@@ -110,12 +116,12 @@ $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 $resource = "campaign"
 $service = "createCampaign"
-$createCampaignUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+$createCampaignUri = "$( $settings.base )/triggerdialog/$( $resource )/" #$( $service )" #?jwt=$( $jwt )"
 $contentType = "application/xml" # text/xml, application/xml, application/json
 
 $createCampaignRequest = @{
     #"masApiVersion" = "1.0.0" # not mandatory
-    "masId" = $settings.defaultPayload.masId # long
+    "masID" = $settings.defaultPayload.masId # long
     "masCampaignID" = "$( $timestamp )" # string 60
     "masClientID" = $settings.defaultPayload.masClientId # string 60
     "campaignData" = @{
@@ -124,10 +130,10 @@ $createCampaignRequest = @{
         #"endDate" = "2019-01-01" # not mandatory
     }
     
-    #"variable" = @{
-    #    "name" = ""
-    #    "type" = "" # boolean, float, integer, string, date, set, image, zip, countryCode, imageurl
-    #}
+    "variable" = @{
+        "name" = "plz"
+        "type" = "zip" # boolean, float, integer, string, date, set, image, zip, countryCode, imageurl
+    }
     
     "printNode" = @{
         "printNodeID" = "abc" # string 32
@@ -142,4 +148,4 @@ $createCampaignBody = Out-HashTableToXml -InputObject $createCampaignRequest -Ro
 # CREATE THE CAMPAIGN
 #-----------------------------------------------
 
-$newCampaign = Invoke-RestMethod -Method Put -Uri $createCampaignUri -ContentType $contentType -Body $createCampaignBody -Verbose
+$newCampaign = Invoke-RestMethod -Method Put -Uri $createCampaignUri -ContentType $contentType -Body $createCampaignBody -Credential $basicAuth -Verbose
