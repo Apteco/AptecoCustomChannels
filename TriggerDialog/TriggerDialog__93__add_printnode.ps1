@@ -68,7 +68,7 @@ $basicAuth = New-Object Management.Automation.PSCredential ($settings.login.user
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach-Object {
     . $_.FullName
 }
 
