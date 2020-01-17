@@ -58,7 +58,7 @@ $logfile = $settings.logfile
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach-Object {
     . $_.FullName
 }
 
