@@ -102,6 +102,10 @@ $namespaces = [hashtable]@{
     "ns2"="urn:pep-dpdhl-com:triggerdialog/campaign/v_10"
 }
 
+# CREATE BASIC AUTH
+$basicAuth = New-Object Management.Automation.PSCredential ($settings.login.user, (Get-SecureToPlaintext -String $settings.login.password))
+
+
 ################################################
 #
 # FUNCTIONS
@@ -161,6 +165,7 @@ Set-Location -Path $uploadsSubfolder
 
 # TODO [ ] if needed, create a updateCampaignVariableRequest to add new variables
 
+<#
 # CREATE PAYLOAD
 $payload = $settings.defaultPayload.PsObject.Copy()
 $payload.iat = Get-Unixtime
@@ -168,11 +173,12 @@ $payload.exp = ( (Get-Unixtime) + 3600 )
 
 # CREATE JWT 
 $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
+#>
 
 # PREPARE THE VARIABLES CREATION
 $resource = "campaign/variable"
 $service = "updateCampaignVariable"
-$updateVariablesUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+$updateVariablesUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )"
 $contentType = "application/xml" # text/xml, application/xml, application/json
 
 # CREATE REQUEST
@@ -203,7 +209,7 @@ $updateVariablesRequest = @{
 $updateVariablesBody = Out-HashTableToXml -InputObject $updateVariablesRequest -Root "ns2:updateCampaignVariableRequest" -namespaces $namespaces -Path ".\last_request.xml"
 
 # UPDATE VARIABLES
-$newVariables = Invoke-RestMethod -Method Post -Uri $updateVariablesUri -ContentType $contentType -Body $updateVariablesBody -Verbose
+$newVariables = Invoke-RestMethod -Method Post -Uri $updateVariablesUri -ContentType $contentType -Body $updateVariablesBody -Credential $basicAuth -Verbose
 
 
 #-----------------------------------------------
@@ -240,7 +246,7 @@ $partFiles | ForEach {
     $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
 
     # TODO [ ] Possible to load in batches?
-
+<#
     # CREATE PAYLOAD
     $payload = $settings.defaultPayload.PsObject.Copy()
     $payload.iat = Get-Unixtime
@@ -248,7 +254,7 @@ $partFiles | ForEach {
 
     # CREATE JWT 
     $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
-
+#>
     # PREPARE THE VARIABLES CREATION
     $resource = "campaign/campaignTrigger"
     $service = "createCampaignTrigger"
@@ -285,7 +291,7 @@ $partFiles | ForEach {
     $createCampaignTrigger = Out-HashTableToXml -InputObject $createCampaignTriggerRequest -Root "ns2:createCampaignTriggerRequest" -namespaces $namespaces -Path ".\last_request.xml"
 
     # UPDATE VARIABLES
-    $newTrigger = Invoke-RestMethod -Method Post -Uri $createTriggerUri -ContentType $contentType -Body $createCampaignTrigger -Verbose
+    $newTrigger = Invoke-RestMethod -Method Post -Uri $createTriggerUri -ContentType $contentType -Body $createCampaignTrigger -Credential $basicAuth -Verbose
 
 
     # TODO [ ] implement the TriggerDialog Campaign Trigger method and check the response data

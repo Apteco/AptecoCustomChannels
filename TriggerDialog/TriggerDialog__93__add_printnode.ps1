@@ -57,6 +57,11 @@ $namespaces = [hashtable]@{
         "ns2"="urn:pep-dpdhl-com:triggerdialog/campaign/v_10"
 }
 
+# CREATE BASIC AUTH
+$secpass = ConvertTo-SecureString (Get-SecureToPlaintext -String $settings.login.password) -AsPlainText -Force
+$basicAuth = New-Object Management.Automation.PSCredential ($settings.login.user, $secpass)
+
+
 ################################################
 #
 # FUNCTIONS AND ASSEMBLIES
@@ -87,6 +92,7 @@ Add-Type -AssemblyName System.Security
 #
 ################################################
 
+<#
 #-----------------------------------------------
 # CREATE PAYLOAD
 #-----------------------------------------------
@@ -100,7 +106,7 @@ $payload.exp = ( (Get-Unixtime) + 3600 )
 #-----------------------------------------------
 
 $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-SecureToPlaintext -String $settings.login.secret )
-
+#>
 
 #-----------------------------------------------
 # PREPARE THE CAMPAIGN CREATION
@@ -108,12 +114,12 @@ $jwt = Create-JWT -headers $settings.headers -payload $payload -secret ( Get-Sec
 
 $resource = "campaign/printNode"
 $service = "addCampaignPrintNode"
-$addPrintNodeUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )?jwt=$( $jwt )"
+$addPrintNodeUri = "$( $settings.base )/triggerdialog/$( $resource )/$( $service )" #?jwt=$( $jwt )"
 $contentType = "application/xml" # text/xml, application/xml, application/json
 
 $createCampaignRequest = @{
     #"masApiVersion" = "1.0.0" # not mandatory
-    "masId" = $settings.defaultPayload.masId # long
+    "masID" = $settings.defaultPayload.masId # long
     "masCampaignID" = 12345 # TODO [ ] How to access existing campaigns?
     "masClientID" = $settings.defaultPayload.masClientId # string 60
     "printNode" = @{
@@ -129,4 +135,4 @@ $addPrintnodeBody = Out-HashTableToXml -InputObject $createCampaignRequest -Root
 # ADD THE PRINTNODE
 #-----------------------------------------------
 
-$newNode = Invoke-RestMethod -Method Post -Uri $addPrintNodeUri -ContentType $contentType -Body $addPrintnodeBody -Verbose
+$newNode = Invoke-RestMethod -Method Post -Uri $addPrintNodeUri -ContentType $contentType -Body $addPrintnodeBody -Credential $basicAuth -Verbose
