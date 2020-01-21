@@ -20,10 +20,12 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\episervercampaign"
-	    abc= "def"
-	    Username= "abc"
+        scriptPath = "C:\FastStats\scripts\episerver\smart campaigns"
+        MessageName = "275324762694 / Test: Smart Campaign Mailing"
+        abc = "def"
+        ListName = "275324762694 / Test: Smart Campaign Mailing"
+        Password = "def"
+        Username = "abc"
     }
 }
 
@@ -38,6 +40,8 @@ if ( $debug ) {
 
 https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
 WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
+
+TODO [ ] implement more logging
 
 #>
 
@@ -84,12 +88,8 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
-# TODO [ ] change campaign type
-
 # more settings
 $logfile = $settings.logfile
-#$guid = ([guid]::NewGuid()).Guid
-$campaignType = $settings.campaignType
 
 
 ################################################
@@ -102,14 +102,16 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
 }
 
+
 ################################################
 #
 # LOG INPUT PARAMETERS
 #
 ################################################
 
+
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGETMAILINGS" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 $params.Keys | ForEach {
     $param = $_
@@ -123,79 +125,38 @@ $params.Keys | ForEach {
 #
 ################################################
 
-
 #-----------------------------------------------
-# GET CURRENT SESSION OR CREATE A NEW ONE
-#-----------------------------------------------
-
-Get-EpiSession
-
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS
+# TRIGGER WAVE
 #-----------------------------------------------
 
-switch ( $campaignType ) {
+# Schedule the mailing
+Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
 
-    "classic" {
-
-        $campaigns = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("regular", "NEW") -useSessionId $true
-        
-    }
-
-    # smart campaigns are the default value
-    default {
-
-        # get all mailings in smart campaigns
-        $mailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("campaign", "ACTIVATION_REQUIRED") -useSessionId $true
-
-        # get all compound elements for the mailings => campaign
-        $campaigns = @()
-        $mailings | Select -Unique | ForEach {
-            $mailingId = $_
-            $campaigns += Invoke-Epi -webservice "SplitMailing" -method "getSplitMasterId" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true   
-        }
-        
-    }
-
-}
-
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
-#-----------------------------------------------
-
-$campaignDetails = @()
-$campaigns | Select -Unique | ForEach {
-
-    $campaignId = $_
-
-    # create new object
-    $campaign = New-Object PSCustomObject
-    $campaign | Add-Member -MemberType NoteProperty -Name "ID" -Value $campaignId
-
-    # ask for name
-    $campaignName = Invoke-Epi -webservice "Mailing" -method "getName" -param @(@{value=$campaignId;datatype="long"}) -useSessionId $true
-    $campaign | Add-Member -MemberType NoteProperty -Name "Name" -Value $campaignName
-
-    $campaignDetails += $campaign
-
-}
-
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
-#-----------------------------------------------
-
-$messages = $campaignDetails | Select @{name="id";expression={ $_.ID }}, @{name="name";expression={ "$( $_.ID )$( $settings.nameConcatChar )$( $_.Name )" }}
+# Wait for the import to be completed
+Do {
+    Start-Sleep -Seconds $settings.waitSecondsForMailingCreation
+    $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+} until ( $mailingId-ne 0 )
 
 
 ################################################
 #
-# RETURN
+# RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
 
-# real messages
-return $messages
+# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is fixed
+$recipients = 1
+
+# put in the source id as the listname
+$transactionId = $mailingId
+
+# return object
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+}
+
+# return the results
+$return
 
