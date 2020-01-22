@@ -55,8 +55,8 @@ sqlite||
 
 ## Requirements
 
-* An Apteco server with an FastStats Service
-* Make sure PS Version 5.1 is installed at Minimum
+* An Apteco server with a FastStats Service and 2019-Q3 release or newer. There were some improvements in the 2019-Q4 release.
+* Make sure PS Version 5.1 is installed at Minimum (PowerShell Core >=6 is not tested yet)
   * You can see it in Powershell if you type in ```$PSVersionTable```
   * If PSVersion < 5.1, then install this one: https://www.microsoft.com/en-us/download/details.aspx?id=54616
   * And restart the machine
