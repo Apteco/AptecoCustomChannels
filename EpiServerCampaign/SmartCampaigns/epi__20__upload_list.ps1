@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -109,9 +109,6 @@ $uploadsFolder = $settings.uploadsFolder
 # FUNCTIONS & ASSEMBLIES
 #
 ################################################
-
-# Add assemblies
-#Add-Type -AssemblyName System.Data #, System.Text.Encoding
 
 Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
@@ -224,15 +221,11 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach {
     Invoke-Epi -webservice "ClosedLoop" -method "importRecipients" -param $paramsEpi -useSessionId $true
 
 } 
-<#
+
+# Schedule the mailing
+# TODO [ ] remove this after the test with release 2019-Q4
 Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
 
-# TODO [ ] put this in the broadcast script where the mailing id should be tracked
-Do {
-    Start-Sleep -Seconds $settings.waitSecondsForMailingCreation
-    $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
-} until ( $mailingId-ne 0 )
- #>
 
 ################################################
 #
@@ -250,6 +243,7 @@ $transactionId = $waveId
 $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "CustomProvider"=$settings.providername
 }
 
 # return the results
