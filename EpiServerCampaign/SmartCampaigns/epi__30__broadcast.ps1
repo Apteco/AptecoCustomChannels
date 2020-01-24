@@ -130,13 +130,33 @@ $params.Keys | ForEach {
 #-----------------------------------------------
 
 # Schedule the mailing
-Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+# TODO [ ] use this after tests with 2019-Q4
+# Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
 
 # Wait for the import to be completed
-Do {
-    Start-Sleep -Seconds $settings.waitSecondsForMailingCreation
-    $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
-} until ( $mailingId-ne 0 )
+if ( $settings.syncType -eq "sync" ) {
+
+    # TODO [ ] also implement $settings.broadcast.maxSecondsForMailingToFinish for this loop
+    Do {
+        Start-Sleep -Seconds $settings.broadcast.waitSecondsForMailingCreation
+        $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+    } until ( $mailingId-ne 0 )
+    
+    # Load successful receivers
+    $sentRecipientCount = Invoke-Epi -webservice "Mailing" -method "getSentRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+
+    # return values
+    $recipients = $sentRecipientCount
+    $transactionId = $mailingId
+
+} else {
+
+    # using async process and set this to null firsthand
+    $transactionId = 0
+    $recipients = 0
+
+}
+
 
 
 ################################################
@@ -145,16 +165,11 @@ Do {
 #
 ################################################
 
-# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is fixed
-$recipients = 1
-
-# put in the source id as the listname
-$transactionId = $mailingId
-
 # return object
 $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "CustomProvider"=$settings.providername
 }
 
 # return the results
