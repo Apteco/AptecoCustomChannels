@@ -199,7 +199,9 @@ if ( $debug ) {
 # LOAD RESPONSE DATA
 #-----------------------------------------------
 
-
+$clicks = @()
+$opens = @()
+$sents = @()
 $responseTypes.Keys | ForEach {
 
     $responseTypeName = $_
@@ -231,7 +233,8 @@ $responseTypes.Keys | ForEach {
         switch ( $responseTypeName ) {
         
             "clicks" {
-                $clicks += $campHistory | select @{name="campaignId";expression={ $campaign }},
+
+                $clicks +=  [array]$campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="linkKey";expression={ $_.link.Key.InnerText }},
@@ -242,7 +245,7 @@ $responseTypes.Keys | ForEach {
 
             "opens" {
                 
-                $opens += $campHistory | select @{name="campaignId";expression={ $campaign }},
+                $opens += [array]$campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="flexmailId";expression={ $_.emailAddressType.flexmailId.InnerText }},
@@ -252,7 +255,7 @@ $responseTypes.Keys | ForEach {
 
             "sents" {
                 
-                $sents += $campHistory | select @{name="campaignId";expression={ $campaign }},
+                $sents += [array]$campHistory | select @{name="campaignId";expression={ $campaign }},
                             @{name="actionId";expression={ $_.actionId.InnerText }},
                             @{name="timestamp";expression={ $_.timestamp.InnerText }},
                             @{name="flexmailId";expression={ $_.emailAddressType.flexmailId.InnerText }},
