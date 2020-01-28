@@ -68,21 +68,54 @@ $previewSettings = @{
 }
 
 #-----------------------------------------------
+# UPLOAD SETTINGS
+#-----------------------------------------------
+
+$uploadSettings = @{
+    "rowsPerUpload" = 800
+    "uploadsFolder" = "$( $scriptPath )\uploads\"
+    #"excludedAttributes" = @()
+}
+
+#-----------------------------------------------
+# BROADCAST SETTINGS
+#-----------------------------------------------
+
+$broadcastSettings = @{
+    "defaultContentType" = "html/text" # html|text|html/text
+    "defaultEditor" = "wizard" # wizard|freeform|advanced|plaintext
+    "defaultOpenTracking" = $true # $true|$false
+    "defaultClickTracking" = $true # $true|$false
+}
+
+
+#-----------------------------------------------
 # ALL SETTINGS
 #-----------------------------------------------
 
 # TODO [ ] use url from PeopleStage Channel Editor Settings instead?
 
 $settings = @{
+    
+    # general
     "base" = "https://rest.cleverreach.com/v3/"
-    "login" = $login
-    "rowsPerUpload" = 800
-    "changeTLS" = $true
     "nameConcatChar" = " / "
     "logfile" = "$( $scriptPath )\cr.log"
-    #"excludedAttributes" = @()
-    "previewSettings" = $previewSettings
-    "uploadsFolder" = "$( $scriptPath )\uploads\"
+    "delimiter" = "`t" # "`t"|","|";" usw.
+    "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
+    "contentType" = "application/json; charset=utf-8"
+
+    # authentication
+    "login" = $login
+    
+    # network
+    "changeTLS" = $true
+    
+    # sub settings categories
+    "preview" = $previewSettings
+    "upload" = $uploadSettings
+    "broadcast" = $broadcastSettings
+
 }
 
 
@@ -100,6 +133,8 @@ $json
 
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+
 
 
 

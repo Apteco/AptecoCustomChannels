@@ -83,10 +83,9 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
-# TODO [ ] change campaign type
-
 # more settings
 $logfile = $settings.logfile
+$contentType = $settings.contentType
 
 
 ################################################
@@ -137,7 +136,7 @@ $apiRoot = $settings.base
 
 $object = "mailings"
 $endpoint = "$( $apiRoot )$( $object ).json"
-$res = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header
+$res = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -ContentType $contentType
 
 
 #-----------------------------------------------
