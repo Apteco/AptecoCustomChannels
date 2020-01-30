@@ -103,6 +103,11 @@ $excludedAttributes = $settings.excludedAttributes
 $maxWriteCount = 2 # TODO [ ] set this to $settings.rowsPerUpload
 $uploadsFolder = $settings.uploadsFolder
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #

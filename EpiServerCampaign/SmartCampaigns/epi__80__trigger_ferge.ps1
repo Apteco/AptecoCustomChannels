@@ -60,6 +60,11 @@ $logfile = $settings.logfile
 $selectBroadcastsSQLFile = ".\sql\epi__81__broadcasts_to_update.sql"
 $updateBroadcastsSQLFile = ".\sql\epi__82__update_broadcasts.sql"
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #
