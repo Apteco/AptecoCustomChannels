@@ -91,6 +91,11 @@ $logfile = $settings.logfile
 #$guid = ([guid]::NewGuid()).Guid
 $campaignType = $settings.campaignType
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #
