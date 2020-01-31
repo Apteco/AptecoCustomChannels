@@ -76,6 +76,7 @@ $uploadSettings = @{
     rowsPerUpload = 800 # TODO [ ] is this used?
     uploadsFolder = "$( $scriptPath )\uploads\"
     excludedAttributes = @()
+    recipientListUrnFieldname = 'ID-Feld'
 }
 
 
@@ -156,7 +157,8 @@ $masterList = $recipientLists | Out-GridView -PassThru | Select -First 1
 
 <#
 Normally some of these
-"Opt-in Source","Opt-in Date","Created","Modified","BROADMAIL_ID","WELLE_ID"
+"Opt-in Source","Opt-in Date","Created","Modified","Erstellt am","Geändert am","Opt-in-Quelle","Opt-in-Datum","BROADMAIL_ID","WELLE_ID"
+Please exclude "Urn", too as this is loaded dynamically through the channel
 #>
 
 $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$masterList.id;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
