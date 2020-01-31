@@ -86,6 +86,12 @@ if ( $settings.changeTLS ) {
 # more settings
 $logfile = $settings.logfile
 $contentType = $settings.contentType
+$customModuleName = "GETMAILINGS"
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -105,7 +111,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGETMAILINGS" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $customModuleName )" >> $logfile
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 $params.Keys | ForEach {
     $param = $_

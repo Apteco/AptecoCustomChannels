@@ -91,6 +91,11 @@ $fileEncoding = $settings.encoding
 $fileDelimiter = $settings.delimiter
 $contentType = $settings.contentType
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #
