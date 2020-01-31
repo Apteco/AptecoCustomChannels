@@ -24,7 +24,7 @@ if ( $debug ) {
 	    TransactionType= "Replace"
 	    Password= "def"
         scriptPath = "C:\FastStats\scripts\episerver\marketingautomation"
-	    MessageName= "275324762694 / Test: Smart Campaign Mailing"
+	    MessageName= "60715369129 / 53712729219 / Apteco Test Mailing / Test List"
 	    abc= "def"
 	    SmsFieldName= ""
 	    Path= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\_dev\EpiServerCampaign\SmartCampaigns\Optivo_Test Apteco_66ce38fd-191a-48b9-885f-eca1bac20803.txt"
@@ -32,7 +32,7 @@ if ( $debug ) {
 	    Username= "abc"
 	    ReplyToSMS= ""
 	    UrnFieldName= "Urn"
-	    ListName= "252060"
+	    ListName= "60715369129 / 53712729219 / Apteco Test Mailing / Test List"
 	    CommunicationKeyFieldName= "Communication Key"
     }
 }
@@ -289,7 +289,7 @@ $importResults | Export-Csv -Path "$( $uploadsFolder )\$( $exportId )\importresu
 $recipients = $importResults | where { $_.Result -ne 0} | Select Urn
 
 # There is no id reference for the upload in Epi
-$transactionId = "0"
+$transactionId = $recipientListID
 
 # return object
 [Hashtable]$return = @{

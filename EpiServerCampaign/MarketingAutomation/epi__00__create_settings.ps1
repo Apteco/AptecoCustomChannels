@@ -64,6 +64,7 @@ $loginSettings = @{
 
 $mailingsSettings = @{
     recipientListFile = "$( $scriptPath )\recipientlists.json"
+    status = "NEW" # NEW|SENDING|DONE|CANCELED -> default should be "SENDING" for productive use, for testing purposes and fill the lists without an email send, use "NEW"
 }
 
 
@@ -154,13 +155,11 @@ $masterList = $recipientLists | Out-GridView -PassThru | Select -First 1
 #-----------------------------------------------
 
 <#
-
 Normally some of these
 "Opt-in Source","Opt-in Date","Created","Modified","BROADMAIL_ID","WELLE_ID"
-
 #>
 
-$listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$masterList;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
+$listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$masterList.id;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
 $listAttributes = $listAttributesRaw | Out-GridView -PassThru
 $settings.upload.excludedAttributes = $listAttributes
 
