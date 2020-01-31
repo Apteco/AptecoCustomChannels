@@ -1,11 +1,4 @@
-﻿<#
-
-https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
-WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
-
-#>
-
-################################################
+﻿################################################
 #
 # INPUT
 #
@@ -42,6 +35,12 @@ if ( $debug ) {
 #
 ################################################
 
+<#
+
+https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
+WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
+
+#>
 
 
 ################################################
