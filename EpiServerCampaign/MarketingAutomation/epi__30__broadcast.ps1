@@ -23,9 +23,9 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
         scriptPath = "C:\FastStats\scripts\episerver\marketingautomation"
-        MessageName = "275324762694 / Test: Smart Marketing Automation"
+        MessageName = "53712729219  60715369129 / 53712729219 / Apteco Test Mailing / Test List"
         abc = "def"
-        ListName = "275324762694 / Test: Smart Marketing Automation"
+        ListName = "60715369129 / 53712729219 / Apteco Test Mailing / Test List"
         Password = "def"
         Username = "abc"
     }
@@ -139,13 +139,28 @@ if ( $paramsExisting ) {
 
 ################################################
 #
+# PROGRAM
+#
+################################################
+
+#-----------------------------------------------
+# RECIPIENT LIST ID
+#-----------------------------------------------
+
+$transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar )[1]
+
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
+
+
+################################################
+#
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
 
 # fill return variables
-$transactionId = 0
-$recipients = 0
+$transactionId = $transactionalMailingID
+$recipients = 0 # TODO [ ] Fill this from the previous upload script
 
 # return object
 $return = [Hashtable]@{

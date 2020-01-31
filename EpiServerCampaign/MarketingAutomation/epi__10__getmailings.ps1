@@ -149,7 +149,7 @@ if ( $paramsExisting ) {
 
 Get-EpiSession
 
-
+<#
 #-----------------------------------------------
 # RECIPIENT LISTS
 #-----------------------------------------------
@@ -177,12 +177,70 @@ $recipientListIDs | Select-Object -Unique | ForEach-Object {
 
 }
 
+
+
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS DETAILS
 #-----------------------------------------------
 
 $messages = $recipientLists | Select-Object @{name="id";expression={ $_.ID }},
                                             @{name="name";expression={ "$( $_.ID )$( $settings.nameConcatChar )$( $_.Name )$( if ($_.Description -ne '') { $settings.nameConcatChar } )$( $_.Description )" }}
+
+#>
+
+#-----------------------------------------------
+# RECIPIENT LISTS
+#-----------------------------------------------
+
+$statusToFilter = $settings.mailings.status
+
+# Get all transactional mailings
+$transactionalMailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("event", $statusToFilter) -useSessionId $true
+
+# Create all combinations of transactional mailings and the connected recipient lists
+$transactionalCombinations = [array]@()
+$transactionalMailings | ForEach-Object {
+    
+    $mailingId = $_
+
+    # Get name for the mailing
+    $mailingName = Invoke-Epi -webservice "Mailing" -method "getName" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+
+    # Get 1..n recipient lists per transactional mailing
+    $mailingRecipientLists = Invoke-Epi -webservice "Mailing" -method "getRecipientListIds" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+
+    # Load recipient lists metadata
+    $mailingRecipientLists | ForEach-Object {
+        
+        $recipientListId = $_
+
+        # ask for name
+        $recipientListName = Invoke-Epi -webservice "RecipientList" -method "getName" -param @(@{value=$recipientListID;datatype="long"}) -useSessionId $true
+
+        # ask for description
+        $recipientListDescription = Invoke-Epi -webservice "RecipientList" -method "getDescription" -param @(@{value=$recipientListID;datatype="long"}) -useSessionId $true
+
+        # Bring everything together
+        $transactionalCombinations += [PSCustomObject]@{
+            Id = $mailingId
+            Name = $mailingName
+            ListId = $recipientListId
+            ListName = $recipientListName
+            ListDescription = $recipientListDescription
+        }
+
+    }
+
+}
+
+
+#-----------------------------------------------
+# GET MAILINGS DETAILS
+#-----------------------------------------------
+
+$messages = $transactionalCombinations | Select-Object @{name="id";expression={ $_.ListId }},
+                                            @{name="name";expression={ "$( $_.Id )$( $settings.nameConcatChar )$( $_.ListId )$( $settings.nameConcatChar )$( $_.Name )$( $settings.nameConcatChar )$( $_.ListName )" }}
+
 
 
 ################################################
