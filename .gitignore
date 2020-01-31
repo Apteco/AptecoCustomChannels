@@ -17,3 +17,5 @@ last_request.xml
 # archive folders
 _archive
 _dev
+EpiServerCampaign/MarketingAutomation/recipientlists.json
+EpiServerCampaign/MarketingAutomation/epi_ma.log.debug

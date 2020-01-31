@@ -1,11 +1,4 @@
-﻿<#
-
-https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
-WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
-
-#>
-
-################################################
+﻿################################################
 #
 # INPUT
 #
@@ -14,6 +7,7 @@ WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
 Param(
     [hashtable] $params
 )
+
 
 #-----------------------------------------------
 # DEBUG SWITCH
@@ -28,10 +22,12 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
         scriptPath = "C:\FastStats\scripts\episerver\marketingautomation"
-	    abc= "def"
-	    Username= "abc"
+        MessageName = "275324762694 / Test: Smart Marketing Automation"
+        abc = "def"
+        ListName = "275324762694 / Test: Smart Marketing Automation"
+        Password = "def"
+        Username = "abc"
     }
 }
 
@@ -42,7 +38,12 @@ if ( $debug ) {
 #
 ################################################
 
+<#
 
+https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
+WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
+
+#>
 
 ################################################
 #
@@ -72,7 +73,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
+$moduleName = "BROADCAST"
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -90,7 +91,7 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$guid = ([guid]::NewGuid()).Guid # TODO [ ] use this guid for a specific identifier of this job in the logfiles
+
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -138,60 +139,20 @@ if ( $paramsExisting ) {
 
 ################################################
 #
-# PROGRAM
+# RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
 
+# fill return variables
+$transactionId = 0
+$recipients = 0
 
-#-----------------------------------------------
-# GET CURRENT SESSION OR CREATE A NEW ONE
-#-----------------------------------------------
-
-Get-EpiSession
-
-
-#-----------------------------------------------
-# RECIPIENT LISTS
-#-----------------------------------------------
-
-$recipientListIDs = ( Get-Content -Path "$( $settings.mailings.recipientListFile )" -Encoding UTF8 -Raw | ConvertFrom-Json ).id
-
-$recipientLists = @()
-$recipientListIDs | Select-Object -Unique | ForEach-Object {
-
-    $recipientListID = $_
-
-    # create new object
-    $recipientList = New-Object PSCustomObject
-    $recipientList | Add-Member -MemberType NoteProperty -Name "ID" -Value $recipientListID
-
-    # ask for name
-    $recipientListName = Invoke-Epi -webservice "RecipientList" -method "getName" -param @(@{value=$recipientListID;datatype="long"}) -useSessionId $true
-    $recipientList | Add-Member -MemberType NoteProperty -Name "Name" -Value $recipientListName
-
-    # ask for description
-    $recipientListDescription = Invoke-Epi -webservice "RecipientList" -method "getDescription" -param @(@{value=$recipientListID;datatype="long"}) -useSessionId $true
-    $recipientList | Add-Member -MemberType NoteProperty -Name "Description" -Value $recipientListDescription
-
-    $recipientLists += $recipientList
-
+# return object
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+    "CustomProvider"=$settings.providername
 }
 
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
-#-----------------------------------------------
-
-$messages = $recipientLists | Select-Object @{name="id";expression={ $_.ID }},
-                                            @{name="name";expression={ "$( $_.ID )$( $settings.nameConcatChar )$( $_.Name )$( if ($_.Description -ne '') { $settings.nameConcatChar } )$( $_.Description )" }}
-
-
-################################################
-#
-# RETURN
-#
-################################################
-
-# real messages
-return $messages
-
-
+# return the results
+$return
