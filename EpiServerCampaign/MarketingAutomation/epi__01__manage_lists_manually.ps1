@@ -131,11 +131,11 @@ If ( Test-Path -Path $recipientListFile ) {
 # operations
 $operations = @{
     "copy"="copy/duplicate an existing recipient list in episerver"
-    "add"="add a list to be used in PeopleStage"
+    #"add"="add a list to be used in PeopleStage"
     "rename"="change the name of an existing list"
     "addDescription"="adds a description to the list name"
     "show"="just show all lists"
-    "remove"="remove a recipient list from the list"
+    #"remove"="remove a recipient list from the list"
     "nothing"="nothing"
 }
 

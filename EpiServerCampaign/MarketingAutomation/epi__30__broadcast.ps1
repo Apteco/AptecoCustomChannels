@@ -22,12 +22,21 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        scriptPath = "C:\FastStats\scripts\episerver\marketingautomation"
-        MessageName = "53712729219  60715369129 / 53712729219 / Apteco Test Mailing / Test List"
-        abc = "def"
-        ListName = "60715369129 / 53712729219 / Apteco Test Mailing / Test List"
+        scriptPath = "C:\FastStats\scripts\episerver\MarketingAutomation"
+        TransactionId = "293461305923"
+        CustomProvider = "epima"
+        MessageName = "285860339465 / 293461305923 / Message 1 / Test List v2 Copy of Florian"
+        ListName = "285860339465 / 293461305923 / Message 1 / Test List v2 Copy of Florian"
         Password = "def"
         Username = "abc"
+        RecipientsSuccessful = 4
+        RecipientsValidationFailed = 0
+        RecipientsUnsubscribed = 0
+        RecipientsBlacklisted = 0
+        RecipientsBouncedOverflow = 0
+        RecipientsAlreadyInList = 0
+        RecipientsFiltered = 0
+        RecipientsGeneralError = 0
     }
 }
 
@@ -147,9 +156,9 @@ if ( $paramsExisting ) {
 # RECIPIENT LIST ID
 #-----------------------------------------------
 
-$transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar )[1]
+$transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar )[0]
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the transactional mailing id $( $transactionalMailingID )" >> $logfile
 
 
 ################################################
@@ -160,13 +169,18 @@ $transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar 
 
 # fill return variables
 $transactionId = $transactionalMailingID
-$recipients = 0 # TODO [ ] Fill this from the previous upload script
+$recipients = If ( $null -eq $params.RecipientsSuccessful ) { 0 } else { $params.RecipientsSuccessful } # the feature of the parameters delivered by the upload is only supported from 2019-Q4 upwards
 
 # return object
 $return = [Hashtable]@{
+
+    # Mandatory return values
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+
+    # General return value to identify this custom channel in the broadcasts detail tables
     "CustomProvider"=$settings.providername
+    
 }
 
 # return the results
