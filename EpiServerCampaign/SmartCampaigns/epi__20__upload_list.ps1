@@ -187,6 +187,7 @@ $listAttributes = $listAttributesRaw | where { $_ -notin $excludedAttributes }
 #"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
 $fileItem = Get-Item -Path $params.Path
 
+# TODO [ ] put in the measure command from the marketing automation module
 $exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $listAttributes -writeCount $maxWriteCount -outputDoubleQuotes $false -outputPath $uploadsFolder
 
 #"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId )!" >> $logfile
