@@ -10,6 +10,10 @@
 * Popup to exclude fiels with recommendations like "Urn"
 * To manage recipient lists in EpiServer (which is not able through the online UI), execute "epi__01__manage_lists_manually.ps1" where you can copy lists and much more
 
+# PeopleStage
+![grafik](https://user-images.githubusercontent.com/14135678/73559886-d9795700-444d-11ea-8b42-2f2d26a09799.png)
+
+
 # Hints
 
 * Transactional Mailing are always single mailings consisting of a recipient list and a mailing
