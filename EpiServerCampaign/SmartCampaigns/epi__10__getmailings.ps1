@@ -139,7 +139,7 @@ Get-EpiSession
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS
 #-----------------------------------------------
-
+<#
 switch ( $campaignType ) {
 
     "classic" {
@@ -164,6 +164,9 @@ switch ( $campaignType ) {
     }
 
 }
+#>
+
+$campaigns = Get-EpiCampaigns -campaignType $campaignType
 
 
 #-----------------------------------------------
