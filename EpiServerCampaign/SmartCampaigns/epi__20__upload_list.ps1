@@ -181,6 +181,7 @@ Get-EpiSession
 $campaigns = Get-EpiCampaigns -campaignType $campaignType
 
 if ($campaigns -notcontains $smartCampaignID) {
+    Write-Log -message "No valid campaign/mailing ID"  
     throw [System.IO.InvalidDataException] "No valid campaign/mailing ID"  
 } 
 
