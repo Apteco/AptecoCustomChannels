@@ -103,6 +103,7 @@ $excludedAttributes = $settings.excludedAttributes
 $maxWriteCount = $settings.rowsPerUpload
 $uploadsFolder = $settings.uploadsFolder
 $urnFieldName = $settings.urnFieldName
+$campaignType = $settings.campaignType
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -171,6 +172,17 @@ $smartCampaignID = $messageName -split $settings.nameConcatChar | select -First 
 #-----------------------------------------------
 
 Get-EpiSession
+
+
+#-----------------------------------------------
+# GET MAILINGS / CAMPAIGNS
+#-----------------------------------------------
+
+$campaigns = Get-EpiCampaigns -campaignType $campaignType
+
+if ($campaigns -notcontains $smartCampaignID) {
+    throw [System.IO.InvalidDataException] "No valid campaign/mailing ID"  
+} 
 
 
 #-----------------------------------------------

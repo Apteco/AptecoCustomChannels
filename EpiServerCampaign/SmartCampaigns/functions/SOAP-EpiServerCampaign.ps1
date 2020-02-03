@@ -348,3 +348,41 @@ Function Get-EpiSession {
     
 }
 
+
+
+
+
+Function Get-EpiCampaigns {
+
+    param(
+        [Parameter(Mandatory=$true)][String]$campaignType
+    )
+
+    switch ( $campaignType ) {
+
+        "classic" {
+
+            $campaigns = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("regular", "NEW") -useSessionId $true
+        
+        }
+
+        # smart campaigns are the default value
+        default {
+
+            # get all mailings in smart campaigns
+            $mailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("campaign", "ACTIVATION_REQUIRED") -useSessionId $true
+
+            # get all compound elements for the mailings => campaign
+            $campaigns = @()
+            $mailings | Select -Unique | ForEach {
+                $mailingId = $_
+                $campaigns += Invoke-Epi -webservice "SplitMailing" -method "getSplitMasterId" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true   
+            }
+        
+        }
+
+    }
+
+    return $campaigns
+
+}
