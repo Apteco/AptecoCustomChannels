@@ -157,11 +157,12 @@ $settings = @{
     # Upload
     # TODO [ ] put these settings into the separate upload object
     masterListId = 0                                    # the master list id for ClosedLoop upload
-    rowsPerUpload = 2                                   # no of rows to upload in a batch
+    rowsPerUpload = 500                                 # no of rows to upload in a batch
     excludedAttributes = @()                            # attributes to exclude for upload -> you make the choice later in the code
     uploadsFolder = "$( $scriptPath )\uploads\"         # folder for the upload conversion
-    syncType = $syncType                                # choice if the process should be synchronised or async
-    
+    syncType = $syncType.Name                           # choice if the process should be synchronised or async
+    urnFieldName = ""                                   # Urn field name
+
     # Detail settings
     login = $loginSettings                              # login object from code above
     upload = $uploadSettings                            # 
@@ -219,14 +220,21 @@ $settings.masterListId = $masterList.id
 
 
 #-----------------------------------------------
+# Choose URN field from recipients list automatically
+#-----------------------------------------------
+
+# Get Urn field of this list
+$settings.urnFieldName = ( $recipientLists | where { $_.id -eq $masterList.id } ).$recipientListUrnFieldname
+
+
+#-----------------------------------------------
 # ATTRIBUTES TO EXCLUDE
 #-----------------------------------------------
 
 <#
-
 Normally some of these
-"Opt-in Source","Opt-in Date","Created","Modified","BROADMAIL_ID","WELLE_ID"
-
+"Opt-in Source","Opt-in Date","Created","Modified","Erstellt am","Geändert am","Opt-in-Quelle","Opt-in-Datum","BROADMAIL_ID","WELLE_ID"
+Please exclude "Urn", too as this is loaded dynamically through the channel
 #>
 
 $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$settings.masterListId;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
