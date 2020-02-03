@@ -100,8 +100,9 @@ if ( $settings.changeTLS ) {
 # more settings
 $logfile = $settings.logfile
 $excludedAttributes = $settings.excludedAttributes
-$maxWriteCount = 2 # TODO [ ] set this to $settings.rowsPerUpload
+$maxWriteCount = $settings.rowsPerUpload
 $uploadsFolder = $settings.uploadsFolder
+$urnFieldName = $settings.urnFieldName
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -126,12 +127,12 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUPLOAD" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "UPLOAD"
+Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 $params.Keys | ForEach {
     $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    Write-Log -message " $( $param ): $( $params[$param] )"
 }
 
 
@@ -177,20 +178,21 @@ Get-EpiSession
 #-----------------------------------------------
 
 $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$settings.masterListId;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
-$listAttributes = $listAttributesRaw | where { $_ -notin $excludedAttributes }
+#$listAttributes = $listAttributesRaw | where { $_ -notin $excludedAttributes }
+$listAttributes = [array]$params.UrnFieldName + [array]( $listAttributesRaw | where  { $_ -notin $excludedAttributes } )
 
 
 #-----------------------------------------------
 # DATA MAPPING
 #-----------------------------------------------
 
-#"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
+#"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tStart to create a new file"
 $fileItem = Get-Item -Path $params.Path
 
 # TODO [ ] put in the measure command from the marketing automation module
 $exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $listAttributes -writeCount $maxWriteCount -outputDoubleQuotes $false -outputPath $uploadsFolder
 
-#"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId )!" >> $logfile
+#"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId )!"
 
 
 #-----------------------------------------------
@@ -218,12 +220,17 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach {
         $importResults += 1
     }
 
+    # Change the urn field name for the upload list
+    $listAttributes = $listAttributes -replace $params.UrnFieldName, $urnFieldName
+
+    # Bring all parameter together for the upload
     $paramsEpi = @(
          @{value=$waveId;datatype="long"}
         ,$listAttributes
         ,$valArr
     )
 
+    # Upload data
     Invoke-Epi -webservice "ClosedLoop" -method "importRecipients" -param $paramsEpi -useSessionId $true
 
 } 
@@ -238,6 +245,8 @@ Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
+
+# TODO [ ] Implement Write-Host for messages in the system health monitor and in the deliveryjobsummary table in the ws-database 
 
 # count the number of successful upload rows
 $recipients = $importResults

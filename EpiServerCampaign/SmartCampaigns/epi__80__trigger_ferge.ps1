@@ -59,11 +59,17 @@ $logfile = $settings.logfile
 # queries
 $selectBroadcastsSQLFile = ".\sql\epi__81__broadcasts_to_update.sql"
 $updateBroadcastsSQLFile = ".\sql\epi__82__update_broadcasts.sql"
+$updateBroadcasts2SQLFile = ".\sql\epi__83__update_broadcasts_part2.sql"
 
 # append a suffix, if in debug mode
 if ( $debug ) {
     $logfile = "$( $logfile ).debug"
 }
+
+# custom settings
+# TODO [ ] find another way for this connection string
+$mssqlConnectionString = "<rsdbconnectionstring>"
+
 
 
 ################################################
@@ -114,7 +120,7 @@ Function Query-SQLServer {
 
         $errText = $_.Exception
         $errText | Write-Output
-        #"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tError: $( $errText )" >> $logfile
+        #Write-Log -message "Error: $( $errText )"
 
     } finally {
         
@@ -151,7 +157,7 @@ Function NonQuery-SQLServer {
 
         $errText = $_.Exception
         $errText | Write-Output
-        #"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tError: $( $errText )" >> $logfile
+        #Write-Log -message "Error: $( $errText )"
 
     } finally {
         
@@ -168,8 +174,8 @@ Function NonQuery-SQLServer {
 #
 ################################################
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tFERGE" >> $logfile
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "FERGE"
 
 
 ################################################
@@ -192,8 +198,8 @@ if ( $settings.syncType -eq "async" ) {
     #----------------------------------------------- 
 
     # load connection string
-    $configXml = [xml] (Get-Content $settings.response.responseConfig -Encoding UTF8)
-    $mssqlConnectionString = $configXml.configuration.appSettings.add.Where({ $_.key -eq "db_connection_digitalresponse" }).value
+    #$configXml = [xml] (Get-Content $settings.response.responseConfig -Encoding UTF8)
+    #$mssqlConnectionString = $configXml.configuration.appSettings.add.Where({ $_.key -eq "db_connection_digitalresponse" }).value
 
     # TODO [ ] implement the rest to load the data first from sqlserver and put into a datatable
     # TODO [ ] implement decryption of connection string, if needed
@@ -204,7 +210,7 @@ if ( $settings.syncType -eq "async" ) {
     #----------------------------------------------- 
 
     # prepare query
-    $selectBroadcastsSQL = Get-Content -Path "$( $selectBroadcastsSQLFile ) -Encoding UTF8
+    $selectBroadcastsSQL = Get-Content -Path "$( $selectBroadcastsSQLFile )" -Encoding UTF8
     $selectBroadcastsSQL = $selectBroadcastsSQL -replace "#PROVIDER#", $settings.providername
 
     # load data
@@ -223,10 +229,10 @@ if ( $settings.syncType -eq "async" ) {
 
     # loop over result from previous query with column BroadcasterTransactionId
     $result = 0
-    $broadcastsDetailDataTable.Rows | ForEach {
+    $broadcastsDetailDataTable | ForEach {
         
-        $waveId = $broadcastsToUpdate.BroadcasterTransactionId
-        $broadcastId = $broadcastsToUpdate.BroadcastId
+        $waveId = $_.BroadcasterTransactionId
+        $broadcastId = $_.BroadcastId
 
         #-----------------------------------------------
         # LOAD MAILING ID FROM EPI
@@ -240,42 +246,56 @@ if ( $settings.syncType -eq "async" ) {
         # LOAD STATUS AND AMOUNT OF RECEIVERS
         #----------------------------------------------- 
 
-        $mailingStatus = Invoke-Epi -webservice "Mailing" -method "getStatus" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+        if ( $mailingId -ne 0 ) {
+            $mailingStatus = Invoke-Epi -webservice "Mailing" -method "getStatus" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
 
-        # TODO [ ] do something with the status CANCELLED?
+            # TODO [ ] do something with the status CANCELLED?
 
-        if ( $mailingStatus -eq 'DONE' ) {
+            if ( $mailingStatus -eq 'DONE' ) {
 
-            # Load more metadata about mailing
-            $overallRecipientCount = Invoke-Epi -webservice "Mailing" -method "getOverallRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
-            $failedRecipientCount = Invoke-Epi -webservice "Mailing" -method "getFailedRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
-            $sentRecipientCount = Invoke-Epi -webservice "Mailing" -method "getSentRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
-            $mailingStartedDate = Invoke-Epi -webservice "Mailing" -method "getSendingStartedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
-            $mailingFinishedDate = Invoke-Epi -webservice "Mailing" -method "getSendingFinishedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+                # Load more metadata about mailing
+                $overallRecipientCount = Invoke-Epi -webservice "Mailing" -method "getOverallRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+                $failedRecipientCount = Invoke-Epi -webservice "Mailing" -method "getFailedRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+                $sentRecipientCount = Invoke-Epi -webservice "Mailing" -method "getSentRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+                $mailingStartedDate = Invoke-Epi -webservice "Mailing" -method "getSendingStartedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+                $mailingFinishedDate = Invoke-Epi -webservice "Mailing" -method "getSendingFinishedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
 
-            # TODO [ ] put this information into a separate object and export it as a file
+                # TODO [ ] put this information into a separate object and export it as a file
 
-            #-----------------------------------------------
-            # UPDATE BROADCAST DETAILS
-            #----------------------------------------------- 
+                #-----------------------------------------------
+                # UPDATE BROADCAST DETAILS
+                #----------------------------------------------- 
 
-            # prepare query
-            $updateBroadcastsSQL = Get-Content -Path "$( $updateBroadcastsSQLFile ) -Encoding UTF8
-            $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#MAILINGID#", $mailingId
-            $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCASTID#", $broadcastId
-            $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#UPLOADED#", $overallRecipientCount
-            $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#REJECTED#", $failedRecipientCount
-            $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCAST#", $sentRecipientCount
+                # prepare query
+                $updateBroadcastsSQL = Get-Content -Path "$( $updateBroadcastsSQLFile )" -Encoding UTF8
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#MAILINGID#", $mailingId
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCASTID#", $broadcastId
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#UPLOADED#", $overallRecipientCount
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#REJECTED#", $failedRecipientCount
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCAST#", $sentRecipientCount
 
-            # execute query
-            $result += NonQuery-SQLServer -connectionString $mssqlConnectionString -command $updateBroadcastsSQL
+                # execute query
+                $result += NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcastsSQL )"
+
+                #-----------------------------------------------
+                # UPDATE BROADCAST - this allows FERGE to load the response data automatically
+                #----------------------------------------------- 
+
+                # prepare query
+                $updateBroadcasts2SQL = Get-Content -Path "$( $updateBroadcasts2SQLFile )" -Encoding UTF8
+                $updateBroadcasts2SQL = $updateBroadcasts2SQL -replace "#BROADCASTID#", $broadcastId
+
+                # execute query
+                NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcasts2SQL )"
+
+            }
 
         }
 
     }   
 
     # log after loop
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tUpdatet $( $result ) rows in Broadcasts for Mailings $( $mailingsToTransform -join ',' )" >> $logfile
+    Write-Log -message "Updatet $( $result ) rows in Broadcasts for Mailings $( $mailingsToTransform -join ',' )"
 
 
 }
@@ -290,13 +310,13 @@ if ( $settings.syncType -eq "async" ) {
 if ( $settings.response.triggerFerge ) {
 
     # TODO [ ] check this part
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tTrigger FERGE" >> $logfile
+    Write-Log -message "Trigger FERGE"
     $timeForDownload = Measure-Command {
         "Return Responses"
         [datetime]::Now.ToString("yyyyMMdd HHmmss") #>> $logfile
-        EmailResponseGatherer64 "$( $settings.response.responseConfig )" # >> $logfile
+        EmailResponseGatherer64 "$( $settings.response.responseConfig )" #
     }
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tFERGE done in $( $timeForDownload.Seconds ) seconds" >> $logfile
+    Write-Log -message "FERGE done in $( $timeForDownload.Seconds ) seconds"
 
 }
 

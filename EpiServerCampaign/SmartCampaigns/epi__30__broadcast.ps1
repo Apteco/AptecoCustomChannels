@@ -115,12 +115,12 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "BROADCAST"
+Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 $params.Keys | ForEach {
     $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    Write-Log -message " $( $param ): $( $params[$param] )"
 }
 
 
