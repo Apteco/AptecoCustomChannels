@@ -214,7 +214,7 @@ Function Invoke-Epi {
         ,[Parameter(Mandatory=$false)]$param = @()
         ,[Parameter(Mandatory=$false)][Boolean]$useSessionId = $false
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
-        
+        ,[Parameter(Mandatory=$false)][String]$writeCallToFile = ""
     )
 
     $tries = 0
@@ -259,9 +259,13 @@ Function Invoke-Epi {
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>
 "@
-            #if ( $verboseCall ) {
+            <#
+            if ( $verboseCall ) {
                 Write-Host $soapEnvelopeXml
-            #}
+            }
+            #>
+
+            if ( $writeCallToFile -ne "" ) { $soapEnvelopeXml | Out-File -FilePath "$( $writeCallToFile ).request" -NoClobber -Encoding utf8 }
 
             $header = @{
                 "SOAPACTION" = $method
@@ -280,9 +284,13 @@ Function Invoke-Epi {
         }
     } until ($tries++ -eq 1 -or $response) # this gives us one retry
 
-    #if ( $verboseCall ) {
+    <#
+    if ( $verboseCall ) {
         write-host $response.OuterXml
-    #}
+    }
+    #>
+    if ( $writeCallToFile -ne "" ) { $response.OuterXml| Out-File -FilePath "$( $writeCallToFile ).response" -NoClobber -Encoding utf8 }
+
     
     $return = $response.Envelope.Body."$( $method )Response"."$( $method )Return"
 
