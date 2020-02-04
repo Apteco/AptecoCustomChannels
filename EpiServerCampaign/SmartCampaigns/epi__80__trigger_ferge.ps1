@@ -141,9 +141,12 @@ if ( $settings.syncType -eq "async" ) {
     # load data
     $broadcastsDetailDataTable = Query-SQLServer -connectionString "$( $mssqlConnectionString )" -query "$( $selectBroadcastsSQL )"
 
+    
     #-----------------------------------------------
     # GET CURRENT SESSION OR CREATE A NEW ONE
     #-----------------------------------------------
+
+    Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
 
     Get-EpiSession
 
@@ -184,6 +187,14 @@ if ( $settings.syncType -eq "async" ) {
                 $sentRecipientCount = Invoke-Epi -webservice "Mailing" -method "getSentRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
                 $mailingStartedDate = Invoke-Epi -webservice "Mailing" -method "getSendingStartedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
                 $mailingFinishedDate = Invoke-Epi -webservice "Mailing" -method "getSendingFinishedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+
+                # Log
+                Write-Log -message "Overall recipients: $( $overallRecipientCount )"
+                Write-Log -message "Failed: $( $failedRecipientCount )"
+                Write-Log -message "Sent: $( $sentRecipientCount )"
+                Write-Log -message "Started: $( $mailingStartedDate )"
+                Write-Log -message "Finished: $( $mailingFinishedDate )"
+
 
                 # TODO [ ] put this information into a separate object and export it as a file
 

@@ -134,6 +134,8 @@ $params.Keys | ForEach {
 # GET CURRENT SESSION OR CREATE A NEW ONE
 #-----------------------------------------------
 
+Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
+
 Get-EpiSession
 
 
@@ -168,6 +170,8 @@ switch ( $campaignType ) {
 #>
 
 $campaigns = Get-EpiCampaigns -campaignType $campaignType
+
+Write-Log -message "Got back $( $campaigns.count ) campaigns/mailings"
 
 
 #-----------------------------------------------
