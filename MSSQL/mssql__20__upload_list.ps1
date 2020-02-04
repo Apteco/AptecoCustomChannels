@@ -177,6 +177,7 @@ try {
     # execute command
     $campaignMssqlCommand = $mssqlConnection.CreateCommand()
     $campaignMssqlCommand.CommandText = $campaignSql
+    $mssqlCommand.CommandTimeout = $settings.commandTimeout # TODO [ ] check this parameter exists
     $campaignMssqlResult = $campaignMssqlCommand.ExecuteReader()
     
     # load data
