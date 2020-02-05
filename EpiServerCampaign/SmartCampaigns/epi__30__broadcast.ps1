@@ -73,6 +73,8 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
+$moduleName = "BROADCAST"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -90,6 +92,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -109,14 +116,26 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-
+# Start the log
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
 }
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    $params.Keys | ForEach-Object {
+        $param = $_
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    }
+}
+
 
 
 ################################################
@@ -130,13 +149,63 @@ $params.Keys | ForEach {
 #-----------------------------------------------
 
 # Schedule the mailing
-Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+# TODO [ ] use this after tests with 2019-Q4
+# Invoke-Epi -webservice "ClosedLoop" -method "importFinishedAndScheduleMailing" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+
+# TODO [ ] is this defined correct?
+$waveId = $params.TransactionId
+Write-Log -message "Loading the wave id $( $waveId ) from the previous upload process"
+
+
 
 # Wait for the import to be completed
-Do {
-    Start-Sleep -Seconds $settings.waitSecondsForMailingCreation
-    $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
-} until ( $mailingId-ne 0 )
+if ( $settings.syncType -eq "sync" ) {
+
+    # Log
+    Write-Log -message "Using sync process and will ask for a mailing id "
+    Write-Log -message "Waiting for $( $settings.broadcast.waitSecondsForMailingCreation ) between loops"
+
+    # Creating a new session
+    Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
+    Get-EpiSession
+
+    # Looping until mailing id created
+    Do {
+        Start-Sleep -Seconds $settings.broadcast.waitSecondsForMailingCreation
+        $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
+    } until ( $mailingId-ne 0 ) # TODO [ ] implement the timer -or $seconds -gt $settings.broadcast.maxSecondsForMailingToFinish)
+    
+    # Results
+    Write-Log -message "Got back mailing id $( $mailingId )"
+
+    # Load stats
+    $overallRecipientCount = Invoke-Epi -webservice "Mailing" -method "getOverallRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+    $failedRecipientCount = Invoke-Epi -webservice "Mailing" -method "getFailedRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+    $sentRecipientCount = Invoke-Epi -webservice "Mailing" -method "getSentRecipientCount" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+    $mailingStartedDate = Invoke-Epi -webservice "Mailing" -method "getSendingStartedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+    $mailingFinishedDate = Invoke-Epi -webservice "Mailing" -method "getSendingFinishedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
+
+    # Log
+    Write-Log -message "Overall recipients: $( $overallRecipientCount )"
+    Write-Log -message "Failed: $( $failedRecipientCount )"
+    Write-Log -message "Sent: $( $sentRecipientCount )"
+    Write-Log -message "Started: $( $mailingStartedDate )"
+    Write-Log -message "Finished: $( $mailingFinishedDate )"
+
+    # return values
+    $recipients = $sentRecipientCount
+    $transactionId = $mailingId
+
+} else {
+
+    Write-Log -message "Using async process and will ask for a mailing id and stats later"
+
+    # using async process and set this to null firsthand
+    $transactionId = 0
+    $recipients = 0
+
+}
+
 
 
 ################################################
@@ -145,16 +214,13 @@ Do {
 #
 ################################################
 
-# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is fixed
-$recipients = 1
-
-# put in the source id as the listname
-$transactionId = $mailingId
+Write-Host "Broadcast for $( $recipients ) records with mailing id $( $transactionId )"
 
 # return object
 $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "CustomProvider"=$settings.providername
 }
 
 # return the results

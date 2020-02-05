@@ -87,9 +87,9 @@
             #$intLineReadCounter
             $batchCount += 1
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tbatchcount $( $batchCount )" >> $logfile
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`trecordCount $( $recordCount )" >> $logfile
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tintLineReadCounter $( $intLineReadCounter )" >> $logfile
+            Write-Log -message "batchcount $( $batchCount )"
+            Write-Log -message "recordCount $( $recordCount )"
+            Write-Log -message "intLineReadCounter $( $intLineReadCounter )"
 
             #--------------------------------------------------------------
             # parse lines sequentially
@@ -112,7 +112,7 @@
             $maxChunks = [Math]::Ceiling($intLineReadCounter/$chunkSize)            
             $end = 0
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tmaxChunks $( $maxChunks )" >> $logfile
+            Write-Log -message "maxChunks $( $maxChunks )"
 
             for($i = 0; $i -lt $maxChunks ; $i++) {
                 $start = $i * $chunkSize 
@@ -130,9 +130,9 @@
             }
 
             # log
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tchunks $( $chunks.Count )" >> $logfile
+            Write-Log -message "chunks $( $chunks.Count )"
             for($i = 0; $i -lt $chunks.Count ; $i++) {
-                "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tchunk $( $i ) size: $( $chunks[$i].Count - [int]$header )" >> $logfile # subtract one line if a header is included
+                Write-Log -message "chunk $( $i ) size: $( $chunks[$i].Count - [int]$header )" # subtract one line if a header is included
             }
             #$chunks[0] | Out-File -FilePath "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") ).csv" -Encoding utf8 # write out some chunks to check
 
@@ -184,7 +184,7 @@
             # create and execute runspaces to parse in parallel
             #--------------------------------------------------------------
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tPrepare runspace pool with throttle of $( $throttleLimit ) threads in parallel" >> $logfile
+            Write-Log -message "Prepare runspace pool with throttle of $( $throttleLimit ) threads in parallel"
 
             $RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, $throttleLimit)
             $RunspacePool.Open()
@@ -198,7 +198,7 @@
                 
             }             
             
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tStarting runspace pool" >> $logfile
+            Write-Log -message "Starting runspace pool"
 
             $jobCount = 0
             $chunks | ForEach {
@@ -232,7 +232,7 @@
 
             }
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tChecking for results of $( $jobcount ) jobs" >> $logfile
+            Write-Log -message "Checking for results of $( $jobcount ) jobs"
 
             # check for results
             Write-Host "Waiting.." -NoNewline
@@ -257,7 +257,7 @@
                               
             }
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tGot results back from $( $jobCount )" >> $logfile
+            Write-Log -message "Got results back from $( $jobCount )"
 
 
             #--------------------------------------------------------------
@@ -267,15 +267,15 @@
             
             # open file if it should written in once
             if ( $writeCount -eq -1 ) {
-                "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tOpen file to write: $( $exportFilePrefix )" >> $logfile
+                Write-Log -message "Open file to write: $( $exportFilePrefix )"
                 $writer = New-Object System.IO.StreamWriter($exportFilePrefix, $append, [System.Text.Encoding]::GetEncoding($outputEncoding))
                 if ($writeHeader) {
-                    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tWriting header" >> $logfile
+                    Write-Log -message "Writing header"
                     $writer.WriteLine($headerRowParsed)
                 }
             }
 
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tWriting $( $rows.count ) lines" >> $logfile
+            Write-Log -message "Writing $( $rows.count ) lines"
 
             # loop for writing lines
             $exportCount = 0          
@@ -284,15 +284,15 @@
                 # close/open streams to write
                 if ( ( $exportCount % $writeCount ) -eq 0 -and $writeCount -gt 0 ) {
                     if ( $null -ne $writer.BaseStream  ) {
-                        "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tClosing file $( $fileCounter ) after exported $( $exportCount )" >> $logfile
+                        Write-Log -message "Closing file $( $fileCounter ) after exported $( $exportCount )"
                         $writer.Close() # close file if stream is open
                         $fileCounter += 1
                     }
                     $f = "$( $exportFilePrefix )$( $fileCounter )"
-                    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tOpen file to write: $( $f )" >> $logfile
+                    Write-Log -message "Open file to write: $( $f )"
                     $writer = New-Object System.IO.StreamWriter($f, $append, [System.Text.Encoding]::GetEncoding($outputEncoding))
                     if ($writeHeader) {
-                        "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tWriting header" >> $logfile
+                        Write-Log -message "Writing header"
                         $writer.WriteLine($headerRowParsed)
                     }
                 }
@@ -306,7 +306,7 @@
             }
 
             # close last file
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tClosing file $( $fileCounter ) after exported $( $exportCount )" >> $logfile
+            Write-Log -message "Closing file $( $fileCounter ) after exported $( $exportCount )"
             $writer.Close()
             $fileCounter += 1
 
