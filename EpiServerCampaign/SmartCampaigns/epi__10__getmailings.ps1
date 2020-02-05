@@ -69,6 +69,8 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
+$moduleName = "GETMAILINGS"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -91,6 +93,11 @@ $logfile = $settings.logfile
 #$guid = ([guid]::NewGuid()).Guid
 $campaignType = $settings.campaignType
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #
@@ -108,13 +115,26 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
+# Start the log
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGETMAILINGS" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
 }
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    $params.Keys | ForEach-Object {
+        $param = $_
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    }
+}
+
 
 
 ################################################
@@ -128,13 +148,15 @@ $params.Keys | ForEach {
 # GET CURRENT SESSION OR CREATE A NEW ONE
 #-----------------------------------------------
 
+Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
+
 Get-EpiSession
 
 
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS
 #-----------------------------------------------
-
+<#
 switch ( $campaignType ) {
 
     "classic" {
@@ -159,6 +181,11 @@ switch ( $campaignType ) {
     }
 
 }
+#>
+
+$campaigns = Get-EpiCampaigns -campaignType $campaignType
+
+Write-Log -message "Got back $( $campaigns.count ) campaigns/mailings"
 
 
 #-----------------------------------------------

@@ -50,11 +50,12 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 $pass = Read-Host -AsSecureString "Please enter the password for epi"
 $passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password)
 
-$login = @{
+$loginSettings = @{
     mandant = <mandantid> 
     user = "<username>" 
     pass = $passEncrypted 
 }
+    
 
 #-----------------------------------------------
 # CAMPAIGN TYPES
@@ -71,44 +72,105 @@ $campaignTypes = @{
     "smart"="Smart Campaigns"
 }
 
-$campaignType = $campaignTypes | Out-GridView -PassThru
+$campaignType = $campaignTypes | Out-GridView -PassThru | Select -First 1
 
+
+#-----------------------------------------------
+# PROCESS SYNCHRONISATION
+#-----------------------------------------------
+
+<#
+
+campaign types, default should be the newer one:
+Smart Campaigns
+
+#>
+$syncTypes = @{
+    "sync"="PeopleStage waits for the list to be fully imported"
+    "async"="PeopleStage just uploads the data and won't wait for completion. The mailing id will be gathered when FERGE starts."
+}
+
+$syncType = $syncTypes | Out-GridView -PassThru | Select -First 1
 
 #-----------------------------------------------
 # PREVIEW SETTINGS
 #-----------------------------------------------
 
 $previewSettings = @{
-    "Type" = "Email" #Email|Sms
-    "FromAddress"="info@apteco.de"
-    "FromName"="Apteco"
-    "ReplyTo"="info@apteco.de"
-    "Subject"="Test-Subject"
+    "Type" = "Email"                # Email|Sms
+    "FromAddress"="info@apteco.de"  # 
+    "FromName"="Apteco"             # 
+    "ReplyTo"="info@apteco.de"      # 
+    "Subject"="Test-Subject"        # 
 }
+
+#-----------------------------------------------
+# UPLOAD SETTINGS
+#-----------------------------------------------
+
+$uploadSettings = @{
+    
+}
+
+
+#-----------------------------------------------
+# BROADCAST SETTINGS
+#-----------------------------------------------
+
+$broadcastSettings = @{
+    waitSecondsForMailingCreation = 20                  # number of seconds to wait for every loop part for the mailing id to be generated
+    maxSecondsForMailingToFinish = 1200                 # maximum number of seconds to wait for the mailing id to be generated 
+}
+
+#-----------------------------------------------
+# RESPONSE SETTINGS
+#-----------------------------------------------
+
+$responseSettings = @{
+    responseConfig = "$( $scriptPath )\epi__ferge.xml"  # response config file, leave it like this if ferge is not triggered from this script
+    triggerFerge = $false                               # $true|$false should ferge be triggered in the epi__80__trigger_ferge part?
+    decryptConfig = $false                               # $true|$false
+}
+
 
 #-----------------------------------------------
 # ALL SETTINGS
 #-----------------------------------------------
 
 # TODO [ ] use url from PeopleStage Channel Editor Settings instead?
+# TODO [ ] Documentation of all these parameters and the ones above
 
 $settings = @{
-    base="https://api.campaign.episerver.net/soap11/" #Rpc
-    sessionFile = "session.json"
-    ttl = 15
-    encryptToken = $true
-    login = $login
-    masterListId = 0
-    rowsPerUpload = 800
-    changeTLS = $true
-    recipientListFile = "recipientlists.json"
-    nameConcatChar = " / "
-    campaignType = $campaignType.Name
-    logfile="$( $scriptPath )\epi_sc.log"
-    waitSecondsForMailingCreation = 20
-    excludedAttributes = @()
-    previewSettings = $previewSettings
-    uploadsFolder = "$( $scriptPath )\uploads\"
+    
+    # General
+    base="https://api.campaign.episerver.net/soap11/"   # Default url
+    changeTLS = $true                                   # should tls be changed on the system?
+    nameConcatChar = " / "                              # character to concat mailing/campaign id with mailing/campaign name
+    campaignType = $campaignType.Name                   # choice of smart campaigns or classic mailings
+    logfile="$( $scriptPath )\epi_sc.log"               # path and name of log file
+    providername = "episc"                              # identifier for this custom integration, this is used for the response allocation
+    
+    # Session 
+    sessionFile = "session.json"                        # name of the session file
+    ttl = 15                                            # Time to live in minutes for the current session, normally 20 minutes for EpiServer Campaign
+    encryptToken = $true                                # $true|$false if the session token should be encrypted
+    
+    # Upload
+    # TODO [ ] put these settings into the separate upload object
+    masterListId = 0                                    # the master list id for ClosedLoop upload
+    rowsPerUpload = 500                                 # no of rows to upload in a batch
+    excludedAttributes = @()                            # attributes to exclude for upload -> you make the choice later in the code
+    uploadsFolder = "$( $scriptPath )\uploads\"         # folder for the upload conversion
+    syncType = $syncType.Name                           # choice if the process should be synchronised or async
+    urnFieldName = ""                                   # Urn field name
+
+    # Detail settings
+    login = $loginSettings                              # login object from code above
+    upload = $uploadSettings                            # 
+    broadcast = $broadcastSettings                      # settings for the broadcast
+    previewSettings = $previewSettings                  # settings for the email html preview
+    response = $responseSettings                        # settings for the response download
+
 }
 
 
@@ -159,14 +221,21 @@ $settings.masterListId = $masterList.id
 
 
 #-----------------------------------------------
+# Choose URN field from recipients list automatically
+#-----------------------------------------------
+
+# Get Urn field of this list
+$settings.urnFieldName = ( $recipientLists | where { $_.id -eq $masterList.id } ).$recipientListUrnFieldname
+
+
+#-----------------------------------------------
 # ATTRIBUTES TO EXCLUDE
 #-----------------------------------------------
 
 <#
-
 Normally some of these
-"Opt-in Source","Opt-in Date","Created","Modified","BROADMAIL_ID","WELLE_ID"
-
+"Opt-in Source","Opt-in Date","Created","Modified","Erstellt am","Geändert am","Opt-in-Quelle","Opt-in-Datum","BROADMAIL_ID","WELLE_ID"
+Please exclude "Urn", too as this is loaded dynamically through the channel
 #>
 
 $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$settings.masterListId;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true

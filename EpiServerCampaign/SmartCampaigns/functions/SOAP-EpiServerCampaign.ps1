@@ -214,7 +214,7 @@ Function Invoke-Epi {
         ,[Parameter(Mandatory=$false)]$param = @()
         ,[Parameter(Mandatory=$false)][Boolean]$useSessionId = $false
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
-        
+        ,[Parameter(Mandatory=$false)][String]$writeCallToFile = ""
     )
 
     $tries = 0
@@ -259,9 +259,13 @@ Function Invoke-Epi {
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>
 "@
-            #if ( $verboseCall ) {
+            <#
+            if ( $verboseCall ) {
                 Write-Host $soapEnvelopeXml
-            #}
+            }
+            #>
+
+            if ( $writeCallToFile -ne "" ) { $soapEnvelopeXml | Out-File -FilePath "$( $writeCallToFile ).request" -NoClobber -Encoding utf8 }
 
             $header = @{
                 "SOAPACTION" = $method
@@ -280,9 +284,13 @@ Function Invoke-Epi {
         }
     } until ($tries++ -eq 1 -or $response) # this gives us one retry
 
-    #if ( $verboseCall ) {
+    <#
+    if ( $verboseCall ) {
         write-host $response.OuterXml
-    #}
+    }
+    #>
+    if ( $writeCallToFile -ne "" ) { $response.OuterXml| Out-File -FilePath "$( $writeCallToFile ).response" -NoClobber -Encoding utf8 }
+
     
     $return = $response.Envelope.Body."$( $method )Response"."$( $method )Return"
 
@@ -340,3 +348,41 @@ Function Get-EpiSession {
     
 }
 
+
+
+
+
+Function Get-EpiCampaigns {
+
+    param(
+        [Parameter(Mandatory=$true)][String]$campaignType
+    )
+
+    switch ( $campaignType ) {
+
+        "classic" {
+
+            $campaigns = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("regular", "NEW") -useSessionId $true
+        
+        }
+
+        # smart campaigns are the default value
+        default {
+
+            # get all mailings in smart campaigns
+            $mailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("campaign", "ACTIVATION_REQUIRED") -useSessionId $true
+
+            # get all compound elements for the mailings => campaign
+            $campaigns = @()
+            $mailings | Select -Unique | ForEach {
+                $mailingId = $_
+                $campaigns += Invoke-Epi -webservice "SplitMailing" -method "getSplitMasterId" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true   
+            }
+        
+        }
+
+    }
+
+    return $campaigns
+
+}
