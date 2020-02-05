@@ -82,6 +82,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
+$moduleName = "UPLOAD"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -129,12 +130,24 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "UPLOAD"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-$params.Keys | ForEach {
-    $param = $_
-    Write-Log -message " $( $param ): $( $params[$param] )"
+# Start the log
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
+
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    $params.Keys | ForEach-Object {
+        $param = $_
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    }
 }
 
 
@@ -241,6 +254,7 @@ Write-Log -message "Creating a new wave for $( $smartCampaignID )"
 $waveId = Invoke-Epi -webservice "ClosedLoop" -method "prepareNewWave" -param @($smartCampaignID) -useSessionId $true
 
 Write-Log -message "Got back wave id $( $waveId )"
+
 
 #-----------------------------------------------
 # IMPORT RECIPIENTS

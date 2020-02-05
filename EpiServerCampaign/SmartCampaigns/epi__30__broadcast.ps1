@@ -73,6 +73,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
+$moduleName = "BROADCAST"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -115,14 +116,26 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
+# Start the log
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "BROADCAST"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-$params.Keys | ForEach {
-    $param = $_
-    Write-Log -message " $( $param ): $( $params[$param] )"
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
 }
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    $params.Keys | ForEach-Object {
+        $param = $_
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+    }
+}
+
 
 
 ################################################
