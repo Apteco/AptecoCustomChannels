@@ -18,7 +18,7 @@ function Retry-Command
     [Parameter(Mandatory=$true)][string]$command, 
     [Parameter(Mandatory=$true)][hashtable]$args, 
     [Parameter(Mandatory=$false)][int]$retries = 5, 
-    [Parameter(Mandatory=$false)][int]$secondsDelay = 2
+    [Parameter(Mandatory=$false)][int]$MillisecondsDelay = 2
     )
     
     # Setting ErrorAction to Stop is important. This ensures any errors that occur in the command are 
@@ -68,7 +68,7 @@ Function Write-Log {
     # Save the string to the logfile
     #$logstring | Out-File -FilePath $logfile -Encoding utf8 -Append -NoClobber
     #Out-File -InputObject = $logstring
-    $randomDelay = Start-Sleep -Milliseconds ( Get-Random -Maximum 3000 )
+    $randomDelay = Get-Random -Maximum 3000
     $outArgs = @{
         FilePath = $logfile
         InputObject = $logstring
@@ -76,7 +76,7 @@ Function Write-Log {
         Append = $true
         NoClobber = $true
     }
-    Retry-Command -Command 'Out-File' -Args $outArgs -Verbose -retries 10 -secondsDelay $randomDelay
+    Retry-Command -Command 'Out-File' -Args $outArgs -Verbose -retries 10 -MillisecondsDelay $randomDelay
 
 }
 
