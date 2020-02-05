@@ -55,7 +55,7 @@ $loginSettings = @{
     user = "<username>" 
     pass = $passEncrypted 
 }
-
+    
 #-----------------------------------------------
 # CAMPAIGN TYPES
 #-----------------------------------------------
