@@ -171,7 +171,7 @@ if ( $settings.syncType -eq "async" ) {
         
         # this returns us the id of the classic mailing or smart campaign
         $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
-        #$mailingId = '292100521182'
+
 
         #-----------------------------------------------
         # LOAD STATUS AND AMOUNT OF RECEIVERS
@@ -192,14 +192,17 @@ if ( $settings.syncType -eq "async" ) {
                 $mailingFinishedDate = Invoke-Epi -webservice "Mailing" -method "getSendingFinishedDate" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true
 
                 # Log
-                Write-Log -message "Overall recipients: $( $overallRecipientCount )"
-                Write-Log -message "Failed: $( $failedRecipientCount )"
-                Write-Log -message "Sent: $( $sentRecipientCount )"
-                Write-Log -message "Started: $( $mailingStartedDate )"
-                Write-Log -message "Finished: $( $mailingFinishedDate )"
+                # TODO [ ] put this information into a separate object and export it as a file?
+                Write-Log -message "Broadcast ID (Apteco): $( $broadcastId )"
+                Write-Log -message "Wave ID (Epi): $( $waveId )"
+                Write-Log -message "Mailing ID (Epi): $( $mailingId )"
+                Write-Log -message " Overall recipients: $( $overallRecipientCount )"
+                Write-Log -message " Failed: $( $failedRecipientCount )"
+                Write-Log -message " Sent: $( $sentRecipientCount )"
+                Write-Log -message " Started: $( $mailingStartedDate )"
+                Write-Log -message " Finished: $( $mailingFinishedDate )"
 
 
-                # TODO [ ] put this information into a separate object and export it as a file
 
                 #-----------------------------------------------
                 # UPDATE BROADCAST DETAILS
