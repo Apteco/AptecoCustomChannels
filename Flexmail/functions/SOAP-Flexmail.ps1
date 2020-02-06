@@ -33,7 +33,7 @@ Function Format-SoapParameter {
                 $xmlRaw += "<$( $key ) SOAP-ENC:arrayType=""xsd:$( $datatype )"" xsi:type=""$( $key )"">"
                 $value.psobject.properties.name | ForEach {        
                     $property = $_
-                    $xmlRaw += "`n        <$( $property ) xsd:type=""xsd:$( $value.$property.type )"">$( $value.$property.value )</$( $property )>"
+                    $xmlRaw += "`n        <$( $property ) xsd:type=""xsd:$( $value.$property.type )"">$( [System.Security.SecurityElement]::Escape($value.$property.value) )</$( $property )>"
                 }    
                 $xmlRaw += "</$( $key )>"
 
@@ -43,10 +43,10 @@ Function Format-SoapParameter {
             } elseif (Is-Numeric $var) {            
                 # TODO [ ] this does not work right for decimals, but they are not needed at the moment because the SOAP only uses strings and longs            
                 $datatype = "long"
-                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( $value )</$( $key )>"
+                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</$( $key )>"
             }  else {
                 $datatype = "string"
-                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( $value )</$( $key )>"
+                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</$( $key )>"
             }
             
             $xmlRaw  
@@ -98,7 +98,7 @@ Function Format-SoapParameter {
                                                 $i+=1
                                                 $xmlCustom += "<item xsi:type=""xsd:CustomFieldType"" id=""ref$( $i )"">" # TODO add number
                                                 $xmlCustom += "  <variableName xsi:type=""xsd:string"">$( $attribute )</variableName>"
-                                                $xmlCustom += "  <value xsi:type=""xsd:$( $customFields.Where({ $_.id -eq $attribute }).type )"">$( $row.$attribute )</value>"
+                                                $xmlCustom += "  <value xsi:type=""xsd:$( $customFields.Where({ $_.id -eq $attribute }).type )"">$( [System.Security.SecurityElement]::Escape( $row.$attribute ) )</value>"
                                                 $xmlCustom += "</item>"
                                                 $itemValue = $xmlCustom
                                             }
@@ -119,7 +119,7 @@ Function Format-SoapParameter {
                                   
                                 #<custom SOAP-ENC:arrayType="ns1:CustomFieldType[32]" xsi:type="ns1:customFieldTypeItems">
 
-                                $xmlRaw += "`n        <$( $property ) $( $arrayType ) $( $xsiOrXsd ):type=""xsd:$( $propertyDataType )"">$( $itemValue )</$( $property )>"
+                                $xmlRaw += "`n        <$( $property ) $( $arrayType ) $( $xsiOrXsd ):type=""xsd:$( $propertyDataType )"">$( [System.Security.SecurityElement]::Escape($itemValue) )</$( $property )>"
                             }    
                             $xmlRaw += "`n    </item>"        
                         }
@@ -136,7 +136,7 @@ Function Format-SoapParameter {
 
 @"
 <$( $key ) SOAP-ENC:arrayType="xsd:string[$( $value.Count )]" xsi:type="ArrayOf_xsd_string">$( $value | ForEach {                
-    "`n    <item xsd:type=""xsd:string"">$( $_ )</item>"                
+    "`n    <item xsd:type=""xsd:string"">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"                
 })
 </$( $key )>
 "@
