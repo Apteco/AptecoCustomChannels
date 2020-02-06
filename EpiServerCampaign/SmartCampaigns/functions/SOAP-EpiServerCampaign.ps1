@@ -146,7 +146,7 @@ Function Format-SoapParameter {
     
 @"
 <in$( $paramIndex ) SOAP-ENC:arrayType="xsd:string[$( $var.Count )]" xsi:type="ArrayOf_xsd_string">$( $var | ForEach {                
-    "`n    <item xsd:type=""xsd:string"">$( $_ )</item>"                
+    "`n    <item xsd:type=""xsd:string"">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"                
 })
 </in$( $paramIndex )>
 "@
@@ -158,7 +158,7 @@ Function Format-SoapParameter {
 @"
 <in$( $paramIndex ) SOAP-ENC:arrayType="xsd:string[][$( $var.Count )]" xsi:type="ArrayOfArrayOf_xsd_string">$($var | ForEach {
     "`n    <item SOAP-ENC:arrayType=""xsd:string[$( $_.Count )]"" xsi:type=""SOAP-ENC:Array"">$( $_ | ForEach {
-        "`n        <item xsd:type=""""xsd:string"""">$( $_ )</item>"
+        "`n        <item xsd:type=""""xsd:string"""">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"
     } )`n    </item>"
 } )
 </in$( $paramIndex )>
@@ -217,6 +217,10 @@ Function Invoke-Epi {
         ,[Parameter(Mandatory=$false)][String]$writeCallToFile = ""
     )
 
+    # local settings
+    $retriesMax = 3
+
+    # try the calls
     $tries = 0
     Do {
         try {
@@ -230,7 +234,7 @@ Function Invoke-Epi {
                     $sessionId = Get-SecureToPlaintext -String $Script:sessionId
                 }
 
-                if ($tries -eq 1) {
+                if ($tries -ge 1) {
                     Write-Host "Refreshing session"
                     # replace $sessionId
                     $param[0] = $sessionId
@@ -279,10 +283,11 @@ Function Invoke-Epi {
         } catch {
             Write-Host $_.Exception
             #If ($_.Exception.Response.StatusCode.value__ -eq "500") {
-                Get-EpiSession
+            Get-EpiSession
+            if ( $writeCallToFile -ne "" ) { $soapEnvelopeXml | Out-File -Encoding utf8 -FilePath "$( $writeCallToFile ).errored" }
             #}
         }
-    } until ($tries++ -eq 1 -or $response) # this gives us one retry
+    } until ($tries++ -eq $retriesMax -or $response) # this gives us one retry
 
     <#
     if ( $verboseCall ) {
