@@ -12,13 +12,17 @@ Current Version = 202002052330
 
 #>
 
-function Retry-Command
+
+<#
+Source: https://blogs.endjin.com/2014/07/how-to-retry-commands-in-powershell/
+#>
+Function Retry-Command
 {
     param (
-    [Parameter(Mandatory=$true)][string]$command, 
-    [Parameter(Mandatory=$true)][hashtable]$args, 
-    [Parameter(Mandatory=$false)][int]$retries = 5, 
-    [Parameter(Mandatory=$false)][int]$MillisecondsDelay = 2
+        [Parameter(Mandatory=$true)][string]$command, 
+        [Parameter(Mandatory=$true)][hashtable]$args, 
+        [Parameter(Mandatory=$false)][int]$retries = 10, 
+        [Parameter(Mandatory=$false)][int]$MillisecondsDelay = ( Get-Random -Maximum 3000 )
     )
     
     # Setting ErrorAction to Stop is important. This ensures any errors that occur in the command are 
@@ -39,16 +43,14 @@ function Retry-Command
                 throw
             } else {
                 Write-Verbose ("Command [{0}] failed. Retrying in {1} seconds." -f $command, $secondsDelay)
-                Start-Sleep $secondsDelay
+                Start-Sleep -Milliseconds $MillisecondsDelay
                 $retrycount++
             }
         }
     }
 }
 
-<#
-Source: https://blogs.endjin.com/2014/07/how-to-retry-commands-in-powershell/
-#>
+
 Function Write-Log {
 
     param(
