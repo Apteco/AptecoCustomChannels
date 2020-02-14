@@ -48,8 +48,9 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 # LOGIN DATA
 #-----------------------------------------------
 
+$keyFile = "$( $scriptPath )\aes.key"
 $pass = Read-Host -AsSecureString "Please enter the password for epi"
-$passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password)
+$passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password) -keyFile $keyFile
 
 $loginSettings = @{
     mandant = <mandantid> 
@@ -97,7 +98,8 @@ $settings = @{
     providername = "epima"                              # identifier for this custom integration, this is used for the response allocation
 
     # Session 
-    sessionFile = "session.json"                        # name of the session file
+    aesFile = $keyFile
+    sessionFile = "$( $scriptPath )\session.json"       # name of the session file
     ttl = 15                                            # Time to live in minutes for the current session, normally 20 minutes for EpiServer Campaign
     encryptToken = $true                                # $true|$false if the session token should be encrypted
     
