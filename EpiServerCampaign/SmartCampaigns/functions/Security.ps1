@@ -1,12 +1,13 @@
 ﻿Function Get-PlaintextToSecure {
 
     param(
-         [Parameter(Mandatory=$true)][String]$String
+         [Parameter(Mandatory=$true)][String]$String,
+         [Parameter(Mandatory=$false)][string]$keyFile = "$( $settings.aesFile )"
     )
     
     # generate salt
-    Create-KeyFile -keyfilename "$( $scriptPath )\aes.key" -byteLength 32
-    $salt = Get-Content -Path "$( $scriptPath )\aes.key" -Encoding UTF8
+    Create-KeyFile -keyfilename "$( $keyFile )" -byteLength 32
+    $salt = Get-Content -Path "$( $keyFile )" -Encoding UTF8
 
     # convert
     $stringSecure = ConvertTo-secureString -String $String -asplaintext -force
@@ -24,7 +25,7 @@ Function Get-SecureToPlaintext {
     )
 
     # generate salt
-    $salt = Get-Content -Path "$( $scriptPath )\aes.key" -Encoding UTF8
+    $salt = Get-Content -Path "$( $settings.aesFile )" -Encoding UTF8
 
     #convert 
     $stringSecure = ConvertTo-SecureString -String $String -Key $salt

@@ -293,7 +293,7 @@ Function Invoke-Epi {
 
 Function Get-EpiSession {
 
-    $sessionPath = "$( $scriptPath )\$( $settings.sessionFile )"
+    $sessionPath = "$( $settings.sessionFile )"
     
     # if file exists -> read it and check ttl
     $createNewSession = $true
