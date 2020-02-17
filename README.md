@@ -40,16 +40,16 @@ Optilyz|REST|REST
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
-Syniverse|SMS|REST
-Syniverse|Number Verification|REST
+Syniverse|SMS|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:question:/:x:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:question:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Syniverse SMS Integration Guideline](Syniverse/SyniverseSMS)
+Syniverse|Number Verification|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Mobile Results Download|[Syniverse Mobile Validation Integration Guideline](Syniverse/SyniverseValidation)
 Syniverse|Wallets|REST
 
 ### Database
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
-MSSQL / SQL Server||
-sqlite||
+MSSQL / SQL Server|Local<br/>Domain<br/>PrivateCloud|PowerShell/.NET|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Data Results Download|[MSSQL Integration Guideline](MSSQL)
+sqlite|Local<br/>Network<br/>In-Memory|PowerShell/.NET/sqliteCLI|
 
 
 
