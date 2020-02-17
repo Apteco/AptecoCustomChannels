@@ -488,6 +488,8 @@ Copy-Item -Path $successDecompressedFile -Destination "D:\FastStats\Publish\FUG\
 #
 ################################################
 
+# TODO [ ] check return results
+
 # count the number of successful upload rows
 $recipients = 0 # ( $importResults | where { $_.Result -eq 0 } ).count
 
