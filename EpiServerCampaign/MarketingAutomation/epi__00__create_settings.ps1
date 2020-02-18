@@ -76,8 +76,10 @@ $mailingsSettings = @{
 $uploadSettings = @{
     rowsPerUpload = 800 # TODO [ ] is this used?
     uploadsFolder = "$( $scriptPath )\uploads\"
-    excludedAttributes = @()
-    recipientListUrnFieldname = 'ID-Feld'
+    excludedAttributes = @()							# Will be defined later in the process
+    recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
+    recipientListUrnField = ""							# Will be defined later in the process
+    recipientListEmailField = "email"					# Normally no need to change
 }
 
 
@@ -152,6 +154,10 @@ ClosedLoopWebserviceTemplate: master
 
 $recipientLists = Get-EpiRecipientLists 
 $masterList = $recipientLists | Out-GridView -PassThru | Select -First 1
+$recipientListUrnFieldname = $settings.upload.recipientListUrnFieldname
+$urnFieldName = ( $recipientLists | where { $_.id -eq $masterList.id } ).$recipientListUrnFieldname
+$settings.upload.recipientListUrnField = $urnFieldName 
+
 
 #-----------------------------------------------
 # ATTRIBUTES TO EXCLUDE

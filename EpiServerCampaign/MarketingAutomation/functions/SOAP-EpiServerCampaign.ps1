@@ -146,7 +146,7 @@ Function Format-SoapParameter {
     
 @"
 <in$( $paramIndex ) SOAP-ENC:arrayType="xsd:string[$( $var.Count )]" xsi:type="ArrayOf_xsd_string">$( $var | ForEach {                
-    "`n    <item xsd:type=""xsd:string"">$( $_ )</item>"                
+    "`n    <item xsd:type=""xsd:string"">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"                
 })
 </in$( $paramIndex )>
 "@
@@ -158,7 +158,7 @@ Function Format-SoapParameter {
 @"
 <in$( $paramIndex ) SOAP-ENC:arrayType="xsd:string[][$( $var.Count )]" xsi:type="ArrayOfArrayOf_xsd_string">$($var | ForEach {
     "`n    <item SOAP-ENC:arrayType=""xsd:string[$( $_.Count )]"" xsi:type=""SOAP-ENC:Array"">$( $_ | ForEach {
-        "`n        <item xsd:type=""""xsd:string"""">$( $_ )</item>"
+        "`n        <item xsd:type=""""xsd:string"""">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"
     } )`n    </item>"
 } )
 </in$( $paramIndex )>
@@ -214,7 +214,7 @@ Function Invoke-Epi {
         ,[Parameter(Mandatory=$false)]$param = @()
         ,[Parameter(Mandatory=$false)][Boolean]$useSessionId = $false
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
-        
+        ,[Parameter(Mandatory=$false)][String]$saveCallTo = ""
     )
 
     $tries = 0
@@ -230,7 +230,7 @@ Function Invoke-Epi {
                     $sessionId = Get-SecureToPlaintext -String $Script:sessionId
                 }
 
-                if ($tries -eq 1) {
+                if ($tries -ge 1) {
                     Write-Host "Refreshing session"
                     # replace $sessionId
                     $param[0] = $sessionId
@@ -260,28 +260,33 @@ Function Invoke-Epi {
 </SOAP-ENV:Envelope>
 "@
             #if ( $verboseCall ) {
-                Write-Host $soapEnvelopeXml
+            #Write-Host $soapEnvelopeXml
+            if ( $saveCallTo -ne "" ) { $soapEnvelopeXml | Out-File -Encoding utf8 -FilePath $saveCallTo }
             #}
 
             $header = @{
                 "SOAPACTION" = $method
             }
 
-            $contentType = "text/xml;charset=""utf-8"""
+            $contentType = "text/xml; charset=""utf-8"""
             #write-host $tries
             #write-host $response
             $response = Invoke-RestMethod -Uri "$( $settings.base )$( $webservice )" -ContentType $contentType -Method Post -Verbose -Body $soapEnvelopeXml -Headers $header
-
+            
         } catch {
             Write-Host $_.Exception
             #If ($_.Exception.Response.StatusCode.value__ -eq "500") {
+            if ( $tries -eq 0 ) {
                 Get-EpiSession
+                if ( $saveCallTo -ne "" ) { $soapEnvelopeXml | Out-File -Encoding utf8 -FilePath "$( $saveCallTo ).errored" }
+            }
             #}
+            Start-Sleep -Seconds 10
         }
-    } until ($tries++ -eq 1 -or $response) # this gives us one retry
+    } until ($tries++ -eq 6 -or $response) # this gives us one retry
 
     #if ( $verboseCall ) {
-        write-host $response.OuterXml
+        #write-host $response.OuterXml
     #}
     
     $return = $response.Envelope.Body."$( $method )Response"."$( $method )Return"
@@ -340,3 +345,40 @@ Function Get-EpiSession {
     
 }
 
+
+
+
+Function Get-EpiCampaigns {
+
+    param(
+        [Parameter(Mandatory=$true)][String]$campaignType
+    )
+
+    switch ( $campaignType ) {
+
+        "classic" {
+
+            $campaigns = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("regular", "NEW") -useSessionId $true
+        
+        }
+
+        # smart campaigns are the default value
+        default {
+
+            # get all mailings in smart campaigns
+            $mailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("campaign", "ACTIVATION_REQUIRED") -useSessionId $true
+
+            # get all compound elements for the mailings => campaign
+            $campaigns = @()
+            $mailings | Select -Unique | ForEach {
+                $mailingId = $_
+                $campaigns += Invoke-Epi -webservice "SplitMailing" -method "getSplitMasterId" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true   
+            }
+        
+        }
+
+    }
+
+    return $campaigns
+
+}

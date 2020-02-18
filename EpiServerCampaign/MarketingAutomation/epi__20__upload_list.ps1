@@ -103,7 +103,7 @@ $maxWriteCount = 800
 $file = "$( $params.Path )"
 $recipientListString = "$( $params.ListName )"
 $uploadsFolder = $settings.upload.uploadsFolder
-$recipientListUrnFieldname = $settings.upload.recipientListUrnFieldname
+#$recipientListUrnFieldname = $settings.upload.recipientListUrnFieldname
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -129,9 +129,9 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 # Start the log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
@@ -144,7 +144,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+        Write-Log -message "$( $param ): $( $params[$param] )"
     }
 }
 
@@ -175,8 +175,9 @@ if ( !(Test-Path -Path $uploadsFolder) ) {
 #-----------------------------------------------
 
 $recipientListID = ( $recipientListString -split $settings.nameConcatChar )[1]
+$recipientListName = ( $recipientListString -split $settings.nameConcatChar )[3]
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
+Write-Log -message "Using the recipient list $( $recipientListID )"
 
 
 #-----------------------------------------------
@@ -190,18 +191,28 @@ Get-EpiSession
 # ATTRIBUTES
 #-----------------------------------------------
 
+# Get Urn field of this list
+$urnFieldName = $settings.upload.recipientListUrnField
+
+# Set email field
+$emailFieldName = $settings.upload.recipientListEmailField
+
+# Load attributes online
 $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$recipientListID;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
+$listAttributes = [array]( $listAttributesRaw | where  { $_ -notin $excludedAttributes } )
 
-$listAttributes = [array]$params.UrnFieldName + [array]( $listAttributesRaw | where  { $_ -notin $excludedAttributes } )
+if ( $emailFieldName -ne $urnFieldName ) {
+    $listAttributes = [array]$params.UrnFieldName + $listAttributes
+} 
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing these fields in list $( $listAttributes -join "," )" >> $logfile
+Write-Log -message "Using these fields in list $( $listAttributes -join "," )"
 
 
 #-----------------------------------------------
 # DATA MAPPING
 #-----------------------------------------------
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
+Write-Log -message "Start to create a new file"
 
 $t = Measure-Command {
     $fileItem = Get-Item -Path $file
@@ -216,7 +227,7 @@ $t = Measure-Command {
                            -outputPath $uploadsFolder
 }
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId ) in $( $t.Seconds ) seconds!" >> $logfile
+Write-Log -message "Done with export id $( $exportId ) in $( $t.Seconds ) seconds!"
 
 
 #-----------------------------------------------
@@ -231,22 +242,16 @@ $listColumns = $recipientLists | where { $_.id -eq $recipientListID }
 #$recipientLists = Get-Content -Path "$( $settings.mailings.recipientListFile )" -Encoding UTF8 -Raw | ConvertFrom-Json
 
 # Get all lists first
-$recipientLists = Get-EpiRecipientLists 
+#$recipientLists = Get-EpiRecipientLists 
 
 
 #-----------------------------------------------
 # IMPORT RECIPIENTS
 #-----------------------------------------------
 
-# Get Urn field of this list
-$urnFieldName = ( $recipientLists | where { $_.id -eq $recipientListID } ).$recipientListUrnFieldname
-
-# Set email field
-$emailFieldName = "email" #@(,"email")
-
 # Log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tURN field name ""$( $urnFieldName )""!" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tE-Mail field name ""$( $emailFieldName )""!" >> $logfile
+Write-Log -message "URN field name ""$( $urnFieldName )""!"
+Write-Log -message "E-Mail field name ""$( $emailFieldName )""!"
 
 # Go through every export file and upload in batches of 1000
 $importResults = @()
@@ -259,7 +264,7 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach-Object {
     
     # Parse the file
     $csvParsed = $csv | convertfrom-csv -Delimiter "`t"
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tReading and parsing $( $f.FullName )!" >> $logfile
+    Write-Log -message "Reading and parsing $( $f.FullName )!"
 
     # Create the array for the upload
     $valArr = @()
@@ -270,7 +275,12 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach-Object {
     #$valArr
     
     # Create the additional urn and email lists for the upload
-    [array]$urns = $csvParsed.($params.UrnFieldName) #$urnFieldName
+    if ( $emailFieldName -eq $urnFieldName ) {
+        [array]$urnContent = $csvParsed.$emailFieldName
+    } else {
+        [array]$urnContent = $csvParsed.($params.UrnFieldName) #$urnFieldName
+    }
+    [array]$urns = $urnContent
     [array]$emails = $csvParsed.$emailFieldName
 
     # Change the urn field name for the upload list
@@ -287,7 +297,7 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach-Object {
     )
 
     # Log
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUploading $( $urns.Count ) receivers" >> $logfile
+    Write-Log -message "Uploading $( $urns.Count ) receivers"
 
     # Upload data
     $importResult = Invoke-Epi -webservice "Recipient" -method "addAll3" -param $paramsEpi -useSessionId $true
@@ -305,7 +315,7 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach-Object {
 
 } 
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tCreated $( $importResults.Count ) import results" >> $logfile
+Write-Log -message "Created $( $importResults.Count ) import results"
 
 # Reference for status codes: https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/recipientwebservice/addall3/
 $importResults | Export-Csv -Path "$( $uploadsFolder )\$( $exportId )\importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
@@ -319,6 +329,7 @@ $importResults | Export-Csv -Path "$( $uploadsFolder )\$( $exportId )\importresu
 
 # count the number of successful upload rows
 $recipients = ( $importResults | where { $_.Result -eq 0 } ).count
+Write-Host "Uploaded $( $recipients ) out of $( $importResults.Count ) in the list $( $recipientListID ) - $( $recipientListName )"
 
 # There is no id reference for the upload in Epi
 $transactionId = $recipientListID

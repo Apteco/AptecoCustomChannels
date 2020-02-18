@@ -19,6 +19,7 @@
 * Transactional Mailing are always single mailings consisting of a recipient list and a mailing
 * Transactional Mailing can contain multiple recipient lists
 * A Marketing Automation Process contains 1..n transactional mailings. This process sets the trigger for new recipient entries in a specific list.
+* Be aware to fill **all** numerical values for the upload with 0, otherwise the api call will be canceled with a http500 code
 
 # How To in Epi
 
