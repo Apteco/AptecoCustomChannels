@@ -1,4 +1,4 @@
-﻿################################################
+################################################
 #
 # INPUT
 #
@@ -22,23 +22,11 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        scriptPath = "C:\FastStats\scripts\episerver\MarketingAutomation"
-        TransactionId = "293461305923"
-        CustomProvider = "epima"
-        MessageName = "285860339465 / 293461305923 / Message 1 / Test List v2 Copy of Florian"
-        ListName = "285860339465 / 293461305923 / Message 1 / Test List v2 Copy of Florian"
-        Password = "def"
-        Username = "abc"
-        RecipientsSuccessful = 4
-        RecipientsValidationFailed = 0
-        RecipientsUnsubscribed = 0
-        RecipientsBlacklisted = 0
-        RecipientsBouncedOverflow = 0
-        RecipientsAlreadyInList = 0
-        RecipientsFiltered = 0
-        RecipientsGeneralError = 0
+	   
     }
 }
+
+
 
 
 ################################################
@@ -82,7 +70,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "BROADCAST"
+$moduleName = "TESTCONNECTION"
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -100,7 +88,6 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -126,9 +113,9 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 # Start the log
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $modulename )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
 
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
@@ -141,9 +128,10 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "$( $param ): $( $params[$param] )"
+        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
     }
 }
+
 
 
 ################################################
@@ -152,36 +140,4 @@ if ( $paramsExisting ) {
 #
 ################################################
 
-#-----------------------------------------------
-# RECIPIENT LIST ID
-#-----------------------------------------------
 
-$transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar )[0]
-
-Write-Log -message "Using the transactional mailing id $( $transactionalMailingID )"
-
-
-################################################
-#
-# RETURN VALUES TO PEOPLESTAGE
-#
-################################################
-
-# fill return variables
-$transactionId = $transactionalMailingID
-$recipients = If ( $null -eq $params.RecipientsSuccessful ) { 0 } else { $params.RecipientsSuccessful } # the feature of the parameters delivered by the upload is only supported from 2019-Q4 upwards
-
-# return object
-$return = [Hashtable]@{
-
-    # Mandatory return values
-    "Recipients"=$recipients
-    "TransactionId"=$transactionId
-
-    # General return value to identify this custom channel in the broadcasts detail tables
-    "CustomProvider"=$settings.providername
-    
-}
-
-# return the results
-$return
