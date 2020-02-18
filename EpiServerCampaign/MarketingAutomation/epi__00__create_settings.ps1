@@ -48,6 +48,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 # LOGIN DATA
 #-----------------------------------------------
 
+$keyFile = "$( $scriptPath )\aes.key" #"E:\Apteco\Scripts\episerver_sc\aes.key"
 $pass = Read-Host -AsSecureString "Please enter the password for epi"
 $passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password)
 
@@ -75,8 +76,10 @@ $mailingsSettings = @{
 $uploadSettings = @{
     rowsPerUpload = 800 # TODO [ ] is this used?
     uploadsFolder = "$( $scriptPath )\uploads\"
-    excludedAttributes = @()
-    recipientListUrnFieldname = 'ID-Feld'
+    excludedAttributes = @()							# Will be defined later in the process
+    recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
+    recipientListUrnField = ""							# Will be defined later in the process
+    recipientListEmailField = "email"					# Normally no need to change
 }
 
 
@@ -97,7 +100,8 @@ $settings = @{
     providername = "epima"                              # identifier for this custom integration, this is used for the response allocation
 
     # Session 
-    sessionFile = "session.json"                        # name of the session file
+    aesFile = $keyFile
+    sessionFile = "$( $scriptPath )\session.json"                        # name of the session file
     ttl = 15                                            # Time to live in minutes for the current session, normally 20 minutes for EpiServer Campaign
     encryptToken = $true                                # $true|$false if the session token should be encrypted
     
@@ -150,6 +154,10 @@ ClosedLoopWebserviceTemplate: master
 
 $recipientLists = Get-EpiRecipientLists 
 $masterList = $recipientLists | Out-GridView -PassThru | Select -First 1
+$recipientListUrnFieldname = $settings.upload.recipientListUrnFieldname
+$urnFieldName = ( $recipientLists | where { $_.id -eq $masterList.id } ).$recipientListUrnFieldname
+$settings.upload.recipientListUrnField = $urnFieldName 
+
 
 #-----------------------------------------------
 # ATTRIBUTES TO EXCLUDE
