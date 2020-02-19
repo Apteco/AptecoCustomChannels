@@ -83,6 +83,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
 $moduleName = "BROADCAST"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
