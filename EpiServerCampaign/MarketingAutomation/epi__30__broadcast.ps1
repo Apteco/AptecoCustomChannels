@@ -37,6 +37,7 @@ if ( $debug ) {
         RecipientsAlreadyInList = 0
         RecipientsFiltered = 0
         RecipientsGeneralError = 0
+        ProcessId = "abc"
     }
 }
 
@@ -83,7 +84,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
 $moduleName = "BROADCAST"
-$processId = [guid]::NewGuid()
+$processId = $params.ProcessId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
