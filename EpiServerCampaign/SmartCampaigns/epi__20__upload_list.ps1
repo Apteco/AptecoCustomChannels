@@ -341,6 +341,7 @@ $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
     "CustomProvider"=$settings.providername
+    "ProcessId" = $processId
 }
 
 # return the results

@@ -26,6 +26,7 @@ if ( $debug ) {
         ListName = "275324762694 / Test: Smart Campaign Mailing"
         Password = "def"
         Username = "abc"
+        ProcessId = "abc"
     }
 }
 
@@ -74,7 +75,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
 $moduleName = "BROADCAST"
-$processId = [guid]::NewGuid()
+$processId = $params.ProcessId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
