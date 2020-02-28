@@ -344,6 +344,7 @@ $transactionId = $recipientListID
     
     # General return value to identify this custom channel in the broadcasts detail tables
     "CustomProvider" = $settings.providername
+    "ProcessId" = $processId
 
     # More information about the different status of the import
     "RecipientsSuccessful" = $recipients
