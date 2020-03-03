@@ -145,7 +145,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "$( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ): $( $params[$param] )"
     }
 }
 
@@ -310,7 +310,7 @@ Get-ChildItem -Path "$( $uploadsFolder )\$( $exportId )" | ForEach-Object {
         $res = New-Object PSCustomObject
         $res | Add-Member -MemberType NoteProperty -Name "Urn" -Value $urns[$i]
         $res | Add-Member -MemberType NoteProperty -Name "Email" -Value $emails[$i]
-        $res | Add-Member -MemberType NoteProperty -Name "Result" -Value $importResult[$i]
+        $res | Add-Member -MemberType NoteProperty -Name "Result" -Value ( [int]::Parse($importResult[$i]) )
         $importResults += $res
     }
 
@@ -329,7 +329,8 @@ $importResults | Export-Csv -Path "$( $uploadsFolder )\$( $exportId )\importresu
 ################################################
 
 # count the number of successful upload rows
-$recipients = ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = ([array]( $importResults | where { $_.Result -eq 0 } )).Count
+
 Write-Host "Uploaded $( $recipients ) out of $( $importResults.Count ) in the list $( $recipientListID ) - $( $recipientListName )"
 
 If ( $recipients -eq 0 ) {
