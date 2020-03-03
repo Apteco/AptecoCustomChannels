@@ -332,6 +332,11 @@ $importResults | Export-Csv -Path "$( $uploadsFolder )\$( $exportId )\importresu
 $recipients = ( $importResults | where { $_.Result -eq 0 } ).count
 Write-Host "Uploaded $( $recipients ) out of $( $importResults.Count ) in the list $( $recipientListID ) - $( $recipientListName )"
 
+If ( $recipients -eq 0 ) {
+    Write-Host "Throwing Exception because of 0 records"
+    throw [System.IO.InvalidDataException] "No records were successfully uploaded"  
+}
+
 # There is no id reference for the upload in Epi
 $transactionId = $recipientListID
 
