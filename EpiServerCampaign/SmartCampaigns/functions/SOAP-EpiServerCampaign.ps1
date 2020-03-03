@@ -312,7 +312,7 @@ Function Get-EpiSession {
     $createNewSession = $true
     if ( (Test-Path -Path $sessionPath) -eq $true ) {
 
-        $sessionContent = Get-Content -Encoding UTF8 -Path $sessionPath | ConvertFrom-Json
+        $sessionContent = Get-Content -Encoding UTF8 -Path $sessionPath -Raw | ConvertFrom-Json
         
         $expire = [datetime]::ParseExact($sessionContent.expire,"yyyyMMddHHmmss",[CultureInfo]::InvariantCulture)
 
