@@ -118,9 +118,9 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 # Start the log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
@@ -133,7 +133,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+        Write-Log -message "    $( $param ): $( $params[$param] )"
     }
 }
 
@@ -164,15 +164,20 @@ if ( $settings.syncType -eq "sync" ) {
 
     # Log
     Write-Log -message "Using sync process and will ask for a mailing id "
-    Write-Log -message "Waiting for $( $settings.broadcast.waitSecondsForMailingCreation ) between loops"
+    Write-Log -message "Waiting for $( $settings.broadcast.waitSecondsForMailingCreation ) seconds between loops"
 
     # Creating a new session
-    Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
+    Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl ) minutes"
     Get-EpiSession
 
     # Looping until mailing id created
+    # TODO [ ] implement a counter or max wait time to trigger exceptions
+    #Write-Host "Throwing Exception because xxx"
+    #throw [System.IO.InvalidDataException] "Max waittime or tries reached!"  
+    
     Do {
         Start-Sleep -Seconds $settings.broadcast.waitSecondsForMailingCreation
+        Write-Log -message "Asking for a mailing id"
         $mailingId = Invoke-Epi -webservice "ClosedLoop" -method "getMailingIdByWaveId" -param @(@{value=$waveId;datatype="long"}) -useSessionId $true
     } until ( $mailingId-ne 0 ) # TODO [ ] implement the timer -or $seconds -gt $settings.broadcast.maxSecondsForMailingToFinish)
     
