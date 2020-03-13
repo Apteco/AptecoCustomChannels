@@ -244,6 +244,20 @@ $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttribut
 $listAttributes = $listAttributesRaw | Out-GridView -PassThru
 $settings.excludedAttributes = $listAttributes
 
+#-----------------------------------------------
+# URN FIELD
+#-----------------------------------------------
+
+<#
+Is one of these fields the urn field? If there is no urn field, just cancel
+#>
+
+$urnField = [array]( $listAttributes | Out-GridView -PassThru )
+
+if ($urnField.count -gt 0 ) {
+    $settings.urnFieldName = $urnField[0]
+}
+
 
 #-----------------------------------------------
 # SAVE
