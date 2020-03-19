@@ -162,6 +162,17 @@ $transactionalMailingID = ( $params.MessageName -split $settings.nameConcatChar 
 
 Write-Log -message "Using the transactional mailing id $( $transactionalMailingID )"
 
+#-----------------------------------------------
+# CHECK STATS/THRESHOLDS AND THROW EXCEPTIONS
+#-----------------------------------------------
+
+# TODO [ ] implements thresholds maybe absolute and relative to whole upload numbers see example below
+<#
+If ( $recipients -eq 0 ) {
+    Write-Host "Throwing Exception because of 0 records"
+    throw [System.IO.InvalidDataException] "No records were successfully uploaded"  
+}
+#>
 
 ################################################
 #
