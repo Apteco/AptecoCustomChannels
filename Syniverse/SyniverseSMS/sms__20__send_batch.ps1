@@ -285,9 +285,9 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json" 
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json;charset=UTF-8" 
 
-    Write-Log -message "SMS result: $( $res.id )" >> $logfile
+    Write-Log -message "SMS result: $( $res.id )"
 
 
 }
