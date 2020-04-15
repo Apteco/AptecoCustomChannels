@@ -78,7 +78,7 @@ $uploadSettings = @{
     uploadsFolder = "$( $scriptPath )\uploads\"
     excludedAttributes = @()							# Will be defined later in the process
     recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
-    recipientListUrnField = ""							# Will be defined later in the process
+    recipientListUrnField = ""							# Will be defined later in the process -> in the current Apteco process this has to be "Urn", if present
     recipientListEmailField = "email"					# Normally no need to change
 }
 
