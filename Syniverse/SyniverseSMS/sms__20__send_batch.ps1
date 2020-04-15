@@ -20,19 +20,19 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    EmailFieldName= "Email"
-	    TransactionType= "Replace"
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\syniverse_validation"
-	    MessageName= "Validate globally"
-	    SmsFieldName= ""
-	    Path= "C:\FastStats\Publish\Handel\system\deliveries\PowerShell Validate globally_66ce38fd-191a-48b9-885f-eca1bac20803.txt"
-	    ReplyToEmail= ""
-	    Username= "abc"
-	    ReplyToSMS= ""
-	    UrnFieldName= "Urn"
-	    ListName= "Validate globally"
-	    CommunicationKeyFieldName= "Communication Key"
+
+        ReplyToSMS = ""
+        EmailFieldName = "Email"
+        Username = "a"
+        MessageName ="Transaktionsbestätigung DEU"
+        ReplyToEmail = ""
+        UrnFieldName = "Bestell ID"
+        Password = "b"
+        ListName = "Transaktionsbestätigung DEU"
+        TransactionType = "Replace"
+        Path = "c:\faststats\Publish\Handel\system\Deliveries\PowerShell_Transaktionsbestätigung DEU_e8c49206-91c3-4d7d-8bc3-1340f3918a75.txt"
+        SmsFieldName = "mdn"
+        CommunicationKeyFieldName = "Communication Key"   
     }
 }
 
