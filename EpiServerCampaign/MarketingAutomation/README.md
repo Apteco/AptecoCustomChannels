@@ -32,3 +32,9 @@
 
 * [ ] Implement email html preview
 * [ ] Implement test connection
+
+# Process
+
+* Data gets uploaded into a recipient list
+* That list is then connected to a transactional mailing and a marketing automation process
+* The transactional mailing will be send out automatically
