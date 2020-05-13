@@ -1,0 +1,783 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Mailing Automation API - campaigns",
+    "contact": {
+      "url": "https://www.deutschepost.de/de/d/dialogpost/dialogmarketing.html",
+      "email": "it-csp@deutschepost.de"
+    },
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "http://service-campaignmanagement-develop:8080/campaignmanagement",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "lookups",
+      "description": "The Campaignmanagement Lookup Resource"
+    },
+    {
+      "name": "longtermcampaigns",
+      "description": "The Long Term Campaign Resource"
+    }
+  ],
+  "paths": {
+    "/longtermcampaigns": {
+      "get": {
+        "tags": [
+          "longtermcampaigns"
+        ],
+        "summary": "Get long-term-campaigns of a customer.",
+        "description": "Requires authorities ROLE_PMP_LONG_TERM_CAMPAIGN_PARTNER_SYSTEM or ROLE_PMP_LONG_TERM_CAMPAIGN_EDITOR or ROLE_PMP_ADMIN. QueryParams: pageNumber = page; pageSize = size; sort={Id of sort field},asc or desc",
+        "operationId": "getCampaigns",
+        "parameters": [
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "The ID of the customer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "predicate",
+            "in": "query",
+            "description": "Predicate of class LongTermCampaignEntity",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Predicate"
+            }
+          },
+          {
+            "name": "pageable",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Pageable"
+            }
+          },
+          {
+            "name": "assembler",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PagedResourcesAssemblerLongTermCampaignEntity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The campaigns are found and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepLongTermCampaignRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "longtermcampaigns"
+        ],
+        "summary": "Creates a long-term-campaign.",
+        "description": " Requires authorities ROLE_PMP_LONG_TERM_CAMPAIGN_PARTNER_SYSTEM(for campaign workflow type TRIGGER_COMPLETE) or ROLE_PMP_LONG_TERM_CAMPAIGN_EDITOR (for campaign workflow type TRIGGER_ONLY) orROLE_PMP_ADMIN",
+        "operationId": "createCampaign",
+        "requestBody": {
+          "description": "The long term campaign data.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLongTermCampaignRequestRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The campaign is created and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden access. Insufficient privileges or access to customer or access to partner system is forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Partner system not found for given customer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in campaign attributes. DM_CA_0103 Found existing campaign with same campaignName. DM_CA_0306 Found existing campaign with same campaignExtId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/longtermcampaigns/{id}": {
+      "get": {
+        "tags": [
+          "longtermcampaigns"
+        ],
+        "summary": "Get a campaign.",
+        "description": "Requires authorities ROLE_PMP_LONG_TERM_CAMPAIGN_PARTNER_SYSTEM or ROLE_PMP_LONG_TERM_CAMPAIGN_EDITOR or ROLE_PMP_ADMIN",
+        "operationId": "getCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the campaign.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "The ID of the customer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The campaign is found and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The campaign was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "longtermcampaigns"
+        ],
+        "summary": "Updates a long-term-campaign.",
+        "description": " Requires authorities ROLE_PMP_LONG_TERM_CAMPAIGN_PARTNER_SYSTEM(for campaign workflow type TRIGGER_COMPLETE) or ROLE_PMP_LONG_TERM_CAMPAIGN_EDITOR(for campaign workflow type TRIGGER_ONLY) or ROLE_PMP_ADMIN",
+        "operationId": "updateCampaign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the campaign.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The campaign attributes to change.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LongTermCampaignUpdateRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The campaign is updated and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found (campaign or product).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in campaign attributes. DM_CA_0103 Found existing campaign with same campaignName.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/longtermcampaigns/{id}/state": {
+      "put": {
+        "tags": [
+          "longtermcampaigns"
+        ],
+        "summary": "Updates the state of a long-term-campaign.",
+        "description": " Requires authorities ROLE_PMP_LONG_TERM_CAMPAIGN_PARTNER_SYSTEM(for campaign workflow type TRIGGER_COMPLETE) or ROLE_PMP_LONG_TERM_CAMPAIGN_EDITOR(for campaign workflow type TRIGGER_ONLY) or ROLE_PMP_ADMIN",
+        "operationId": "updateCampaignState",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the campaign.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The new campaign state.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LongTermCampaignStateUpdateRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The campaign state is updated and the updated long term campaign returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Campaign not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in attributes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermCampaignRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaignlookups": {
+      "get": {
+        "tags": [
+          "lookups"
+        ],
+        "summary": "Retrieve all lookups for this service.",
+        "description": "A lookup consists of an id and an internationalized label. It is used to communicate possible values for specific objects to the api caller",
+        "operationId": "getAllLookups",
+        "responses": {
+          "200": {
+            "description": "All available lookup values per lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/KeyValuePairRep"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateLongTermCampaignRequestRep": {
+        "required": [
+          "campaignIdExt",
+          "campaignName",
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "campaignIdExt": {
+            "maxLength": 60,
+            "minLength": 1,
+            "type": "string",
+            "description": "Id that identifies the campaign and is known to the partner system. Mandatory for createCampaign, optional otherwise"
+          },
+          "campaignName": {
+            "maxLength": 50,
+            "minLength": 1,
+            "type": "string",
+            "description": "The name of the campaign. Mandatory for createCampaign, optional otherwise."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The starting date of the campaign",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date of the campaign",
+            "format": "date"
+          }
+        }
+      },
+      "LongTermCampaignRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "campaignType": {
+            "type": "string",
+            "description": "The campaign type, ONE_TIME or LONG_TERM."
+          },
+          "campaignName": {
+            "type": "string",
+            "description": "The name of the campaign."
+          },
+          "stateId": {
+            "type": "integer",
+            "description": "The ID of the campaign state.",
+            "format": "int32"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductRep"
+          },
+          "sendingReasonId": {
+            "type": "integer",
+            "description": "The sending reason of the campaign. The following values are potentially allowed: 10 - UNDEFINED,20 - NOT_PROMOTIONAL,30 - PROMOTIONAL.",
+            "format": "int32"
+          },
+          "actions": {
+            "type": "array",
+            "description": "Actions that may be executed on the campaign.",
+            "items": {
+              "type": "string",
+              "description": "Actions that may be executed on the campaign.",
+              "enum": [
+                "EDIT",
+                "DELETE",
+                "SUMMARY",
+                "ORDER",
+                "OPEN_EDITOR",
+                "CALCULATE_COST",
+                "LONG_TERM_CAMPAIGN_ACTIVATE"
+              ]
+            }
+          },
+          "requiredActions": {
+            "type": "array",
+            "description": "Actions that need to be executed by the client before the campaign can be ordered or activated.",
+            "items": {
+              "type": "string",
+              "description": "Actions that need to be executed by the client before the campaign can be ordered or activated."
+            }
+          },
+          "workflowType": {
+            "type": "string",
+            "description": "The workflow type. TRIGGER_ONLY: In the trigger only workflow the campaign is created by the users and only the triggers are send via the partner system. TRIGGER_COMPLETE: In the trigger complete workflow the partner system create and updates the campaign and the triggers.",
+            "enum": [
+              "TRIGGER_ONLY",
+              "TRIGGER_COMPLETE"
+            ]
+          },
+          "hasDummyName": {
+            "type": "boolean",
+            "description": "If true the campaign name was generated"
+          },
+          "campaignIdExt": {
+            "type": "string",
+            "description": "The campaign ID used by the external partner system."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The start date.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date.",
+            "format": "date"
+          },
+          "variableDefVersion": {
+            "type": "integer",
+            "description": "The version of the variable definition.",
+            "format": "int32"
+          },
+          "individualizationId": {
+            "type": "integer",
+            "description": "The ID of the type of individualization used for the mailing. ADDRESS_ONLY = 10, LIMITED_INDIVIDUALIZATION = 20, FULL_INDIVIDUALIZATION = 30",
+            "format": "int32"
+          },
+          "printingProcessId": {
+            "type": "integer",
+            "description": "The ID of the printing process for production of the mail items. OFFSET = 10, OFFSET_PLUS = 20, DIGITAL = 30",
+            "format": "int32"
+          },
+          "deliveryProductId": {
+            "type": "integer",
+            "description": "The ID of the delivery product to be used for the mailing. BRIEFKOMMUNIKATION = 10, DIALOGPOST = 20",
+            "format": "int32"
+          }
+        }
+      },
+      "ProductRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The product id. Use this id to create a mailing.",
+            "format": "int64"
+          },
+          "productTypeId": {
+            "type": "integer",
+            "description": "The product type id.",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of base product."
+          },
+          "imageName": {
+            "type": "string",
+            "description": "The name of the image."
+          },
+          "pageCount": {
+            "type": "integer",
+            "description": "The number of pages (includes also the pack side) for example if you have a double sides page  you have 2 pages.",
+            "format": "int32"
+          },
+          "sheetCount": {
+            "type": "integer",
+            "description": "If the page is printed on both sides then you would have 1 sheet (of paper) but 2 pages. If the page is simplex, then both are the same.",
+            "format": "int32"
+          },
+          "productEkp": {
+            "type": "string",
+            "description": "The product EKP for offset printing."
+          },
+          "offsetPlusEkp": {
+            "type": "string",
+            "description": "The product EKP for offset printing with some individualization."
+          },
+          "digitalEkp": {
+            "type": "string",
+            "description": "The product EKP for digital printing."
+          },
+          "length": {
+            "type": "integer",
+            "description": "The length of the shipment product in mm/10.",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "description": "The height of the shipment product in mm/10.",
+            "format": "int32"
+          },
+          "thickness": {
+            "type": "integer",
+            "description": "The thickness of the product in mm/10.",
+            "format": "int32"
+          },
+          "weight": {
+            "type": "integer",
+            "description": "The weight of the product in gram.",
+            "format": "int32"
+          },
+          "pageWithVariables": {
+            "type": "integer",
+            "description": "The number of the page where variable contents have to be printed.",
+            "format": "int32"
+          },
+          "printWidth": {
+            "type": "integer",
+            "description": "The width of the print template in mm.",
+            "format": "int32"
+          },
+          "printHeight": {
+            "type": "integer",
+            "description": "The height of the print template in mm.",
+            "format": "int32"
+          },
+          "duplex": {
+            "type": "boolean"
+          }
+        },
+        "description": "The mailing product."
+      },
+      "LongTermCampaignUpdateRep": {
+        "required": [
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "integer",
+            "description": "The ID of the mailing product.",
+            "format": "int64"
+          },
+          "campaignName": {
+            "maxLength": 50,
+            "minLength": 0,
+            "type": "string",
+            "description": "The name of the campaign."
+          },
+          "startDate": {
+            "type": "string",
+            "description": "The starting date of the campaign.",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "The end date of the campaign.",
+            "format": "date"
+          },
+          "sendingReasonId": {
+            "type": "integer",
+            "description": "The sending reason of the campaign. The following values are potentially allowed: 10 - UNDEFINED,20 - NOT_PROMOTIONAL,30 - PROMOTIONAL.",
+            "format": "int32"
+          }
+        }
+      },
+      "LongTermCampaignStateUpdateRep": {
+        "required": [
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "stateId": {
+            "type": "integer",
+            "description": "The campaign state ID of the new state to set. The following values are potentially allowed: 110 - EDIT,120 - ACTIVE,125 - PAUSED,130 - FINISHED.",
+            "format": "int32"
+          }
+        }
+      },
+      "Predicate": {
+        "type": "object"
+      },
+      "Pageable": {
+        "type": "object",
+        "properties": {
+          "sort": {
+            "$ref": "#/components/schemas/Sort"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pageNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "paged": {
+            "type": "boolean"
+          },
+          "unpaged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Sort": {
+        "type": "object",
+        "properties": {
+          "unsorted": {
+            "type": "boolean"
+          },
+          "sorted": {
+            "type": "boolean"
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PagedResourcesAssemblerLongTermCampaignEntity": {
+        "type": "object",
+        "properties": {
+          "forceFirstAndLastRels": {
+            "type": "boolean",
+            "writeOnly": true
+          }
+        }
+      },
+      "CollectionRepLongTermCampaignRep": {
+        "type": "object",
+        "properties": {
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LongTermCampaignRep"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "properties": {
+          "rel": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          },
+          "hreflang": {
+            "type": "string"
+          },
+          "media": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "deprecation": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PageMetadata": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "KeyValuePairRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

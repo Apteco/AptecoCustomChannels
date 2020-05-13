@@ -1,0 +1,966 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Mailing Automation API - mailings",
+    "contact": {
+      "url": "https://www.deutschepost.de/de/d/dialogpost/dialogmarketing.html",
+      "email": "it-csp@deutschepost.de"
+    },
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "http://service-mailingmanagement-develop:8080/mailingmanagement",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "variabledefinitions",
+      "description": "The Variable Definition Resource"
+    },
+    {
+      "name": "mailings",
+      "description": "The Mailing Resource"
+    },
+    {
+      "name": "lookups",
+      "description": "The Mailingmanagement Lookup Resource"
+    },
+    {
+      "name": "addressvariables",
+      "description": "The Address Variable Resource"
+    }
+  ],
+  "paths": {
+    "/mailings/addressvariables": {
+      "get": {
+        "tags": [
+          "addressvariables"
+        ],
+        "summary": "Returns a list of address variables with their name and sort order",
+        "operationId": "getAddressVariables",
+        "responses": {
+          "200": {
+            "description": "The address variables were found and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepAddressVariableRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mailinglookups": {
+      "get": {
+        "tags": [
+          "lookups"
+        ],
+        "summary": "Retrieve all lookups for this service.",
+        "description": "A lookup consists of an id and an internationalized label. It is used to communicate possible values for specific objects to the api caller",
+        "operationId": "getAllLookups",
+        "responses": {
+          "200": {
+            "description": "All available lookup values per lookup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/KeyValuePairRep"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mailings": {
+      "get": {
+        "tags": [
+          "mailings"
+        ],
+        "summary": "Returns the list of mailings for the campaign or if not present returns mailings for the logged in customer.",
+        "operationId": "getMailings",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "query",
+            "description": "The Id of the campaign.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "The Id of the customer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "the mailing of the requested campaign: If the campaignId is not given then we return the mailings for the customer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepMailingRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "mailings"
+        ],
+        "summary": "Creates a new mailing.",
+        "operationId": "createMailing",
+        "requestBody": {
+          "description": "The mailing attributes.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMailingRequestRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The mailing is created and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in mailing attributes (e.g. customer does not exist).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "mailings"
+        ],
+        "summary": "Delete mailing and all related objects such as mailing template and style information if the mailing exists.",
+        "description": "This resource is deprecated and will be removed soon.",
+        "operationId": "deleteMailingForCampaignIfAvailable",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "query",
+            "description": "The campaign ID.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "The customer ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mailings/{id}": {
+      "put": {
+        "tags": [
+          "mailings"
+        ],
+        "summary": "Adds or removes a sender address to the mailing.",
+        "operationId": "updateMailing",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the mailing",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The attributes to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMailingRequestRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The mailing is updated and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The mailing to update was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The given update rep contains errors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailingRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mailings/{id}/variabledefinitions": {
+      "get": {
+        "tags": [
+          "variabledefinitions"
+        ],
+        "summary": "Gets a collection of variable definitions",
+        "operationId": "getVariableDefList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the mailing",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "description": "The ID of the customer.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The variable definition list for the mailing is found and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The mailing entity for this variable definition was not found .",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "variabledefinitions"
+        ],
+        "summary": "Updates the variable def list",
+        "operationId": "updateVariableDefList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the mailing",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The create variable def list",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVariableDefListRequestRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The variable definitions are updated and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "DM_MM_0043 if creating variable definitions is not allowed because of the campaign workflow type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found (e.g. mailing).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in variable definitions (e.g. wrong data types).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "variabledefinitions"
+        ],
+        "summary": "Creates a list of variable definitions for a mailing.",
+        "operationId": "createVariableDefList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The ID of the mailing",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The create variable def list",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVariableDefListRequestRep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The variable definitions are created and returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "DM_MM_0043 if creating variable definitions is not allowed because of the campaign workflow type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The mailing was not found for this variable definitions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Failure in variable definitions (e.g. wrong data types).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRepVariableDefRep"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddressVariableRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The address variable name"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "The order for sorting address variables",
+            "format": "int32"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Indicates if this address variable needs to be mapped"
+          }
+        }
+      },
+      "CollectionRepAddressVariableRep": {
+        "type": "object",
+        "properties": {
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressVariableRep"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "properties": {
+          "rel": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          },
+          "hreflang": {
+            "type": "string"
+          },
+          "media": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "deprecation": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PageMetadata": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "KeyValuePairRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateMailingRequestRep": {
+        "required": [
+          "campaignId",
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "integer",
+            "description": "The campaign Id used for creating a mailing",
+            "format": "int64"
+          }
+        }
+      },
+      "MailingRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "campaignId": {
+            "type": "integer",
+            "description": "The campaign id identifying the campaign that the mailing was created for",
+            "format": "int64"
+          },
+          "variableDefVersion": {
+            "type": "integer",
+            "description": "The version of the variable definitions.",
+            "format": "int32"
+          },
+          "senderAddress": {
+            "type": "string",
+            "description": "The sender address printed on the mailing"
+          },
+          "mailingTemplateType": {
+            "$ref": "#/components/schemas/MailingTemplateTypeRep"
+          }
+        }
+      },
+      "MailingTemplateTypeRep": {
+        "type": "object",
+        "properties": {
+          "mailingTemplateTypeId": {
+            "type": "integer",
+            "description": "The type of the mailing template. Available values are:BASIC_ADDRESS_ONLY - A mailing template of the basic (PMP) editor fitting for individualization of type address-only.BASIC_LIMITED_INDIVIDUALIZATION - A mailing template of the basic (PMP) editor fitting for limited individualization (up to 5 variables).ADVANCED_ADDRESS_ONLY - A mailing template of the advanced (Chili) editor fitting for individualization of type address-only.ADVANCED_LIMITED_INDIVIDUALIZATION - A mailing template of the advanced (Chili) editor fitting for limited individualization (up to 5 variables).ADVANCED_FULL_INDIVIDUALIZATION - A mailing template of the advanced (Chili) editor fitting for full individualization.",
+            "format": "int32"
+          },
+          "editorType": {
+            "type": "string",
+            "description": "Editor type. Available types: BASIC - The basic PMP editorADVANCED - The advanced editor",
+            "enum": [
+              "BASIC",
+              "ADVANCED"
+            ]
+          }
+        },
+        "description": "Information about the type of template that was uploaded. If no template exists yet, this value is null."
+      },
+      "UpdateMailingRequestRep": {
+        "required": [
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "senderAddress": {
+            "maxLength": 55,
+            "minLength": 0,
+            "type": "string",
+            "description": "The sender address rendered on the template"
+          }
+        }
+      },
+      "CollectionRepMailingRep": {
+        "type": "object",
+        "properties": {
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MailingRep"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          }
+        }
+      },
+      "CreateVariableDefListRequestRep": {
+        "required": [
+          "createVariableDefRequestRepList",
+          "customerId"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "createVariableDefRequestRepList": {
+            "type": "array",
+            "description": "The list of the  variables definition created",
+            "items": {
+              "$ref": "#/components/schemas/CreateVariableDefRequestRep"
+            }
+          }
+        }
+      },
+      "CreateVariableDefRequestRep": {
+        "required": [
+          "dataTypeId",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "description": "The variable label"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "The variable sorted order",
+            "format": "int32"
+          },
+          "x": {
+            "minimum": 0,
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis X",
+            "format": "double"
+          },
+          "y": {
+            "minimum": 0,
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis Y",
+            "format": "double"
+          },
+          "font": {
+            "type": "integer",
+            "description": "The Variable Font type. The ID of the key value pair is the ID of the Font enum value and the LABEL is the enum name. Possible combinations are: 12 - BERNHARDFASHION_EF, 13 - FUTURA_EF_BOLD, 14 - FUTURA_EF_LIGHT, 15 - FUTURA_EF_LIGHT_OBL, 16 - MAXIMA_EF_BOLD, 17 - MAXIMA_EF_BOLD_OBLIQUE, 18 - MAXIMA_EF_MEDIUM, 19 - MAXIMA_EF_MEDIUM_OBLIQUE, 20 - RUNDSCHRIFT_EF, 21 - TECHNOSCRIPT_EF, 22 - TIMELESS_EF_BOLD, 23 - TIMELESS_EF_LIGHT, 24 - TIMELESS_EF_LIGHT_ITALIC",
+            "format": "int32"
+          },
+          "fontSize": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "description": "The Variable Font size",
+            "format": "int32"
+          },
+          "spanHeight": {
+            "type": "integer",
+            "description": "Value of the html element that is needed for transforming the coordinates equals the height of the variable field in pixel",
+            "format": "int32"
+          },
+          "dataTypeId": {
+            "type": "integer",
+            "description": "The data type ID of the variable",
+            "format": "int32"
+          }
+        },
+        "description": "The list of the  variables definition created"
+      },
+      "CollectionRepVariableDefRep": {
+        "type": "object",
+        "properties": {
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariableDefRep"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          }
+        }
+      },
+      "VariableDefRep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "description": "The variable label"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "The variable sorted order",
+            "format": "int32"
+          },
+          "dataType": {
+            "$ref": "#/components/schemas/KeyValuePairRep"
+          },
+          "addressVariableId": {
+            "type": "integer",
+            "description": "The id of the mapped address variable",
+            "format": "int64"
+          },
+          "addressVariableMappingConfirmed": {
+            "type": "boolean",
+            "description": "Flag that indicates if this address variable mapping was confirmed by the user"
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "Flag indicating if this variable was selected. This is only relevant for long term offset print campaigns with more individual variables than allowed. In this case the user has to choose."
+          },
+          "x": {
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis X",
+            "format": "double"
+          },
+          "y": {
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis Y",
+            "format": "double"
+          },
+          "font": {
+            "$ref": "#/components/schemas/KeyValuePairRep"
+          },
+          "fontColor": {
+            "$ref": "#/components/schemas/KeyValuePairRep"
+          },
+          "fontSize": {
+            "type": "integer",
+            "description": "The Variable Font size",
+            "format": "int32"
+          },
+          "spanHeight": {
+            "type": "integer",
+            "description": "value of the variable field height in pixel",
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateVariableDefListRequestRep": {
+        "required": [
+          "customerId",
+          "updateVariableDefRequestRepList"
+        ],
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string"
+          },
+          "updateVariableDefRequestRepList": {
+            "type": "array",
+            "description": "The update variable def list request used for updates to the variable definition and style.",
+            "items": {
+              "$ref": "#/components/schemas/UpdateVariableDefRequestRep"
+            }
+          }
+        }
+      },
+      "UpdateVariableDefRequestRep": {
+        "required": [
+          "dataTypeId",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "description": "The variable label"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "The variable sorted order",
+            "format": "int32"
+          },
+          "x": {
+            "minimum": 0,
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis X",
+            "format": "double"
+          },
+          "y": {
+            "minimum": 0,
+            "type": "number",
+            "description": "The Variable starting position in Points for the Axis Y",
+            "format": "double"
+          },
+          "font": {
+            "type": "integer",
+            "description": "The Variable Font type. The ID of the key value pair is the ID of the Font enum value and the LABEL is the enum name. Possible combinations are: 12 - BERNHARDFASHION_EF, 13 - FUTURA_EF_BOLD, 14 - FUTURA_EF_LIGHT, 15 - FUTURA_EF_LIGHT_OBL, 16 - MAXIMA_EF_BOLD, 17 - MAXIMA_EF_BOLD_OBLIQUE, 18 - MAXIMA_EF_MEDIUM, 19 - MAXIMA_EF_MEDIUM_OBLIQUE, 20 - RUNDSCHRIFT_EF, 21 - TECHNOSCRIPT_EF, 22 - TIMELESS_EF_BOLD, 23 - TIMELESS_EF_LIGHT, 24 - TIMELESS_EF_LIGHT_ITALIC",
+            "format": "int32"
+          },
+          "fontSize": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "description": "The Variable Font size",
+            "format": "int32"
+          },
+          "spanHeight": {
+            "type": "integer",
+            "description": "Value of the html element that is needed for transforming the coordinates equals the height of the variable field in pixel",
+            "format": "int32"
+          },
+          "dataTypeId": {
+            "type": "integer",
+            "description": "The data type ID of the variable",
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "description": "The id of the newly modified variable",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "description": "The version of the newly modified variable",
+            "format": "int32"
+          },
+          "addressVariableId": {
+            "type": "integer",
+            "description": "The id of the mapped address variable",
+            "format": "int64"
+          },
+          "addressVariableMappingConfirmed": {
+            "type": "boolean",
+            "description": "Flag that indicates if this address variable mapping was confirmed by the user"
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "Flag indicating if this variable was selected. This is only relevant for long term offset print campaigns with more individual variables than allowed and can only be set for variables of data type STRING. In this case the user has to choose which variables to use. If the entire number of variables is below the maximum, all selected flags for individual string variables will automatically be selected=true to avoid work for the user."
+          }
+        },
+        "description": "The update variable def list request used for updates to the variable definition and style."
+      }
+    }
+  }
+}
