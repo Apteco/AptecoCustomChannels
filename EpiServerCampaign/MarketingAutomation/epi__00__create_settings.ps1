@@ -50,7 +50,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 
 $keyFile = "$( $scriptPath )\aes.key" #"E:\Apteco\Scripts\episerver_sc\aes.key"
 $pass = Read-Host -AsSecureString "Please enter the password for epi"
-$passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password)
+$passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password) -keyfile $keyFile
 
 $loginSettings = @{
     mandant = <mandantid> 
