@@ -54,6 +54,10 @@ Integration|API|Type|Functionalities|Link
 MSSQL / SQL Server|Local<br/>Domain<br/>PrivateCloud|PowerShell/.NET<br/>Bulk|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Data Results Download|[MSSQL Integration Guideline](MSSQL)
 sqlite|Local<br/>Network<br/>In-Memory|PowerShell/.NET/sqliteCLI|
 
+### File Transfer
+Integration|API|Type|Functionalities|Link
+-|-|-|-|-
+WinSCP|SFTP<br/>FTP<br/>S3<br/>WebDAV<br/>SCP (SSH)|WinSCP .NET assembly|:x:/:x:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:o:/:o: Data Results Download|[WinSCP Integration Guideline](WinSCP)
 
 
 ## Requirements
