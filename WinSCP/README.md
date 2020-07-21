@@ -28,6 +28,8 @@ Steps to install.
 1. Download all files of the folder and below.
 1. Put these files on your Apteco app server somewhere like `D:\Scripts\SQLServer\winscp\`
 1. From the downloaded file from winscp, please put `WinSCP.exe` `WinSCPnet.dll` in the `lib` folder
+1. Until these steps you should have those files in such a folder/file structure:<br/>![grafik](https://user-images.githubusercontent.com/14135678/87948442-3916fd80-ca94-11ea-9d1c-c5472655b46b.png)
+
 1. Add this part between the `...` to your extras.xml (and maybe change the paths in there)
 
 ```
