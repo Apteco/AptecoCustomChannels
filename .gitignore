@@ -17,3 +17,4 @@ last_request.xml
 # archive folders
 _archive
 _dev
+*.debug
