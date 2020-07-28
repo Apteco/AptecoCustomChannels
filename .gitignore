@@ -5,6 +5,7 @@ session.json
 # logfiles
 *.log
 *.debug
+*.txt
 
 # encryption files
 aes.key
@@ -19,3 +20,4 @@ recipientlists.json
 # archive folders
 _archive
 _dev
+
