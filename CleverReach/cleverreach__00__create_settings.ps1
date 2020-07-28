@@ -32,7 +32,7 @@ $settingsFilename = "settings.json"
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+Get-ChildItem ".\$( $functionsSubfolder )" -Filter "*.ps1" -Recurse | ForEach {
     . $_.FullName
 }
 

@@ -14,16 +14,14 @@ Param(
 
 $debug = $true
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\cleverreach"
-	    abc= "def"
-	    Username= "abc"
+	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
     }
 }
 
@@ -67,7 +65,10 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
+$moduleName = "CLVRGETMAILINGS"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -78,31 +79,43 @@ if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
         #[System.Net.SecurityProtocolType]::Tls13,
-        ,[System.Net.SecurityProtocolType]::Ssl3
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
 # more settings
 $logfile = $settings.logfile
-$contentType = $settings.contentType
-$customModuleName = "GETMAILINGS"
-
-# append a suffix, if in debug mode
-if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
-}
+#$contentType = $settings.contentType
 
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+
 
 ################################################
 #
@@ -110,12 +123,24 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $customModuleName )" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
+
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    $( $param ): $( $params[$param] )"
+    }
 }
 
 
@@ -129,27 +154,34 @@ $params.Keys | ForEach {
 # AUTHENTICATION
 #-----------------------------------------------
 
+$apiRoot = $settings.base
+$contentType = "application/json; charset=utf-8"
 $auth = "Bearer $( Get-SecureToPlaintext -String $settings.login.accesstoken )"
 $header = @{
     "Authorization" = $auth
 }
 
-$apiRoot = $settings.base
 
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS
 #-----------------------------------------------
 
 $object = "mailings"
-$endpoint = "$( $apiRoot )$( $object ).json"
-$res = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -ContentType $contentType
+
+Write-Log -message "Downloading all mailings"
+
+# get all draft mailings
+$endpoint = "$( $apiRoot )$( $object )?state=draft&limit=999"
+$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+
+Write-Log -message "Found $( $mailings.draft.count  ) mailings"
 
 
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS DETAILS
 #-----------------------------------------------
 
-$messages = $res.draft | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
+$messages = $mailings.draft | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
 
 
 ################################################

@@ -1,4 +1,4 @@
-################################################
+﻿################################################
 #
 # INPUT
 #
@@ -17,8 +17,6 @@ $debug = $true
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
-
-# TODO [ ] check input parameter
 
 if ( $debug ) {
     $params = [hashtable]@{
@@ -68,7 +66,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRTEST"
+$moduleName = "CLVRGETGROUPS"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -151,7 +149,6 @@ if ( $paramsExisting ) {
 #
 ################################################
 
-
 #-----------------------------------------------
 # AUTHENTICATION
 #-----------------------------------------------
@@ -165,19 +162,33 @@ $header = @{
 
 
 #-----------------------------------------------
-# WHO AM I
+# GET GROUPS
 #-----------------------------------------------
 
-# Load information about the account
+$object = "groups"
 
-$object = "debug"
-$endpoint = "$( $apiRoot )$( $object )/whoami.json"
-$whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+Write-Log -message "Downloading all groups"
 
-exit 0
+# get all groups
+$endpoint = "$( $apiRoot )$( $object )"
+$groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+
+Write-Log -message "Found $( $groups.count  ) groups"
+
 
 #-----------------------------------------------
+# GET MAILINGS / CAMPAIGNS DETAILS
+#-----------------------------------------------
+
+$lists = $groups | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
+
+
+################################################
+#
 # RETURN
-#-----------------------------------------------
+#
+################################################
 
-# TODO [ ] Is there something expected to return? Something like true or false?
+# real messages
+return $lists
+
