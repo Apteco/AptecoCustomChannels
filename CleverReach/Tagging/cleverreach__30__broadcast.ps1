@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -22,15 +22,15 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    EmailFieldName= "email"
-	    TransactionType= "Replace"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
-	    MessageName= "Test.Tag001" # just add - to remove a tag like -test.tag or -test.*
-	    SmsFieldName= ""
-	    Path= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach\CleverReach_Bewertung Post Stay_b33c83bc-d396-422c-abb8-f766826cb4e9.txt"
-	    UrnFieldName= "Urn"
-	    ListName= "CR Tag Test" # TODO [ ] if PeopleStage will offer lists as dropdown, we need to re-check this "text only" parameter
-	    CommunicationKeyFieldName= "Communication Key"
+        Password= "def"
+        scriptPath= "D:\Scripts\CleverReach\Tagging"
+	    MessageName= "-FreeTry.Login" # just add - to remove a tag like -test.tag or -test.*
+        Username= "abc"
+        ListName= "Free Try Automation"
+        # Coming from Upload
+        EmailFieldName= "Email"
+        Path= "D:\Apteco\Publish\CleverReach\system\Deliveries\PowerShell_1122853  Free Try Automation_fea11774-c67e-4081-8506-55303b0318d1.txt"
+        UrnFieldName= "RC Id"
     }
 }
 
@@ -74,7 +74,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRUPLOAD"
+$moduleName = "CLVRBROADCAST"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -174,6 +174,8 @@ $header = @{
     "Authorization" = $auth
 }
 
+Write-Log -message "Setting authentication"
+
 
 #-----------------------------------------------
 # LOAD DATA
@@ -181,13 +183,18 @@ $header = @{
 
 # TODO [ ] implement loading bigger files later
 
+
 # Get file item
 $file = Get-Item -Path $params.Path
 $filename = $file.Name -replace $file.Extension
 
+Write-Log -message "Loading data from $( $file.fullname )"
+
 # Load data from file
 $dataCsv = @()
 $dataCsv += import-csv -Path $file.FullName -Delimiter "`t" -Encoding UTF8
+
+Write-Log -message "Loaded $( $dataCsv.count ) records"
 
 
 #-----------------------------------------------
@@ -205,6 +212,8 @@ if ( $listItems[1].count -gt 0 ) {
     $groupId = $listName
     $createNewGroup = $false
 
+    Write-Log -message "Loaded group with id $( $groupId ), no need for new group"
+
 } elseif ( $listItems[0].count -gt 0 ) {
     
     $listNameTxt = $listItems[0]
@@ -214,20 +223,26 @@ if ( $listItems[1].count -gt 0 ) {
     $endpoint = "$( $apiRoot )$( $object )"
     $groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
     
+    Write-Log -message "Loaded $( $groups.count ) from CleverReach first to compare names"
+
     $matchGroups = ( $groups | where { $_.name -eq $listNameTxt } | sort stamp -Descending | Select -first 1 ).id
 
     if ( $matchGroups.count -ne "" ) {
         $listName = $matchGroups
         $groupId = $listName
         $createNewGroup = $false
+        Write-Log -message "Found a group with name $( $listName ) that resolved into the id $( $groupId ) -> No need for a new group"
     } else {
         $listName = $listNameTxt
+        Write-Log -message "Found no group with name $( $listName ) and will create a new one"
     }
 
 
 } else {
 
     $listName = [datetime]::Now.ToString("yyyyMMdd HHmmss")
+    Write-Log -message "Will create a new group with date as name: $( $listname )"
+
 
 }
 
@@ -239,6 +254,7 @@ if ( $createNewGroup ) {
     $bodyJson = $body | ConvertTo-Json
     $newGroup = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
     $groupId = $newGroup.id
+    Write-Log -message "Created a new group with id $( $groupId )"
 }
 
 
@@ -248,6 +264,9 @@ if ( $createNewGroup ) {
 
 $requiredFields = @(,$params.EmailFieldName)
 
+Write-Log -message "Required fields $( $requiredFields -join ", " )"
+
+
 # Load global attributes
 
 $object = "attributes"
@@ -256,10 +275,15 @@ $globalAttributes = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $heade
 $localAttributes = Invoke-RestMethod -Method Get -Uri "$( $endpoint )?group_id=$( $groupId )" -Headers $header  -Verbose -ContentType $contentType
 $attributes = $globalAttributes + $localAttributes
 
+Write-Log -message "Loaded global attributes $( $globalAttributes.name -join ", " )"
+Write-Log -message "Loaded local attributes $( $localAttributes.name -join ", " )"
+
+
 # TODO [ ] Implement re-using a group (with deactivation of receivers and comparation of local fields)
 
 $attributesNames = $attributes | where { $_.name -notin $requiredFields }
 $csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
+Write-Log -message "Loaded csv attributes $( $csvAttributesNames.Name -join ", " )"
 
 # Check if email field is present
 
@@ -305,6 +329,9 @@ $colsInCsvButNotAttr | ForEach {
 
 }
 
+Write-Log -message "Created new local attributes in CleverReach: $( $newAttributes.name -join ", " )"
+
+
 #-----------------------------------------------
 # TRANSFORM UPLOAD DATA
 #-----------------------------------------------
@@ -319,7 +346,8 @@ $colsInCsvButNotAttr | ForEach {
 #>
 
 $globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
-
+$tags = ,$params.MessageName -split ","
+$upload = @()
 $uploadObject = @()
 For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
 
@@ -353,7 +381,7 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     In the array of tags, prepend a "-" to the tag you want to be removed.
     To remove all tags with a specific origin, simply specify "*" instead of any tag name.
     #>
-    $uploadEntry.tags = ,$params.MessageName -split ","
+    $uploadEntry.tags = $tags
 
     <#
         #$props = Get-Member -InputObject $dataCsv[$i] -MemberType NoteProperty | where { $_.Name -ne "email" }
@@ -363,19 +391,24 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     }
     #>
 
-    $uploadObject += $uploadEntry
+    #$uploadObject += $uploadEntry
     
+    #-----------------------------------------------
+    # UPSERT DATA INTO GROUP
+    #-----------------------------------------------
+
+    $object = "groups"
+    $endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
+    $bodyJson = $uploadEntry | ConvertTo-Json
+    
+    $upload += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
+    #$bodyJson | Set-Content -path "$( $scriptPath )\archive\$( $processId ).json" -Encoding UTF8
+
 }
 
+Write-Log -message "Use the tags: $( $tags -join ", " )"
 
-#-----------------------------------------------
-# UPSERT DATA INTO GROUP
-#-----------------------------------------------
-
-$object = "groups"
-$endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
-$bodyJson = $uploadObject | ConvertTo-Json
-$upload = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
+Write-Log -message "UpsertPlus for $( $upload.count ) records"
 
 
 ################################################
@@ -394,8 +427,9 @@ $transactionId = $processId
 $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
 }
 
 # return the results
 $return
-

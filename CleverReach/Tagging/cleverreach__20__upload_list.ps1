@@ -1,4 +1,5 @@
-﻿################################################
+﻿
+################################################
 #
 # INPUT
 #
@@ -12,7 +13,8 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,10 +22,21 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
+        TransactionType= "Replace"
+        Password= "def"
+        scriptPath= "D:\Scripts\CleverReach\Tagging"
+        MessageName= ""
+        EmailFieldName= "Email"
+        SmsFieldName= ""
+        Path= "D:\Apteco\Publish\CleverReach\system\Deliveries\PowerShell_Free Try Automation_25cb7d21-58d9-4136-a1a0-ca1886a0670b.txt"
+        ReplyToEmail= ""
+        Username= "abc"
+        ReplyToSMS= ""
+        UrnFieldName= "RC Id"
+        ListName= "Free Try Automation"
+        CommunicationKeyFieldName= "Communication Key"
     }
 }
-
 
 ################################################
 #
@@ -33,7 +46,6 @@ if ( $debug ) {
 
 <#
 
-https://rest.cleverreach.com/explorer/v3
 
 #>
 
@@ -66,7 +78,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRGETGROUPS"
+$moduleName = "CLVRUPLOAD"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -85,7 +97,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -143,52 +159,45 @@ if ( $paramsExisting ) {
 }
 
 
+
 ################################################
 #
 # PROGRAM
 #
 ################################################
 
-#-----------------------------------------------
-# AUTHENTICATION
-#-----------------------------------------------
+<#
 
-$apiRoot = $settings.base
-$contentType = "application/json; charset=utf-8"
-$auth = "Bearer $( Get-SecureToPlaintext -String $settings.login.accesstoken )"
-$header = @{
-    "Authorization" = $auth
+JUST FORWARDING A FEW PARAMETERS TO THE BROADCAST TO DO EVERYTHING THERE
+
+#>
+
+Write-Log -message "Just forwarding parameters to broadcast"
+
+
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE
+#
+################################################
+
+# count the number of successful upload rows
+$recipients = 0 #$upload.count
+
+# put in the source id as the listname
+$transactionId = $processId
+
+# return object
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
+    "EmailFieldName"= $params.EmailFieldName
+    "Path"= $params.Path
+    "UrnFieldName"= $params.UrnFieldName
 }
 
-
-#-----------------------------------------------
-# GET GROUPS
-#-----------------------------------------------
-
-$object = "groups"
-
-Write-Log -message "Downloading all groups"
-
-# get all groups
-$endpoint = "$( $apiRoot )$( $object )"
-$groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
-
-Write-Log -message "Found $( $groups.count  ) groups"
-
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
-#-----------------------------------------------
-
-$lists = $groups | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
-
-
-################################################
-#
-# RETURN
-#
-################################################
-
-# real messages
-return $lists
+# return the results
+$return
 

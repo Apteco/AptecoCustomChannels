@@ -12,8 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
-
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -67,7 +66,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRGETMAILINGS"
+$moduleName = "CLVRGETGROUPS"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -163,25 +162,25 @@ $header = @{
 
 
 #-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS
+# GET GROUPS
 #-----------------------------------------------
 
-$object = "mailings"
+$object = "groups"
 
-Write-Log -message "Downloading all mailings"
+Write-Log -message "Downloading all groups"
 
-# get all draft mailings
-$endpoint = "$( $apiRoot )$( $object )?state=draft&limit=999"
-$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+# get all groups
+$endpoint = "$( $apiRoot )$( $object )"
+$groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
 
-Write-Log -message "Found $( $mailings.draft.count  ) mailings"
+Write-Log -message "Found $( $groups.count  ) groups"
 
 
 #-----------------------------------------------
 # GET MAILINGS / CAMPAIGNS DETAILS
 #-----------------------------------------------
 
-$messages = $mailings.draft | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
+$lists = $groups | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
 
 
 ################################################
@@ -191,5 +190,5 @@ $messages = $mailings.draft | Select @{name="id";expression={ $_.id }}, @{name="
 ################################################
 
 # real messages
-return $messages
+return $lists
 
