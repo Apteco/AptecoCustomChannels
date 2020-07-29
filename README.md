@@ -1,3 +1,73 @@
+# Existing Standard Integrations
+
+## E-Mail
+
+Vendor | Product
+-|-
+upland|[Adestra](https://uplandsoftware.com/adestra/)
+Oracle|[Bronto](https://bronto.com/)
+Cheetah Digital|[Cheetah Messaging](https://www.cheetahdigital.com/solutions/cheetah-messaging)
+CleverReach|[CleverReach](https://www.cleverreach.com/de/)
+Communicator Corp|[Communicator](https://www.communicatorcorp.com/features/email-marketing)
+DisplayBlock|[DisplayBlock](https://www.displayblock.com/)
+dotdigital|engagement cloud
+Dream|
+DreamMail|
+Dynmark|
+artegic|[ELAINE](https://www.artegic.com/de/)
+Oracle|[Eloqua](https://www.oracle.com/de/marketingcloud/products/marketing-automation/)
+Ecos|
+EmailCenter|
+EmailFlow|
+EmailVision|
+Emarsys|
+SalesForce|Marketing Cloud (+ Data Extensions)
+instiller|[instiller](https://instiller.co.uk/)
+Kingpin|[Kingpin](https://kingpincomms.com/)
+LinkMobility|
+Mailingwork|[Mailingwork](https://mailingwork.de/)
+Maxemail|
+Optivo|
+Pure360|
+QBaseMail|
+RedEye|
+Responsys|
+ResponsysInteract|
+SAILTHRU|[Email Manager](https://www.sailthru.com/)
+~~SignUpTo~~|
+IBM|Watson Campaign Automation
+SparkPost|[SparkPost](https://www.sparkpost.com/)
+Selligent|Marketing Cloud (formerly StrongView)
+Taguchi|[Marketing Automation](http://taguchi.com.au/)
+Mapp Cloud|[Engage](https://mapp.com/de/e-mail-marketing/)
+traction DIGITAL|[Marketing Platform](https://tractiondigital.com/traction-marketing-platform/)
+TrustPilot|[Trustpilot](https://de.trustpilot.com/)
+GenericSFTP|
+
+## Mobile Push Notifications
+
+Vendor | Product
+-|-
+Google|
+Apple|
+Microsoft|
+
+## Social
+
+Vendor | Product
+-|-
+Facebook|
+LinkedIn|
+Google|
+Twitter|
+
+## CRM
+
+Vendor | Product
+-|-
+Microsoft|Dynamics CRM
+Salesforce|Sales Cloud
+
 # AptecoCustomChannels
 
 Custom Channels made for usage in the Apteco Marketing Suite
