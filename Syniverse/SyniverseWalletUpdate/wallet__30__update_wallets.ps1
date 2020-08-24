@@ -199,8 +199,6 @@ The wallet_item_id, campaign_ref, url, provider, created_at, and updated_at fiel
 Any fields that are specified will be updated with the new values. Any fields whose value is set to Null will be removed from the Wallet item. Any fields completely omitted will be ignored and any existing values will remain.
 The only fields that will be updated on the Wallet object are: tokens, locations, and group_code
 
-}
-
 #>
 
 #-----------------------------------------------
@@ -225,37 +223,6 @@ $dataWallets = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UT
 
 Write-Log -message "Got a file with no of rows: $( $dataWallets.Count )"
 
-
-#-----------------------------------------------
-# READ CURRENT TOKENS FROM SQLITE
-#-----------------------------------------------
-<#
-$assemblyFile = "D:\FastStats\Scripts\syniverse\sqlite-netFx46-binary-x64-2015-1.0.112.0\System.Data.SQLite.dll" # download precompiled binaries for .net or "System.Data.SQLite"
-[Reflection.Assembly]::LoadFile($assemblyFile) 
-$connString = "Data Source=""$( $scriptPath )\syniverse.sqlite"";Version=3;"
-$sqlCommand = "select * from wallet_tokens_latest"
-
-$conn = New-Object -TypeName System.Data.SQLite.SQLiteConnection
-$conn.ConnectionString = $connString
-$conn.Open()
-
-$cmd = New-Object -TypeName System.Data.SQLite.SQLiteCommand
-$cmd.CommandText = $sqlCommand
-$cmd.Connection = $conn
-
-$dataAdapter = New-Object -TypeName System.Data.SQLite.SQLiteDataAdapter
-$dataAdapter.SelectCommand = $cmd
-
-$data = New-Object -TypeName System.Data.DataSet
-$dataAdapter.fill($data)
-#$data.tables.rows | Out-GridView
-
-$dataAdapter.Dispose()
-$cmd.Dispose()
-$conn.Dispose()
-
-Write-Log -message "Got no of wallet tokens: $( $data.tables.rows.count )"
-#>
 
 #-----------------------------------------------
 # READ CURRENT TOKENS FROM MSSQL
@@ -363,50 +330,7 @@ $dataWallets | ForEach { #| where { $_."first_name" -eq "Florian" }
                     }
                 )
                 }
-               <#
-               "passbook"= @{
-                  "notification"= "This is a notification"
-                }
-                #>                
            } | ConvertTo-Json -Depth 8 -Compress
-
-
-           <#
-
-           "locations": [
-      {
-        "latitude": 43.6867,
-        "longitude": -85.0102,
-        "relevant_text": "Visit our State St store"
-      }
-
-      "passbook": {
-      "notification": "This is a notification"
-    },
-
-
-
-    "message":{
-         "template":"This is the updated message I would like to send.",
-         "header":"Header, for Android Pay only.",
-         "image_url":"http://www.google.com/wallet.jpg"
-      },
-
-      "google_wallet": {
-      "messages": [
-        {
-          "header": "Message",
-          "body": "This is a message",
-          "action_uri": "http://vibescm.com",
-          "image_uri": "http://www.vibes.com/sites/all/themes/vibes/images/logo.png"
-        }
-      ]
-    },
-
-      #>
-
-
-
 
     # log  
     Write-Log -message "Update wallet $( $row.WalletUrl ) with: $( $updateBody )"
