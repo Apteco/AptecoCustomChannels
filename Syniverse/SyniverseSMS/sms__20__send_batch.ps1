@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,19 +20,19 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-
-        ReplyToSMS = ""
-        EmailFieldName = "Email"
-        Username = "a"
-        MessageName ="Transaktionsbestätigung DEU"
-        ReplyToEmail = ""
-        UrnFieldName = "Bestell ID"
-        Password = "b"
-        ListName = "Transaktionsbestätigung DEU"
-        TransactionType = "Replace"
-        Path = "c:\faststats\Publish\Handel\system\Deliveries\PowerShell_Transaktionsbestätigung DEU_e8c49206-91c3-4d7d-8bc3-1340f3918a75.txt"
-        SmsFieldName = "mdn"
-        CommunicationKeyFieldName = "Communication Key"   
+	   "TransactionType"="Replace"
+        "Password"="b"
+        "scriptPath"="D:\Scripts\Syniverse\SMS"
+        "MessageName"="SMS Wallet Offer"
+        "EmailFieldName"="Email"
+        "SmsFieldName"="mdn"
+        "Path"="d:\faststats\Publish\Handel\system\Deliveries\PowerShell_SMS Wallet Offer_2aa41347-0c0a-43ae-987c-dc7210ba9281.txt"
+        "ReplyToEmail"=""
+        "Username"="a"
+        "ReplyToSMS"=""
+        "UrnFieldName"="Kunden ID"
+        "ListName"="SMS Wallet Offer"
+        "CommunicationKeyFieldName"="Communication Key"
     }
 }
 
@@ -78,7 +78,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "UPLOAD"
+$moduleName = "SYNSMSUPLOAD"
 $processId = [guid]::NewGuid()
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
@@ -114,7 +114,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data  #, System.Text.Encoding
+Add-Type -AssemblyName System.Data, System.Web  #, System.Text.Encoding
 
 Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
@@ -195,10 +195,25 @@ $mssqlTable.Load($mssqlResult)
 # close connection
 $mssqlConnection.Close()
 
+<#
+# some notes and other way for selections
+# https://www.regextester.com/97589
+$hash=@{}
+$creativeTemplateText | select-string -AllMatches '(http[s]?)(:\/\/)([^\s,]+)' | %{ $hash."Valid URLs"=$_.Matches.value }
+$hash
+#>
+
+# Regex patterns
+$regexForValuesBetweenCurlyBrackets = "(?<={{)(.*?)(?=}})"
+$regexForLinks = "(http[s]?)(:\/\/)({{(.*?)}}|[^\s,])+"
+
 # extract the important template information
 # https://stackoverflow.com/questions/34212731/powershell-get-all-strings-between-curly-braces-in-a-file
 $creativeTemplateText = $mssqlTable[0].Creative
-$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, '(?<={{)(.*?)(?=}})') | Select -ExpandProperty Value
+$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValuesBetweenCurlyBrackets) | Select -ExpandProperty Value
+$creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value
+
+
 
 #-----------------------------------------------
 # DEFINE NUMBERS
@@ -210,6 +225,7 @@ Write-Log -message "Start to create a new file"
 # TODO [ ] load parameters from creative template for default values
 
 $data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+
 
 
 #-----------------------------------------------
@@ -233,10 +249,22 @@ $data | ForEach {
     $row = $_
     $txt = $creativeTemplateText
     
-    # replace all tokens in text with personalised data
+    # replace all tokens in links in text with personalised data
+    $creativeTemplateLinks | ForEach {
+        $linkTemplate = $_
+        $linkReplaced = $_
+        $creativeTemplateToken | ForEach {
+            $token = $_
+            $linkReplaced = $linkReplaced -replace [regex]::Escape("{{$( $token )}}"), [uri]::EscapeDataString($row.$token)
+        }
+        # the #track function in syniverse automatically creates a trackable short link in the SMS
+        $txt = $txt -replace [regex]::Escape($linkTemplate), "#track(""$( $linkReplaced )"")"
+    }    
+
+    # replace all remaining tokens in text with personalised data
     $creativeTemplateToken | ForEach {
         $token = $_
-        $txt = $txt -replace "{{$( $token )}}", $row.$token
+        $txt = $txt -replace [regex]::Escape("{{$( $token )}}"), $row.$token
     }
 
     # create new object with data
@@ -260,7 +288,7 @@ $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeIn
 
 $url = "$( $settings.base )scg-external-api/api/v1/messaging/message_requests"
 
-
+$results = @()
 $parsedData | ForEach {
     
     $text = $_.message
@@ -285,13 +313,17 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json;charset=UTF-8" 
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json; charset=utf-8" 
 
     Write-Log -message "SMS result: $( $res.id )"
 
+    $results += $res
 
 }
+exit 0
 
+# Get message requests
+#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/zJWpbaWAoqMOE5xEBH23m6" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
 #$res
 #$res
 
@@ -326,7 +358,7 @@ $commFilePath = $commFile.FullName -replace "\\","/"
 # TODO [ ] check return results
 
 # count the number of successful upload rows
-$recipients = 0 # ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
 # There is no id reference for the upload in Epi
 $transactionId = 0 #$recipientListID

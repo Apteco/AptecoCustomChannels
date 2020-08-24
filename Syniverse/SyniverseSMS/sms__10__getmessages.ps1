@@ -21,7 +21,7 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\syniverse_validation"
+	    scriptPath= "D:\Scripts\Syniverse\SMS"
 	    Username= "abc"
     }
 }

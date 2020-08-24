@@ -109,7 +109,7 @@ $channelIds = @{
 #-----------------------------------------------
 
 # connection string of response database
-$mssqlConnectionString = "<responseConnectionString>"
+$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=abc123;"
 
 
 #-----------------------------------------------
