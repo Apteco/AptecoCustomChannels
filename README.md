@@ -43,9 +43,11 @@ Optilyz|REST|REST
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
-Syniverse|SMS|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:question:/:x:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:question:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Syniverse SMS Integration Guideline](Syniverse/SyniverseSMS)
+Syniverse|SMS|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Syniverse SMS Integration Guideline](Syniverse/SyniverseSMS)
 Syniverse|Number Verification|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Mobile Results Download|[Syniverse Mobile Validation Integration Guideline](Syniverse/SyniverseValidation)
-Syniverse|Wallets|REST
+Syniverse|Wallet Download|REST|:heavy_check_mark:/:heavy_check_mark: Webhooks Trigger<br/>:heavy_check_mark:/:heavy_check_mark: Regular Batch Download|[Syniverse Wallet Download Integration Guideline](Syniverse/SyniverseWalletDownload)
+Syniverse|Wallet Notification|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:x:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:question:/:x: Response Download<br/>:question:/:x:Trigger FERGE|[Syniverse Wallet Notification Integration Guideline](Syniverse/SyniverseWalletNotification)
+Syniverse|Wallet Update|REST|:heavy_check_mark:/:heavy_check_mark: Update wallets|[Syniverse Wallet Update Integration Guideline](Syniverse/SyniverseWalletUpdate)
 
 ### Database
 
