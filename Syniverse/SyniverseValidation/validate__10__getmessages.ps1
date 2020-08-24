@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
