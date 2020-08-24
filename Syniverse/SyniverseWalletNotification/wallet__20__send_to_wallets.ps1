@@ -21,19 +21,19 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        TransactionType= "Replace"
-        Password= "def"
-        scriptPath= "D:\Scripts\CleverReach\Tagging"
-        MessageName= ""
-        EmailFieldName= "Email"
-        SmsFieldName= ""
-        Path= "D:\Apteco\Publish\CleverReach\system\Deliveries\PowerShell_Free Try Automation_25cb7d21-58d9-4136-a1a0-ca1886a0670b.txt"
-        ReplyToEmail= ""
-        Username= "abc"
-        ReplyToSMS= ""
-        UrnFieldName= "RC Id"
-        ListName= "Free Try Automation"
-        CommunicationKeyFieldName= "Communication Key"
+        "TransactionType" = "Replace"
+        "Password" = "b"
+        "scriptPath" = "D:\Scripts\Syniverse\WalletNotification"
+        "MessageName" = "Wallet Notification"
+        "EmailFieldName" = "Email"
+        "SmsFieldName" = "WalletUrl"
+        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_Wallet Notification_b8919dd5-a92b-4a7e-b70b-7ddac8e8ebee.txt"
+        "ReplyToEmail" = ""
+        "Username" = "a"
+        "ReplyToSMS" = ""
+        "UrnFieldName" = "Kunden ID"
+        "ListName" = "Wallet Notification"
+        "CommunicationKeyFieldName" = "Communication Key"
     }
 }
 
@@ -87,13 +87,11 @@ $settings = @{
 }
 
 #$settings = Get-Content -Path "$( $scriptPath )\settings.json" -Encoding UTF8 -Raw | ConvertFrom-Json
-$walletIds = @("abcdeg")
+$walletIds = @("abcde5")
 $baseUrl = "https://public-api.cm.syniverse.eu"
-$companyId = "<compandId>"
+$companyId = "<companyId>"
 $token = "<token>"
-$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;Trusted_Connection=True;"
-
-
+$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=abc123;"
 
 # Current timestamp
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
@@ -110,7 +108,7 @@ $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 #}
 
 # more settings
-$logfile = "wallets.log" #$settings.logfile
+$logfile = $settings.logfile
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -198,15 +196,14 @@ $headers = @{
     "Authorization"="Basic $( $token )"
     "X-API-Version"="2"
     "int-companyid"=$companyId 
-
+}
 
 
 #-----------------------------------------------
 # READ TEMPLATE
 #-----------------------------------------------
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoading template with name $( $params.MessageName )" >> $logfile
-
+Write-Log -message "Loading template with name $( $params.MessageName )"
 
 $mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
 $mssqlConnection.ConnectionString = $mssqlConnectionString
@@ -223,7 +220,7 @@ FROM (
   ,row_number() OVER (
    PARTITION BY CreativeTemplateId ORDER BY Revision DESC
    ) AS prio
- FROM [RS_FUG].[dbo].[CreativeTemplate]
+ FROM [dbo].[CreativeTemplate]
  ) ct
 WHERE ct.prio = '1' and MessageContentType = 'SMS' and Name = '$( $params.MessageName )'
 ORDER BY CreatedOn
@@ -241,19 +238,22 @@ $mssqlTable.Load($mssqlResult)
 # close connection
 $mssqlConnection.Close()
 
+# Regex patterns
+$regexForValuesBetweenCurlyBrackets = "(?<={{)(.*?)(?=}})"
+$regexForLinks = "(http[s]?)(:\/\/)({{(.*?)}}|[^\s,])+"
+
 # extract the important template information
 # https://stackoverflow.com/questions/34212731/powershell-get-all-strings-between-curly-braces-in-a-file
 $creativeTemplateText = $mssqlTable[0].Creative
-$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, '(?<={{)(.*?)(?=}})') | Select -ExpandProperty Value
+$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValuesBetweenCurlyBrackets) | Select -ExpandProperty Value
+$creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value
+
 
 #-----------------------------------------------
 # DEFINE NUMBERS
 #-----------------------------------------------
 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
-#$cols = ,@($params.SmsFieldName)
-#$exportId = Split-File -inputPath $params.Path -header $true -writeHeader $false -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $cols -writeCount -1 -outputDoubleQuotes $true
-#$exportId = "75c3978f-4c94-4a28-ace6-b497494df2aa"
+Write-Log -message "Start to create a new file"
 
 # TODO [ ] use split file process for larger files
 # TODO [ ] load parameters from creative template for default values
@@ -262,7 +262,7 @@ $data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
 
 
 #-----------------------------------------------
-# SINGLE SMS SEND
+# PREPARE DATA TO UPLOAD
 #-----------------------------------------------
 
 # TODO [ ] put this workflow in parallel groups
@@ -273,11 +273,24 @@ $data | ForEach {
     $row = $_
     $txt = $creativeTemplateText
     
-    # replace all tokens in text with personalised data
+    # replace all tokens in links in text with personalised data
+    $creativeTemplateLinks | ForEach {
+        $linkTemplate = $_
+        $linkReplaced = $_
+        $creativeTemplateToken | ForEach {
+            $token = $_
+            $linkReplaced = $linkReplaced -replace [regex]::Escape("{{$( $token )}}"), [uri]::EscapeDataString($row.$token)
+        }
+
+        $txt = $txt -replace [regex]::Escape($linkTemplate), $linkReplaced
+    }    
+
+    # replace all remaining tokens in text with personalised data
     $creativeTemplateToken | ForEach {
         $token = $_
-        $txt = $txt -replace "{{$( $token )}}", $row.$token
+        $txt = $txt -replace [regex]::Escape("{{$( $token )}}"), $row.$token
     }
+
 
     # create new object with data
     $newRow = New-Object PSCustomObject
@@ -299,14 +312,9 @@ $walletFile = "$( $tempFolder )\wallet.csv"
 $parsedData | Export-Csv -Path $walletFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 
 
-
-
-
-
-
-$contentType = "application/json" 
-
-
+#-----------------------------------------------
+# UPLOAD MESSAGES
+#-----------------------------------------------
 
 $notificationResponse = @()
 $parsedData | ForEach {
@@ -332,11 +340,11 @@ $parsedData | ForEach {
     #$walletItemDetail = $_
     $walletItemDetailUrl = "$( $baseUrl )$( $mobile )"
 
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tPush to: '$( $walletItemDetailUrl )' and content '$( $notificationBody )'" >> $logfile
+    Write-Log -message "Push to: '$( $walletItemDetailUrl )' and content '$( $notificationBody )'"
 
     $notificationResponse = Invoke-RestMethod -ContentType $contentType -Method Put -Uri $walletItemDetailUrl -Headers $headers -Body $notificationBody -Verbose
 
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tPush result: $( $notificationResponse | ConvertTo-Json -Compress )" >> $logfile
+    Write-Log -message "Push result: $( $notificationResponse | ConvertTo-Json -Compress )"
 
 
 }
@@ -366,3 +374,32 @@ $notificationResponse = Invoke-RestMethod -ContentType $contentType -Method Post
 #
 ################################################
 
+
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE
+#
+################################################
+
+# TODO [ ] check return results
+
+# count the number of successful upload rows
+$recipients = 0 # ( $importResults | where { $_.Result -eq 0 } ).count
+
+# There is no id reference for the upload in Epi
+$transactionId = 0 #$recipientListID
+
+# return object
+[Hashtable]$return = @{
+    
+    # Mandatory return values
+    "Recipients" = $recipients
+    "TransactionId" = $transactionId
+    
+    # General return value to identify this custom channel in the broadcasts detail tables
+    "CustomProvider" = $settings.providername
+
+}
+
+# return the results
+$return

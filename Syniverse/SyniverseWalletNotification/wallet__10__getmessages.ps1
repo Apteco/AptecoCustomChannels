@@ -1,4 +1,4 @@
-﻿################################################
+################################################
 #
 # INPUT
 #
@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,7 +20,9 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-        
+	    Password= "def"
+	    scriptPath= "D:\Scripts\Syniverse\WalletNotification"
+	    Username= "abc"
     }
 }
 
@@ -33,6 +35,8 @@ if ( $debug ) {
 
 <#
 
+TODO [ ] more logging
+TODO [ ] replace mssql with already existent functions of EpiServer
 
 #>
 
@@ -43,14 +47,14 @@ if ( $debug ) {
 ################################################
 
 if ( $debug ) {
-    # Load scriptpath
-    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    } else {
-        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    }
+  # Load scriptpath
+  if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+      $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+  } else {
+      $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+  }
 } else {
-    $scriptPath = "$( $params.scriptPath )" 
+  $scriptPath = "$( $params.scriptPath )" 
 }
 Set-Location -Path $scriptPath
 
@@ -63,45 +67,34 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
-$libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "SYNWALMESSAGES"
+$moduleName = "GETMAILINGS"
 $processId = [guid]::NewGuid()
+$timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 # Load settings
-
-
-$settings = @{
-    nameConcatChar = " | "
-    logfile = "wallets.log"
-}
-
-#$settings = Get-Content -Path "$( $scriptPath )\settings.json" -Encoding UTF8 -Raw | ConvertFrom-Json
-$walletIds = @("abcde5")
-$baseUrl = "https://public-api.cm.syniverse.eu"
-$companyId = "<companyId>"
-$token = "<token>"
-
+$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-#if ( $settings.changeTLS ) {
-    $AllProtocols = @(    
-        [System.Net.SecurityProtocolType]::Tls12
-        #[System.Net.SecurityProtocolType]::Tls13,
-        #,[System.Net.SecurityProtocolType]::Ssl3
-    )
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-#}
+if ( $settings.changeTLS ) {
+  $AllProtocols = @(    
+      [System.Net.SecurityProtocolType]::Tls12
+      #[System.Net.SecurityProtocolType]::Tls13,
+      ,[System.Net.SecurityProtocolType]::Ssl3
+  )
+  [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+}
 
 # more settings
-$logfile = "wallets.log" #$settings.logfile
+$logfile = $settings.logfile
+$mssqlConnectionString = $settings.responseDB
+
 
 # append a suffix, if in debug mode
 if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
+  $logfile = "$( $logfile ).debug"
 }
-
 
 
 ################################################
@@ -109,6 +102,8 @@ if ( $debug ) {
 # FUNCTIONS & ASSEMBLIES
 #
 ################################################
+
+Add-Type -AssemblyName System.Data  #, System.Text.Encoding
 
 # Load all PowerShell Code
 "Loading..."
@@ -134,7 +129,6 @@ $libExecutables | ForEach {
 #>
 
 
-
 ################################################
 #
 # LOG INPUT PARAMETERS
@@ -143,47 +137,96 @@ $libExecutables | ForEach {
 
 # Start the log
 Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $modulename )"
+Write-Log -message "$( $moduleName )"
 Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-    $paramsExisting = $true
+  $paramsExisting = $true
 } else {
-    $paramsExisting = $false
+  $paramsExisting = $false
 }
 
 # Log the params, if existing
 if ( $paramsExisting ) {
-    $params.Keys | ForEach-Object {
-        $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
-    }
+  $params.Keys | ForEach-Object {
+      $param = $_
+      Write-Log -message " $( $param ): $( $params[$param] )"
+  }
 }
-
 
 
 ################################################
 #
-# GET WALLETS
+# CHECK MSSQL FOR TEMPLATES
 #
 ################################################
 
+#-----------------------------------------------
+# LOAD TEMPLATES FROM MSSQL
+#-----------------------------------------------
 
-$contentType = "application/json" 
+$mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
+$mssqlConnection.ConnectionString = $mssqlConnectionString
 
-$headers = @{
-    "Authorization"="Basic $( $token )"
-    "X-API-Version"="2"
-    "int-companyid"=$companyId
+$mssqlConnection.Open()
+
+"Trying to load the data from MSSQL"
+
+# define query -> currently the age of the date in the query has to be less than 12 hours
+$mssqlQuery = @"
+SELECT *
+FROM (
+ SELECT *
+  ,row_number() OVER (
+   PARTITION BY CreativeTemplateId ORDER BY Revision DESC
+   ) AS prio
+ FROM [dbo].[CreativeTemplate]
+ ) ct
+WHERE ct.prio = '1' and MessageContentType = 'SMS'
+ORDER BY CreatedOn
+"@
+
+# execute command
+$mssqlCommand = $mssqlConnection.CreateCommand()
+$mssqlCommand.CommandText = $mssqlQuery
+$mssqlResult = $mssqlCommand.ExecuteReader()
+    
+# load data
+$mssqlTable = new-object System.Data.DataTable
+$mssqlTable.Load($mssqlResult)
+    
+
+$mssqlConnection.Close()
+
+# show result
+#$mssqlTable
+
+
+#-----------------------------------------------
+# TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
+#-----------------------------------------------
+
+$templates = @()
+$mssqlTable | ForEach {
+
+    $currentRow = $_
+
+    $row = New-Object PSCustomObject
+
+    $row | Add-Member -MemberType NoteProperty -Name "id" -Value $currentRow.CreativeTemplateId
+    $row | Add-Member -MemberType NoteProperty -Name "name" -Value $currentRow.Name
+
+    $templates += $row
+
 }
 
 
-$walletDetails = @()
-$walletIds | ForEach {
-    $walletId = $_
-    $walletUrl = "$( $baseUrl )/companies/$( $companyId )/campaigns/wallet/$( $walletId )"
-    $walletDetails += Invoke-RestMethod -ContentType $contentType -Method Get -Uri $walletUrl -Headers $headers
-}
 
-$messages = $walletDetails | Select @{name="id";expression={ $_.wallet_id }}, @{name="name";expression={ "$( $_.wallet_id )$( $settings.nameConcatChar )$( $_.Name )" }}
+###############################
+#
+# RETURN MESSAGES
+#
+###############################
+
+return $templates
