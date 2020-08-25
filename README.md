@@ -82,3 +82,7 @@ The custom channels can trigger those functionalities
 6.	UploadScript: used to upload a list to the broadcaster, given a tab delimited file
 7.	BroadcastScript: used to send a list a message
   
+# Troubleshooting
+
+* If the files created from PeopleStage and used by the "upload" scripts have the extension `.converted` then the output encoding in the PeopleStage Channel Editor should be changed to another encoding.
+* If some umlauts are not used correctly, then the script is maybe saved in the wrong encoding. It should be UTF-8.
