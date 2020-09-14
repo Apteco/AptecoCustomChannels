@@ -220,6 +220,9 @@ $headers = @{
     "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
 }
 
+$contentType = "application/json; charset=utf-8"
+
+
 #-----------------------------------------------
 # SINGLE SMS SEND
 #-----------------------------------------------
@@ -285,36 +288,12 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json" 
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
 
     Write-Log -message "SMS result: $( $res.id )" >> $logfile
 
 
 }
-
-#$res
-#$res
-
-#$messages = Invoke-RestMethod -Uri $url -Method Get -Verbose -Headers $headers
-#$messages.list | Out-GridView
-
-
-<#
-################################################
-#
-# INSERT COMMUNICATION KEY IN SQLITE
-#
-################################################
-
-$cols = @($params.UrnFieldName,$params.CommunicationKeyFieldName)
-$commExportId = Split-File -inputPath $params.Path -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $cols -writeCount -1 -outputDoubleQuotes $true
-
-Write-Log -message "Done with export id $( $commExportId )!" >> $logfile
-$commFile = Get-ChildItem -Path "$( $scriptPath )\$( $commExportId )" | Select -First 1
-$commFilePath = $commFile.FullName -replace "\\","/"
-
-".mode csv",".separator \t",".import $( $commFilePath ) communications" | .\sqlite3.exe syniverse.sqlite
-#>
 
 
 ################################################
@@ -326,7 +305,7 @@ $commFilePath = $commFile.FullName -replace "\\","/"
 # TODO [ ] check return results
 
 # count the number of successful upload rows
-$recipients = 0 # ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
 # There is no id reference for the upload in Epi
 $transactionId = 0 #$recipientListID
