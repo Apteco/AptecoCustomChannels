@@ -78,7 +78,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "UPLOAD"
+$moduleName = "SYNSMSUPLOAD"
 $processId = [guid]::NewGuid()
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
@@ -195,10 +195,41 @@ $mssqlTable.Load($mssqlResult)
 # close connection
 $mssqlConnection.Close()
 
+
+#-----------------------------------------------
+# REGEX FOR EXTRACT OF LINKS AND TOKENS IN TEMPLATE
+#-----------------------------------------------
+
+<#
+# some notes and other way for selections
+# https://www.regextester.com/97589
+$hash=@{}
+$creativeTemplateText | select-string -AllMatches '(http[s]?)(:\/\/)([^\s,]+)' | %{ $hash."Valid URLs"=$_.Matches.value }
+$hash
+#>
+
+# Regex patterns
+$regexForValuesBetweenCurlyBrackets = "(?<={{)(.*?)(?=}})"
+$regexForLinks = "(http[s]?)(:\/\/)({{(.*?)}}|[^\s,])+"
+
 # extract the important template information
 # https://stackoverflow.com/questions/34212731/powershell-get-all-strings-between-curly-braces-in-a-file
 $creativeTemplateText = $mssqlTable[0].Creative
-$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, '(?<={{)(.*?)(?=}})') | Select -ExpandProperty Value
+$creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValuesBetweenCurlyBrackets) | Select -ExpandProperty Value
+$creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value
+
+
+#-----------------------------------------------
+# SWITCH TO UTF8
+#-----------------------------------------------
+<#
+# Call an external program first so the console encoding command works in ISE, too. Good explanation here: https://social.technet.microsoft.com/Forums/scriptcenter/en-US/b92b15c8-6854-4d3e-8a35-51b4b56276ba/powershell-ise-vs-consoleoutputencoding?forum=ITCG
+ping | Out-Null
+
+# Change the console output to UTF8
+$originalConsoleCodePage = [Console]::OutputEncoding.CodePage
+[Console]::OutputEncoding = [text.encoding]::utf8
+#>
 
 #-----------------------------------------------
 # DEFINE NUMBERS
@@ -209,7 +240,8 @@ Write-Log -message "Start to create a new file"
 # TODO [ ] use split file process for larger files
 # TODO [ ] load parameters from creative template for default values
 
-$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+#$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+$data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-Csv -Delimiter "`t"
 
 
 #-----------------------------------------------
@@ -236,11 +268,27 @@ $data | ForEach {
     $row = $_
     $txt = $creativeTemplateText
     
-    # replace all tokens in text with personalised data
+    # replace all tokens in links in text with personalised data
+    $creativeTemplateLinks | ForEach {
+        $linkTemplate = $_
+        $linkReplaced = $_
+        $creativeTemplateToken | ForEach {
+            $token = $_
+            $linkReplaced = $linkReplaced -replace [regex]::Escape("{{$( $token )}}"), [uri]::EscapeDataString($row.$token)
+            Write-Log -message "$( ($row.$token).toString() ) - $( [uri]::EscapeDataString($row.$token) )"
+        }
+        # the #track function in syniverse automatically creates a trackable short link in the SMS
+        $txt = $txt -replace [regex]::Escape($linkTemplate), "#track(""$( $linkReplaced )"")"
+    }    
+
+    # replace all remaining tokens in text with personalised data
     $creativeTemplateToken | ForEach {
         $token = $_
-        $txt = $txt -replace "{{$( $token )}}", $row.$token
+        $txt = $txt -replace [regex]::Escape("{{$( $token )}}"), $row.$token
     }
+
+    # Unescape and escape data to catch remaining umlauts in the template
+    #$txt = [uri]::EscapeDataString([uri]::UnescapeDataString($txt))
 
     # create new object with data
     $newRow = New-Object PSCustomObject
@@ -263,7 +311,7 @@ $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeIn
 
 $url = "$( $settings.base )scg-external-api/api/v1/messaging/message_requests"
 
-
+$results = @()
 $parsedData | ForEach {
     
     $text = $_.message
@@ -291,6 +339,10 @@ $parsedData | ForEach {
     $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
 
     Write-Log -message "SMS result: $( $res.id )" >> $logfile
+
+    Write-Log -message "SMS result: $( $res.id )"
+
+    $results += $res
 
 
 }
