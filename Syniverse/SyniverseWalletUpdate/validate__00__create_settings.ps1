@@ -69,12 +69,11 @@ $consumerSecretEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dumm
 $accessToken = Read-Host -AsSecureString "Please enter the accessToken for syniverse"
 $accessTokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$accessToken).GetNetworkCredential().Password)
 
+
 $authentication = @{
     consumerKey = "<consumerkey>"
-    consumerSecret = $consumerSecretEncrypted 
+    consumerSecret = $consumerSecretEncrypted
     accessToken = $accessTokenEncrypted
-}
-
 
 #-----------------------------------------------
 # SEND SMS
@@ -95,44 +94,71 @@ $countryMap = @{
 # sender number is not fixed.
 # we have public shared codes available for 58 countries listed here
 $channelIds = @{
-    "uk"="JXxaP5zAitsUnd66Ynavc" #"DJm-vHcnSBKbeK4b2FAOLQ"
+    "uk"="JXxaP5zAitsUnd66Ynavc"
     #"fr"="RUHDTglIodfuVx2vBg7qg3"
-    "de"="JXxaP5zAitsUnd66Ynavc" #"qSOdzTqaSfO0bmwLEQGNdw"
+    "de"="JXxaP5zAitsUnd66Ynavc"
     #"es"="zm8lO9Y9QKGKTeS-BoHCKA"
     #"dk"="o4u6_YvUSLas0SjuFYCtDw"
     #"se"="qAQwTeyCQsi5UturUnJApQ"
 }
 
 
+
 #-----------------------------------------------
-# APTECO SETTINGS
+# NISScrub - Discover valid numbers
 #-----------------------------------------------
 
-# connection string of response database
-$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=abc123;"
+# see the layouts
+<#
+$headers = @{
+    "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
+    "Content-Type"= "application/json"
+}
+$url = "$( $settings.base )aba/v1/layouts"
+$layouts = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -Verbose 
+#>
 
+$nisscrub = @{
+    "inputLayoutName" = "MDN-input-v1"
+    "outputLayoutName" = "NIS-Scrub-Output-v1"
+}
+
+
+#-----------------------------------------------
+# MEDIACENTER
+#-----------------------------------------------
+
+$emptyFileContent = @{
+    "fileName" = ""
+    "fileTag" = ""
+    "fileFolder" = ""
+    "appName" = ""
+    "expireTimestamp" = ""
+    "checksum" = ""
+    "file_fullsize" = "2000000"
+    <#"compressionType" = ""#>
+}
+
+$mediacenter = @{
+    emptyFileContent = $emptyFileContent
+    maxTries = 100 # number of tries while checking status of batch automation
+    waitBetweenTries = 1000 # milliseconds
+    timeoutSecForDeletion = 2
+}
 
 #-----------------------------------------------
 # EVERYTHING TOGETHER
 #-----------------------------------------------
 
 $settings = @{
-
-    # General
-    base="https://api.syniverse.com/"					# Default url
-    changeTLS = $true                      	            # should tls be changed on the system?
-    nameConcatChar = " / "                 	            # character to concat mailing/campaign id with mailing/campaign name
-    logfile="$( $scriptPath )\syn_sms.log"		        # path and name of log file
-    providername = "synsms"                             # identifier for this custom integration, this is used for the response allocation
-
-    # Authentication
+    base="https://api.syniverse.com/"
+    general=@{
+    }
     authentication = $authentication
-    
-    # Detail settings
     countryMap = $countryMap
     channels = $channelIds
-    responseDB = $mssqlConnectionString
-
+    mediacenter = $mediacenter
+    nisscrub = $nisscrub
 }
 
 

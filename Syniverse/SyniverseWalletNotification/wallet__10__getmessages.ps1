@@ -21,7 +21,7 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "D:\Scripts\Syniverse\SMS"
+	    scriptPath= "D:\Scripts\Syniverse\WalletNotification"
 	    Username= "abc"
     }
 }
@@ -99,16 +99,34 @@ if ( $debug ) {
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
-# TODO [ ] add mssql assemblies or extend it
-Add-Type -AssemblyName System.Data #, System.Text.Encoding
+Add-Type -AssemblyName System.Data  #, System.Text.Encoding
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
-  . $_.FullName
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+    . $_.FullName
+    "... $( $_.FullName )"
 }
+
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################

@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,21 +20,23 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    EmailFieldName= "Email"
-	    TransactionType= "Replace"
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\syniverse_validation"
-	    MessageName= "Validate globally"
-	    SmsFieldName= ""
-	    Path= "C:\FastStats\Publish\Handel\system\deliveries\PowerShell Validate globally_66ce38fd-191a-48b9-885f-eca1bac20803.txt"
-	    ReplyToEmail= ""
-	    Username= "abc"
-	    ReplyToSMS= ""
-	    UrnFieldName= "Urn"
-	    ListName= "Validate globally"
-	    CommunicationKeyFieldName= "Communication Key"
+	   "TransactionType"="Replace"
+        "Password"="b"
+        "scriptPath"="D:\Scripts\Syniverse\SMS"
+        "MessageName"="SMS Wallet Offer"
+        "EmailFieldName"="Email"
+        "SmsFieldName"="mdn"
+        "Path"="d:\faststats\Publish\Handel\system\Deliveries\PowerShell_SMS Wallet Offer_2aa41347-0c0a-43ae-987c-dc7210ba9281.txt"
+        "ReplyToEmail"=""
+        "Username"="a"
+        "ReplyToSMS"=""
+        "UrnFieldName"="Kunden ID"
+        "ListName"="SMS Wallet Offer"
+        "CommunicationKeyFieldName"="Communication Key"
     }
 }
+
+#Copy-Item -Path $params.Path -Destination "D:\Scripts\Syniverse\SMS"
 
 ################################################
 #
@@ -98,8 +100,8 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$maxWriteCount = $settings.rowsPerUpload
-$uploadsFolder = $settings.uploadsFolder
+$maxWriteCount = 100 #$settings.rowsPerUpload
+$uploadsFolder = "$( $scriptPath )\upload" #$settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
 
 # append a suffix, if in debug mode
@@ -114,7 +116,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data  #, System.Text.Encoding
+Add-Type -AssemblyName System.Data #, System.Web  #, System.Text.Encoding
 
 Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
@@ -222,14 +224,14 @@ $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks)
 #-----------------------------------------------
 # SWITCH TO UTF8
 #-----------------------------------------------
-<#
 # Call an external program first so the console encoding command works in ISE, too. Good explanation here: https://social.technet.microsoft.com/Forums/scriptcenter/en-US/b92b15c8-6854-4d3e-8a35-51b4b56276ba/powershell-ise-vs-consoleoutputencoding?forum=ITCG
 ping | Out-Null
 
 # Change the console output to UTF8
 $originalConsoleCodePage = [Console]::OutputEncoding.CodePage
 [Console]::OutputEncoding = [text.encoding]::utf8
-#>
+
+$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
 
 #-----------------------------------------------
 # DEFINE NUMBERS
@@ -260,6 +262,7 @@ $contentType = "application/json; charset=utf-8"
 #-----------------------------------------------
 
 # TODO [ ] put this workflow in parallel groups
+Write-Log -message "Parsing data and putting links into syniverse functions via regex"
 
 
 $parsedData = @()
@@ -294,17 +297,20 @@ $data | ForEach {
     $newRow = New-Object PSCustomObject
     $newRow | Add-Member -MemberType NoteProperty -Name "mdn" -Value $row."$( $params.SmsFieldName )"
     $newRow | Add-Member -MemberType NoteProperty -Name "message" -Value $txt
+    $newRow | Add-Member -MemberType NoteProperty -Name "Urn" -Value $row.($params.UrnFieldName)
+    $newRow | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $row.($params.CommunicationKeyFieldName)
     
     # add to array
     $parsedData += $newRow
 }
 
 # create new guid
-$smsId = [guid]::NewGuid()
+$smsId = $processId.Guid
 
 # Filenames
 $tempFolder = "$( $uploadsFolder )\$( $smsId )"
 New-Item -ItemType Directory -Path $tempFolder
+Write-Log -message "Creating files in $( $tempFolder )"
 $smsFile = "$( $tempFolder )\sms.csv"
 
 $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
@@ -338,14 +344,73 @@ $parsedData | ForEach {
     #$body
     $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
 
-    Write-Log -message "SMS result: $( $res.id )" >> $logfile
-
     Write-Log -message "SMS result: $( $res.id )"
 
-    $results += $res
+    # create new object with data
+    $newResult = New-Object PSCustomObject
+    $newResult | Add-Member -MemberType NoteProperty -Name "messageid" -Value $res.id
+    $newResult | Add-Member -MemberType NoteProperty -Name "Urn" -Value $parsedData.Urn
+    $newResult | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $parsedData.CommunicationKey
+
+    $results += $newResult
+
+}
+
+# Get message requests
+#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/nbFtqIqiLcqPQLA1HukB" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
+#$res
+
+#$messages = Invoke-RestMethod -Uri $url -Method Get -Verbose -Headers $headers
+#$messages.list | Out-GridView
+
+
+
+################################################
+#
+# INSERT COMMUNICATION KEY IN MSSQL
+#
+################################################
+
+Write-Log -message "Putting results in response database"
+
+# open connection again
+$mssqlConnection.Open()
+
+$results | ForEach {
+    
+    $res = $_
+
+    $insert = @"
+        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey])
+          VALUES ('SYNSMS','$( $res.Urn )','$( $processId.Guid )','$( $res.messageid )','$( $res.CommunicationKey )')
+"@
+
+    try {
+
+        # execute command
+        $levelUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+        $levelUpdateMssqlCommand.CommandText = $insert
+        $updateResult = $levelUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+    
+    } catch [System.Exception] {
+
+        $errText = $_.Exception
+        $errText | Write-Output
+        Write-Log -message $errText
+
+
+    } finally {
+    
+            
+
+    }
 
 
 }
+
+# close connection
+$mssqlConnection.Close()
+
 
 
 ################################################
@@ -359,8 +424,8 @@ $parsedData | ForEach {
 # count the number of successful upload rows
 $recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
-# There is no id reference for the upload in Epi
-$transactionId = 0 #$recipientListID
+# There is no id reference, but saving and using the current GUI, that will be saved in the broadcastdetails
+$transactionId = $processId.Guid #$recipientListID
 
 # return object
 [Hashtable]$return = @{

@@ -1,4 +1,4 @@
-################################################
+﻿################################################
 #
 # INPUT
 #
@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,9 +20,7 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\syniverse_validation"
-	    Username= "abc"
+        
     }
 }
 
@@ -35,9 +33,6 @@ if ( $debug ) {
 
 <#
 
-https://github.com/Syniverse/QuickStart-BatchNumberLookup-Python/blob/master/ABA-example-external.py
-
-FILEUPLOAD UP TO 2 GB allowed
 
 #>
 
@@ -68,27 +63,41 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
+$moduleName = "SYNWALMESSAGES"
 $processId = [guid]::NewGuid()
-$timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 # Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+
+
+$settings = @{
+    nameConcatChar = " | "
+    logfile = "wallets.log"
+}
+
+# TODO [ ] put all settings back into settings.json
+
+#$settings = Get-Content -Path "$( $scriptPath )\settings.json" -Encoding UTF8 -Raw | ConvertFrom-Json
+$walletIds = @("abcde5")
+$baseUrl = "https://public-api.cm.syniverse.eu"
+$companyId = "<companyId>"
+$token = "<token>"
+
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-if ( $settings.changeTLS ) {
+#if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
         #[System.Net.SecurityProtocolType]::Tls13,
-        ,[System.Net.SecurityProtocolType]::Ssl3
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-}
+#}
 
 # more settings
-$logfile = $settings.logfile
+$logfile = "wallets.log" #$settings.logfile
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -96,15 +105,36 @@ if ( $debug ) {
 }
 
 
+
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
+
 
 
 ################################################
@@ -115,7 +145,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 
 # Start the log
 Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $moduleName )"
+Write-Log -message "$( $modulename )"
 Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
 
 # Check if params object exists
@@ -129,27 +159,34 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message " $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ): $( $params[$param] )"
     }
 }
 
 
+
 ################################################
 #
-# OPTIONS FOR VALIDATION
+# GET WALLETS
 #
 ################################################
 
-$messages = $settings.nisscrub.validationOptions
+
+$contentType = "application/json" 
+
+$headers = @{
+    "Authorization"="Basic $( $token )"
+    "X-API-Version"="2"
+    "int-companyid"=$companyId
+}
 
 
+$walletDetails = @()
+$walletIds | ForEach {
+    $walletId = $_
+    $walletUrl = "$( $baseUrl )/companies/$( $companyId )/campaigns/wallet/$( $walletId )"
+    $walletDetails += Invoke-RestMethod -ContentType $contentType -Method Get -Uri $walletUrl -Headers $headers
+}
 
-###############################
-#
-# RETURN MESSAGES
-#
-###############################
-
-
-return $messages | select id, name
-
+$messages = $walletDetails | Select @{name="id";expression={ $_.wallet_id }}, @{name="name";expression={ "$( $_.wallet_id )$( $settings.nameConcatChar )$( $_.Name )" }}
+$messages
