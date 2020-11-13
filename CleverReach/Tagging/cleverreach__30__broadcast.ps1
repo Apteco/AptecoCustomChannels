@@ -310,7 +310,7 @@ $colsInCsvButNotAttr = $differences | where { $_.SideIndicator -eq "=>" }
 #-----------------------------------------------
 
 $object = "groups"
-$endpoint = "$( $apiRoot )$( $object ).json/$( $newGroup.id )/attributes"
+$endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/attributes"
 $newAttributes = @()
 $colsInCsvButNotAttr | ForEach {
 
@@ -345,6 +345,12 @@ Write-Log -message "Created new local attributes in CleverReach: $( $newAttribut
 ]}
 #>
 
+# Filenames
+$tempFolder = "$( $settings.upload.uploadsFolder )\$( $processId.guid )"
+New-Item -ItemType Directory -Path $tempFolder
+Write-Log -message "Creating files in $( $tempFolder )"
+
+
 $globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
 $tags = ,$params.MessageName -split ","
 $upload = @()
@@ -360,20 +366,23 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
 
     # Global attributes
     $globalAtts | ForEach {
-        $attrName = $_.name
-        $uploadEntry.global_attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
+        $attrName = $_.name # using description now rather than name, because the comparison is made on descriptions
+        $attrDescription = $_.description
+        $uploadEntry.global_attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrDescription
     }
 
     # New local attributes
     $newAttributes | ForEach {
-        $attrName = $_.name
-        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
+        $attrName = $_.name # using description now rather than name, because the comparison is made on descriptions
+        $attrDescription = $_.description
+        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrDescription
     }
 
     # Existing local attributes
     $localAttributes | ForEach {
-        $attrName = $_.name
-        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
+        $attrName = $_.name # using description now rather than name, because the comparison is made on descriptions
+        $attrDescription = $_.description
+        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrDescription
     }
 
     # Tags
@@ -401,6 +410,8 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     $endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
     $bodyJson = $uploadEntry | ConvertTo-Json
     
+    $bodyJson | Set-Content -path "$( $tempFolder )\$( $i ).json" -Encoding UTF8
+
     $upload += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
     #$bodyJson | Set-Content -path "$( $scriptPath )\archive\$( $processId ).json" -Encoding UTF8
 
