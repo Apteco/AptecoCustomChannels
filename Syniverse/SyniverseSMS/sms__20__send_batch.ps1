@@ -231,7 +231,7 @@ ping | Out-Null
 $originalConsoleCodePage = [Console]::OutputEncoding.CodePage
 [Console]::OutputEncoding = [text.encoding]::utf8
 
-$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
+#$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
 
 #-----------------------------------------------
 # DEFINE NUMBERS
