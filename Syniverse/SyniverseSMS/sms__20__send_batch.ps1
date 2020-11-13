@@ -36,6 +36,8 @@ if ( $debug ) {
     }
 }
 
+#Copy-Item -Path $params.Path -Destination "D:\Scripts\Syniverse\SMS"
+
 ################################################
 #
 # NOTES
@@ -98,8 +100,8 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$maxWriteCount = $settings.rowsPerUpload
-$uploadsFolder = $settings.uploadsFolder
+$maxWriteCount = 100 #$settings.rowsPerUpload
+$uploadsFolder = "$( $scriptPath )\upload" #$settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
 
 # append a suffix, if in debug mode
@@ -114,7 +116,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data, System.Web  #, System.Text.Encoding
+Add-Type -AssemblyName System.Data #, System.Web  #, System.Text.Encoding
 
 Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
     . $_.FullName
@@ -214,6 +216,18 @@ $creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValues
 $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value
 
 
+#-----------------------------------------------
+# SWITCH TO UTF8
+#-----------------------------------------------
+
+# Call an external program first so the console encoding command works in ISE, too. Good explanation here: https://social.technet.microsoft.com/Forums/scriptcenter/en-US/b92b15c8-6854-4d3e-8a35-51b4b56276ba/powershell-ise-vs-consoleoutputencoding?forum=ITCG
+ping | Out-Null
+
+# Change the console output to UTF8
+$originalConsoleCodePage = [Console]::OutputEncoding.CodePage
+[Console]::OutputEncoding = [text.encoding]::utf8
+
+$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
 
 #-----------------------------------------------
 # DEFINE NUMBERS
@@ -224,8 +238,8 @@ Write-Log -message "Start to create a new file"
 # TODO [ ] use split file process for larger files
 # TODO [ ] load parameters from creative template for default values
 
-$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
-
+#$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+$data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-Csv -Delimiter "`t"
 
 
 #-----------------------------------------------
@@ -236,11 +250,16 @@ $headers = @{
     "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
 }
 
+$contentType = "application/json; charset=utf-8" #; charset=utf-8
+
+
+
 #-----------------------------------------------
 # SINGLE SMS SEND
 #-----------------------------------------------
 
 # TODO [ ] put this workflow in parallel groups
+Write-Log -message "Parsing data and putting links into syniverse functions via regex"
 
 
 $parsedData = @()
@@ -256,6 +275,7 @@ $data | ForEach {
         $creativeTemplateToken | ForEach {
             $token = $_
             $linkReplaced = $linkReplaced -replace [regex]::Escape("{{$( $token )}}"), [uri]::EscapeDataString($row.$token)
+            Write-Log -message "$( ($row.$token).toString() ) - $( [uri]::EscapeDataString($row.$token) )"
         }
         # the #track function in syniverse automatically creates a trackable short link in the SMS
         $txt = $txt -replace [regex]::Escape($linkTemplate), "#track(""$( $linkReplaced )"")"
@@ -267,21 +287,27 @@ $data | ForEach {
         $txt = $txt -replace [regex]::Escape("{{$( $token )}}"), $row.$token
     }
 
+    # Unescape and escape data to catch remaining umlauts in the template
+    #$txt = [uri]::EscapeDataString([uri]::UnescapeDataString($txt))
+
     # create new object with data
     $newRow = New-Object PSCustomObject
     $newRow | Add-Member -MemberType NoteProperty -Name "mdn" -Value $row."$( $params.SmsFieldName )"
     $newRow | Add-Member -MemberType NoteProperty -Name "message" -Value $txt
+    $newRow | Add-Member -MemberType NoteProperty -Name "Urn" -Value $row.($params.UrnFieldName)
+    $newRow | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $row.($params.CommunicationKeyFieldName)
     
     # add to array
     $parsedData += $newRow
 }
 
 # create new guid
-$smsId = [guid]::NewGuid()
+$smsId = $processId.Guid
 
 # Filenames
 $tempFolder = "$( $uploadsFolder )\$( $smsId )"
 New-Item -ItemType Directory -Path $tempFolder
+Write-Log -message "Creating files in $( $tempFolder )"
 $smsFile = "$( $tempFolder )\sms.csv"
 
 $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
@@ -313,40 +339,75 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType "application/json; charset=utf-8" 
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
 
     Write-Log -message "SMS result: $( $res.id )"
 
-    $results += $res
+    # create new object with data
+    $newResult = New-Object PSCustomObject
+    $newResult | Add-Member -MemberType NoteProperty -Name "messageid" -Value $res.id
+    $newResult | Add-Member -MemberType NoteProperty -Name "Urn" -Value $parsedData.Urn
+    $newResult | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $parsedData.CommunicationKey
+
+    $results += $newResult
 
 }
-exit 0
 
 # Get message requests
-#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/zJWpbaWAoqMOE5xEBH23m6" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
-#$res
+#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/nbFtqIqiLcqPQLA1HukB" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
 #$res
 
 #$messages = Invoke-RestMethod -Uri $url -Method Get -Verbose -Headers $headers
 #$messages.list | Out-GridView
 
 
-<#
+
 ################################################
 #
-# INSERT COMMUNICATION KEY IN SQLITE
+# INSERT COMMUNICATION KEY IN MSSQL
 #
 ################################################
 
-$cols = @($params.UrnFieldName,$params.CommunicationKeyFieldName)
-$commExportId = Split-File -inputPath $params.Path -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $cols -writeCount -1 -outputDoubleQuotes $true
+Write-Log -message "Putting results in response database"
 
-Write-Log -message "Done with export id $( $commExportId )!" >> $logfile
-$commFile = Get-ChildItem -Path "$( $scriptPath )\$( $commExportId )" | Select -First 1
-$commFilePath = $commFile.FullName -replace "\\","/"
+# open connection again
+$mssqlConnection.Open()
 
-".mode csv",".separator \t",".import $( $commFilePath ) communications" | .\sqlite3.exe syniverse.sqlite
-#>
+$results | ForEach {
+    
+    $res = $_
+
+    $insert = @"
+        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey])
+          VALUES ('SYNSMS','$( $res.Urn )','$( $processId.Guid )','$( $res.messageid )','$( $res.CommunicationKey )')
+"@
+
+    try {
+
+        # execute command
+        $levelUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+        $levelUpdateMssqlCommand.CommandText = $insert
+        $updateResult = $levelUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+    
+    } catch [System.Exception] {
+
+        $errText = $_.Exception
+        $errText | Write-Output
+        Write-Log -message $errText
+
+
+    } finally {
+    
+            
+
+    }
+
+
+}
+
+# close connection
+$mssqlConnection.Close()
+
 
 
 ################################################
@@ -360,8 +421,8 @@ $commFilePath = $commFile.FullName -replace "\\","/"
 # count the number of successful upload rows
 $recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
-# There is no id reference for the upload in Epi
-$transactionId = 0 #$recipientListID
+# There is no id reference, but saving and using the current GUI, that will be saved in the broadcastdetails
+$transactionId = $processId.Guid #$recipientListID
 
 # return object
 [Hashtable]$return = @{
