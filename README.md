@@ -86,3 +86,8 @@ The custom channels can trigger those functionalities
 
 * If the files created from PeopleStage and used by the "upload" scripts have the extension `.converted` then the output encoding in the PeopleStage Channel Editor should be changed to another encoding.
 * If some umlauts are not used correctly, then the script is maybe saved in the wrong encoding. It should be UTF-8.
+
+# Cloning and get Updates from this Repository
+
+* You can download the whole repository as a zip file, clone it via GitHub Desktop or use a command line interface. All possibilities are shown here:<br/>![grafik](https://user-images.githubusercontent.com/14135678/99143550-9b58c700-265e-11eb-91cb-dcc3001e26b0.png)
+* I can recommend the last two options because then you can "pull" updated code from time to time and can benefit from new features or bugfixes.
