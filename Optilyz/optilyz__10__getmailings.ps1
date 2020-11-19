@@ -137,9 +137,8 @@ if ( $paramsExisting ) {
 #
 ################################################
 
-
 #-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
+# AUTH
 #-----------------------------------------------
 
 # Step 2. Encode the pair to Base64 string
@@ -148,7 +147,14 @@ $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::A
 # Step 3. Form the header and add the Authorization attribute to it
 $headers = @{ Authorization = "Basic $encodedCredentials" }
 
-$result = Invoke-RestMethod -uri $settings.base -Headers $headers -Method Get -Verbose
+
+#-----------------------------------------------
+# GET MAILINGS / CAMPAIGNS DETAILS
+#-----------------------------------------------
+
+$url = "$( $settings.base )/v2/automations" 
+
+$result = Invoke-RestMethod -uri $url -Headers $headers -Method Get -Verbose
 
 
 

@@ -60,7 +60,7 @@ $loginSettings = @{
 #-----------------------------------------------
 # AWS SETTINGS
 #-----------------------------------------------
-
+<#
 $accessKey = Read-Host -AsSecureString "Please enter the access key for AWS S3"
 $accessKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$accessKey).GetNetworkCredential().Password) -keyFile $keyFile
 
@@ -77,7 +77,7 @@ $awsSettings = @{
     endpoint = "https://s3-eu-central-1.amazonaws.com"
 
 }
-
+#>
 
 
 #-----------------------------------------------
@@ -115,7 +115,7 @@ $uploadSettings = @{
 $settings = @{
 
     # General
-    base="https://www.campaign-automation.de/api/v2/automations"   # Default url
+    base="https://www.optilyz.com/api"   # Default url
     changeTLS = $true                                   # should tls be changed on the system?
     nameConcatChar = " / "                              # character to concat mailing/campaign id with mailing/campaign name
     logfile="$( $scriptPath )\optilyz.log"               # path and name of log file
@@ -128,7 +128,7 @@ $settings = @{
     encryptToken = $true                                # $true|$false if the session token should be encrypted
     
     # Detail settings
-    aws = $awsSettings
+    # aws = $awsSettings
     login = $loginSettings
     mailings = $mailingsSettings
     upload = $uploadSettings
@@ -150,64 +150,3 @@ $json
 
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
-
-
-################################################
-#
-# LAST SETTINGS USING THE NEW LOGIN DATA
-#
-################################################
-
-#-----------------------------------------------
-# GET CURRENT SESSION OR CREATE A NEW ONE
-#-----------------------------------------------
-
-#Get-EpiSession
-
-#-----------------------------------------------
-# MASTERLIST
-#-----------------------------------------------
-
-<#
-
-normally something like:
-ClosedLoopWebserviceTemplate: master
-
-#>
-<#
-$recipientLists = Get-EpiRecipientLists 
-$masterList = $recipientLists | Out-GridView -PassThru | Select -First 1
-$recipientListUrnFieldname = $settings.upload.recipientListUrnFieldname
-$urnFieldName = ( $recipientLists | where { $_.id -eq $masterList.id } ).$recipientListUrnFieldname
-$settings.upload.recipientListUrnField = $urnFieldName 
-#>
-
-#-----------------------------------------------
-# ATTRIBUTES TO EXCLUDE
-#-----------------------------------------------
-
-<#
-Normally some of these
-"Opt-in Source","Opt-in Date","Created","Modified","Erstellt am","Geändert am","Opt-in-Quelle","Opt-in-Datum","BROADMAIL_ID","WELLE_ID"
-Please exclude "Urn", too as this is loaded dynamically through the channel
-#>
-<#
-$listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttributeNames" -param @(@{value=$masterList.id;datatype="long"},@{value="en";datatype="String"}) -useSessionId $true
-$listAttributes = $listAttributesRaw | Out-GridView -PassThru
-$settings.upload.excludedAttributes = $listAttributes
-#>
-
-#-----------------------------------------------
-# SAVE
-#-----------------------------------------------
-<#
-# create json object
-$json = $settings | ConvertTo-Json -Depth 8 # -compress
-
-# print settings to console
-$json
-
-# save settings to file
-$json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
-
-#>
