@@ -19,3 +19,4 @@ recipientlists.json
 # archive folders
 _archive
 _dev
+*.json
