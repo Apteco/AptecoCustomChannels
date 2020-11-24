@@ -416,6 +416,14 @@ $mssqlConnection.Close()
 #
 ################################################
 
+<#
+
+JUST FORWARDING A FEW PARAMETERS TO THE BROADCAST TO DO EVERYTHING THERE
+
+#>
+
+Write-Log -message "Just forwarding parameters to broadcast"
+
 # TODO [ ] check return results
 
 # count the number of successful upload rows
@@ -425,15 +433,15 @@ $recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).co
 $transactionId = $processId.Guid #$recipientListID
 
 # return object
-[Hashtable]$return = @{
-    
-    # Mandatory return values
-    "Recipients" = $recipients
-    "TransactionId" = $transactionId
-    
-    # General return value to identify this custom channel in the broadcasts detail tables
-    "CustomProvider" = $settings.providername
-
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId.Guid
+    #"EmailFieldName"= $params.EmailFieldName
+    "SMSFieldName"= $params.SmsFieldName
+    "Path"= $params.Path
+    "UrnFieldName"= $params.UrnFieldName
 }
 
 # return the results
