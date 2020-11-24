@@ -14,6 +14,7 @@ Param(
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
@@ -79,6 +80,7 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "SYNSMSUPLOAD"
 $processId = [guid]::NewGuid()
@@ -104,6 +106,8 @@ $maxWriteCount = 100 #$settings.rowsPerUpload
 $uploadsFolder = "$( $scriptPath )\upload" #$settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
 
+# TODO [ ] check these maxwritecount parameters
+
 # append a suffix, if in debug mode
 if ( $debug ) {
     $logfile = "$( $logfile ).debug"
@@ -118,9 +122,27 @@ if ( $debug ) {
 
 Add-Type -AssemblyName System.Data #, System.Web  #, System.Text.Encoding
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################
