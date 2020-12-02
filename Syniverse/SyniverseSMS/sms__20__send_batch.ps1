@@ -345,7 +345,7 @@ $parsedData | ForEach {
     
     switch ($settings.sendMethod) {
         "sender_id" {
-            $sendFrom = $settings.sender_id
+            $sendFrom = $settings.senderId
         }
         "channel" {
             $mobileCountry = $settings.countryMap.($mobile.Substring(0,3))
@@ -354,7 +354,7 @@ $parsedData | ForEach {
     }
 
     $bodyContent = @{
-        "from"="$( $settings.sentMethod ):$( $sendFrom )"
+        "from"="$( $settings.sendMethod ):$( $sendFrom )"
         "to"=@($mobile)
         #"media_urls"=@()
         #"attachments"=@()
