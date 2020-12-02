@@ -14,13 +14,14 @@ Param(
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
     $params = [hashtable]@{
-	   "TransactionType"="Replace"
+        "TransactionType"="Replace"
         "Password"="b"
         "scriptPath"="D:\Scripts\Syniverse\SMS"
         "MessageName"="SMS Wallet Offer"
@@ -35,8 +36,6 @@ if ( $debug ) {
         "CommunicationKeyFieldName"="Communication Key"
     }
 }
-
-#Copy-Item -Path $params.Path -Destination "D:\Scripts\Syniverse\SMS"
 
 ################################################
 #
@@ -79,6 +78,7 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "SYNSMSUPLOAD"
 $processId = [guid]::NewGuid()
@@ -100,8 +100,8 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$maxWriteCount = 100 #$settings.rowsPerUpload
-$uploadsFolder = "$( $scriptPath )\upload" #$settings.uploadsFolder
+$maxWriteCount = $settings.rowsPerUpload
+$uploadsFolder = $settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
 
 # append a suffix, if in debug mode
@@ -118,9 +118,27 @@ if ( $debug ) {
 
 Add-Type -AssemblyName System.Data #, System.Web  #, System.Text.Encoding
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################
@@ -233,6 +251,7 @@ $originalConsoleCodePage = [Console]::OutputEncoding.CodePage
 
 #$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
 
+
 #-----------------------------------------------
 # DEFINE NUMBERS
 #-----------------------------------------------
@@ -244,6 +263,7 @@ Write-Log -message "Start to create a new file"
 
 #$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
 $data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-Csv -Delimiter "`t"
+
 
 
 #-----------------------------------------------
@@ -322,16 +342,24 @@ $parsedData | ForEach {
     
     $text = $_.message
     $mobile = $_.mdn
-    $mobileCountry = $settings.countryMap.($mobile.Substring(0,3))
-    $mobileChannel = $settings.channels.($mobileCountry)
+    
+    switch ($settings.sendMethod) {
+        "sender_id" {
+            $sendFrom = $settings.sender_id
+        }
+        "channel" {
+            $mobileCountry = $settings.countryMap.($mobile.Substring(0,3))
+            $sendFrom = $settings.channels.($mobileCountry)
+        }
+    }
 
     $bodyContent = @{
-        "from"="channel:$( $mobileChannel )"
+        "from"="$( $settings.sentMethod ):$( $sendFrom )"
         "to"=@($mobile)
         #"media_urls"=@()
         #"attachments"=@()
         #"pause_before_transmit"=$false
-        #"verify_number"=$false
+        "verify_number"=$true
         "body"=$text #$smsTextTranslations.Item($mobileCountry)
         #"consent_requirement"="NONE"
     }
@@ -342,7 +370,7 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType # -UseDefaultCredentials -ProxyUseDefaultCredentials -Proxy $settings.proxyUrl
 
     Write-Log -message "SMS result: $( $res.id )"
 
@@ -356,14 +384,6 @@ $parsedData | ForEach {
 
 }
 
-# Get message requests
-#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/nbFtqIqiLcqPQLA1HukB" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
-#$res
-
-#$messages = Invoke-RestMethod -Uri $url -Method Get -Verbose -Headers $headers
-#$messages.list | Out-GridView
-
-
 
 ################################################
 #
@@ -376,21 +396,37 @@ Write-Log -message "Putting results in response database"
 # open connection again
 $mssqlConnection.Open()
 
+$states = @()
 $results | ForEach {
     
-    $res = $_
+    $result = $_
 
+    # Get message requests result
+    $messageStatus = Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/$( $result.messageid )" -Method Get -Headers $headers -Verbose -ContentType "application/json" #-UseDefaultCredentials -Proxy $ProxyURL -ProxyUseDefaultCredentials
+    $states += $messageStatus
+    #$messageStatus
+    
     $insert = @"
-        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey])
-          VALUES ('SYNSMS','$( $res.Urn )','$( $processId.Guid )','$( $res.messageid )','$( $res.CommunicationKey )')
+        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey],[failurecode],[state],[created_date],[to])
+          VALUES (
+               'SYNSMS'
+              ,'$( $result.Urn )'
+              ,'$( $processId.Guid )'
+              ,'$( $result.messageid )'
+              ,'$( $result.CommunicationKey )'
+              ,'$( $messageStatus.failure_code )'
+              ,'$( $messageStatus.state )'
+              ,'$( $messageStatus.created_date )'
+              ,'$( $messageStatus.to )'
+              )
 "@
 
     try {
 
         # execute command
-        $levelUpdateMssqlCommand = $mssqlConnection.CreateCommand()
-        $levelUpdateMssqlCommand.CommandText = $insert
-        $updateResult = $levelUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+        $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+        $messageUpdateMssqlCommand.CommandText = $insert
+        $updateResult = $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
     
     } catch [System.Exception] {
 
@@ -398,19 +434,14 @@ $results | ForEach {
         $errText | Write-Output
         Write-Log -message $errText
 
-
     } finally {
     
-            
-
     }
-
 
 }
 
 # close connection
 $mssqlConnection.Close()
-
 
 
 ################################################
@@ -422,21 +453,21 @@ $mssqlConnection.Close()
 # TODO [ ] check return results
 
 # count the number of successful upload rows
-$recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = ($states | where { $_.state -eq "SUCCESS" }).count #$results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
 # There is no id reference, but saving and using the current GUI, that will be saved in the broadcastdetails
 $transactionId = $processId.Guid #$recipientListID
 
 # return object
-[Hashtable]$return = @{
-    
-    # Mandatory return values
-    "Recipients" = $recipients
-    "TransactionId" = $transactionId
-    
-    # General return value to identify this custom channel in the broadcasts detail tables
-    "CustomProvider" = $settings.providername
-
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId.Guid
+    #"EmailFieldName"= $params.EmailFieldName
+    "SMSFieldName"= $params.SmsFieldName
+    "Path"= $params.Path
+    "UrnFieldName"= $params.UrnFieldName
 }
 
 # return the results

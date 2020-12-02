@@ -1,11 +1,13 @@
 # settings files
 settings.json
 session.json
+*.json
 
 # logfiles
 *.log
 *.debug
 *.txt
+
 
 # encryption files
 aes.key
@@ -20,4 +22,3 @@ recipientlists.json
 # archive folders
 _archive
 _dev
-
