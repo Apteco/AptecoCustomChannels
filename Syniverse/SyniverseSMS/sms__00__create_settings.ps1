@@ -84,7 +84,7 @@ $sendMethod = "sender_id" # sender_id|channel
 $senderId = ""
 
 if ($sendMethod -eq "sender_id") {
-    $senderId = Read-Host -AsSecureString "Please enter the senderId for syniverse"
+    $senderId = Read-Host "Please enter the senderId for syniverse"
 }
 
 
