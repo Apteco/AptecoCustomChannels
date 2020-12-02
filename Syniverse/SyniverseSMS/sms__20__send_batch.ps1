@@ -21,7 +21,7 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	   "TransactionType"="Replace"
+        "TransactionType"="Replace"
         "Password"="b"
         "scriptPath"="D:\Scripts\Syniverse\SMS"
         "MessageName"="SMS Wallet Offer"
@@ -36,8 +36,6 @@ if ( $debug ) {
         "CommunicationKeyFieldName"="Communication Key"
     }
 }
-
-#Copy-Item -Path $params.Path -Destination "D:\Scripts\Syniverse\SMS"
 
 ################################################
 #
@@ -102,11 +100,9 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$maxWriteCount = 100 #$settings.rowsPerUpload
-$uploadsFolder = "$( $scriptPath )\upload" #$settings.uploadsFolder
+$maxWriteCount = $settings.rowsPerUpload
+$uploadsFolder = $settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
-
-# TODO [ ] check these maxwritecount parameters
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -219,6 +215,11 @@ $mssqlTable.Load($mssqlResult)
 # close connection
 $mssqlConnection.Close()
 
+
+#-----------------------------------------------
+# REGEX FOR EXTRACT OF LINKS AND TOKENS IN TEMPLATE
+#-----------------------------------------------
+
 <#
 # some notes and other way for selections
 # https://www.regextester.com/97589
@@ -241,7 +242,6 @@ $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks)
 #-----------------------------------------------
 # SWITCH TO UTF8
 #-----------------------------------------------
-
 # Call an external program first so the console encoding command works in ISE, too. Good explanation here: https://social.technet.microsoft.com/Forums/scriptcenter/en-US/b92b15c8-6854-4d3e-8a35-51b4b56276ba/powershell-ise-vs-consoleoutputencoding?forum=ITCG
 ping | Out-Null
 
@@ -249,7 +249,8 @@ ping | Out-Null
 $originalConsoleCodePage = [Console]::OutputEncoding.CodePage
 [Console]::OutputEncoding = [text.encoding]::utf8
 
-$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
+#$PSVersionTable | Out-File "D:\Scripts\Syniverse\SMS\test.txt"
+
 
 #-----------------------------------------------
 # DEFINE NUMBERS
@@ -264,6 +265,7 @@ Write-Log -message "Start to create a new file"
 $data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-Csv -Delimiter "`t"
 
 
+
 #-----------------------------------------------
 # PREPARE HEADERS
 #-----------------------------------------------
@@ -272,8 +274,7 @@ $headers = @{
     "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
 }
 
-$contentType = "application/json; charset=utf-8" #; charset=utf-8
-
+$contentType = "application/json; charset=utf-8"
 
 
 #-----------------------------------------------
@@ -341,16 +342,24 @@ $parsedData | ForEach {
     
     $text = $_.message
     $mobile = $_.mdn
-    $mobileCountry = $settings.countryMap.($mobile.Substring(0,3))
-    $mobileChannel = $settings.channels.($mobileCountry)
+    
+    switch ($settings.sendMethod) {
+        "sender_id" {
+            $sendFrom = $settings.sender_id
+        }
+        "channel" {
+            $mobileCountry = $settings.countryMap.($mobile.Substring(0,3))
+            $sendFrom = $settings.channels.($mobileCountry)
+        }
+    }
 
     $bodyContent = @{
-        "from"="channel:$( $mobileChannel )"
+        "from"="$( $settings.sentMethod ):$( $sendFrom )"
         "to"=@($mobile)
         #"media_urls"=@()
         #"attachments"=@()
         #"pause_before_transmit"=$false
-        #"verify_number"=$false
+        "verify_number"=$true
         "body"=$text #$smsTextTranslations.Item($mobileCountry)
         #"consent_requirement"="NONE"
     }
@@ -361,7 +370,7 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType
+    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType # -UseDefaultCredentials -ProxyUseDefaultCredentials -Proxy $settings.proxyUrl
 
     Write-Log -message "SMS result: $( $res.id )"
 
@@ -375,14 +384,6 @@ $parsedData | ForEach {
 
 }
 
-# Get message requests
-#Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/nbFtqIqiLcqPQLA1HukB" -Method Get -Headers $headers -Verbose -ContentType "application/json" 
-#$res
-
-#$messages = Invoke-RestMethod -Uri $url -Method Get -Verbose -Headers $headers
-#$messages.list | Out-GridView
-
-
 
 ################################################
 #
@@ -395,21 +396,37 @@ Write-Log -message "Putting results in response database"
 # open connection again
 $mssqlConnection.Open()
 
+$states = @()
 $results | ForEach {
     
-    $res = $_
+    $result = $_
 
+    # Get message requests result
+    $messageStatus = Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/$( $result.messageid )" -Method Get -Headers $headers -Verbose -ContentType "application/json" #-UseDefaultCredentials -Proxy $ProxyURL -ProxyUseDefaultCredentials
+    $states += $messageStatus
+    #$messageStatus
+    
     $insert = @"
-        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey])
-          VALUES ('SYNSMS','$( $res.Urn )','$( $processId.Guid )','$( $res.messageid )','$( $res.CommunicationKey )')
+        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey],[failurecode],[state],[created_date],[to])
+          VALUES (
+               'SYNSMS'
+              ,'$( $result.Urn )'
+              ,'$( $processId.Guid )'
+              ,'$( $result.messageid )'
+              ,'$( $result.CommunicationKey )'
+              ,'$( $messageStatus.failure_code )'
+              ,'$( $messageStatus.state )'
+              ,'$( $messageStatus.created_date )'
+              ,'$( $messageStatus.to )'
+              )
 "@
 
     try {
 
         # execute command
-        $levelUpdateMssqlCommand = $mssqlConnection.CreateCommand()
-        $levelUpdateMssqlCommand.CommandText = $insert
-        $updateResult = $levelUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+        $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+        $messageUpdateMssqlCommand.CommandText = $insert
+        $updateResult = $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
     
     } catch [System.Exception] {
 
@@ -417,19 +434,14 @@ $results | ForEach {
         $errText | Write-Output
         Write-Log -message $errText
 
-
     } finally {
     
-            
-
     }
-
 
 }
 
 # close connection
 $mssqlConnection.Close()
-
 
 
 ################################################
@@ -438,18 +450,10 @@ $mssqlConnection.Close()
 #
 ################################################
 
-<#
-
-JUST FORWARDING A FEW PARAMETERS TO THE BROADCAST TO DO EVERYTHING THERE
-
-#>
-
-Write-Log -message "Just forwarding parameters to broadcast"
-
 # TODO [ ] check return results
 
 # count the number of successful upload rows
-$recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = ($states | where { $_.state -eq "SUCCESS" }).count #$results.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
 # There is no id reference, but saving and using the current GUI, that will be saved in the broadcastdetails
 $transactionId = $processId.Guid #$recipientListID

@@ -62,16 +62,16 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #-----------------------------------------------
 # AUTHENTICATION
 #-----------------------------------------------
-
+<#
 $consumerSecret = Read-Host -AsSecureString "Please enter the consumerSecret for syniverse"
 $consumerSecretEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$consumerSecret).GetNetworkCredential().Password)
-
+#>
 $accessToken = Read-Host -AsSecureString "Please enter the accessToken for syniverse"
 $accessTokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$accessToken).GetNetworkCredential().Password)
 
 $authentication = @{
-    consumerKey = "<consumerkey>"
-    consumerSecret = $consumerSecretEncrypted 
+    #consumerKey = "<consumerkey>"
+    #consumerSecret = $consumerSecretEncrypted 
     accessToken = $accessTokenEncrypted
 }
 
@@ -79,6 +79,14 @@ $authentication = @{
 #-----------------------------------------------
 # SEND SMS
 #-----------------------------------------------
+
+$sendMethod = "sender_id" # sender_id|channel
+$senderId = ""
+
+if ($sendMethod -eq "sender_id") {
+    $senderId = Read-Host -AsSecureString "Please enter the senderId for syniverse"
+}
+
 
 $countryMap = @{
     "+44"="uk"
@@ -125,6 +133,9 @@ $settings = @{
     logfile="$( $scriptPath )\syn_sms.log"		        # path and name of log file
     providername = "synsms"                             # identifier for this custom integration, this is used for the response allocation
 
+    # Proxy settings, if needed... this needs to be commented in in the code
+    proxyUrl = "http://proxyurl:8080"
+
     # Authentication
     authentication = $authentication
     
@@ -132,6 +143,8 @@ $settings = @{
     countryMap = $countryMap
     channels = $channelIds
     responseDB = $mssqlConnectionString
+    sendMethod = $sendMethod
+    senderId = $senderId
 
 }
 
