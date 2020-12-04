@@ -13,7 +13,7 @@ Param(
 #-----------------------------------------------
 
 $debug = $false
-$removeRecipientsAfterUpload = $true
+$removeRecipientsAfterUpload = $false
 
 
 #-----------------------------------------------
@@ -22,19 +22,19 @@ $removeRecipientsAfterUpload = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-        TransactionType= "Replace"
-        Password= "def"
-        scriptPath= "D:\Scripts\Optilyz"
-        MessageName= "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
-        EmailFieldName= "Email"
-        SmsFieldName= ""
-        Path= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Optilyz\REST\random100.csv"
-        ReplyToEmail= ""
-        Username= "abc"
-        ReplyToSMS= ""
-        UrnFieldName= "Urn"
-        ListName= "Free Try Automation"
-        CommunicationKeyFieldName= "Communication Key"
+        TransactionType = "Replace"
+        Password = "b"
+        scriptPath = "D:\Scripts\Optilyz"
+        MessageName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+        EmailFieldName = "E-Mail"
+        SmsFieldName = ""
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_5fc6ca6a89b5e200e0de42e0  Test Automation Apteco_aada3235-9bb8-44ad-9aee-63ef1ab74d0f.txt"
+        ReplyToEmail = ""
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Kunden ID"
+        ListName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+        CommunicationKeyFieldName = "Communication Key"
     }
 }
 
@@ -243,6 +243,16 @@ Try {
 
 $fields = Invoke-RestMethod -Verbose -Uri "$( $settings.base )/v1/dataMappingFields" -Method Get -Headers $headers -ContentType $contentType #-Body $bodyJson -TimeoutSec $maxTimeout
 
+# TODO [ ] decisions to make: fullName or firstName+lastName / address1 or street+houseNumber / companyName if no fullname or lastname -> automatically checked from optilyz at upload
+
+# Add fields for matching that are missing in the previous API call
+$moreFields = @()
+$moreFields += "address1"
+1..99 | ForEach {
+    $moreFields += "individualisation$( $_ )"
+}
+
+
 <#
 label                 fieldName          required type      
 -----                 ---------          -------- ----
@@ -268,16 +278,18 @@ Other titles          otherTitles           False string
 
 Write-Log -message "Loaded attributes $( $fields.fieldName -join ", " )"
 
+
 #-----------------------------------------------
 # FIELD MAPPING
 #-----------------------------------------------
 
 # Check required fields
-$requiredFields = ($fields | where { $_.required -eq $true }).fieldName
-Write-Log -message "Required fields $( $requiredFields -join ", " )"
+$requiredFields = @() # multiple combinations of requirements available -> Optilyz will catch this at the upload
+#$requiredFields = ($fields | where { $_.required -eq $true }).fieldName 
+#Write-Log -message "Required fields $( $requiredFields -join ", " )"
 
 # Check optional fields
-$attributesNames = $fields | where { $_.fieldName -notin $requiredFields }
+$attributesNames = $fields.fieldName + $moreFields | where { $_ -notin $requiredFields }
 
 # Check csv fields
 $csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
@@ -295,18 +307,19 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
 
 # Compare columns
 # TODO [ ] Now the csv column headers are checked against the name of the optilyz attributes
-$differences = Compare-Object -ReferenceObject $attributesNames.fieldName -DifferenceObject ( $csvAttributesNames  | where { $_.name -notin $requiredFields } ).name -IncludeEqual #-Property Name 
+$differences = Compare-Object -ReferenceObject $attributesNames -DifferenceObject ( $csvAttributesNames  | where { $_.name -notin $requiredFields } ).name -IncludeEqual #-Property Name 
 $colsEqual = $differences | where { $_.SideIndicator -eq "==" } 
 $colsInAttrButNotCsv = $differences | where { $_.SideIndicator -eq "<=" } 
 $colsInCsvButNotAttr = $differences | where { $_.SideIndicator -eq "=>" }
 Write-Log -message "Only fields $( $colsEqual.InputObject -join "," ) are matching"
 
 
+
+
 #-----------------------------------------------
 # CREATE UPLOAD OBJECT
 #-----------------------------------------------
 
-# TODO [ ] decisions to make: fullName or firstName+lastName / address1 or street+houseNumber / companyName if no fullname or lastname -> automatically checked from optilyz at upload
 
 $urnFieldName = $params.UrnFieldName
 $commkeyFieldName = $params.CommunicationKeyFieldName
@@ -431,10 +444,14 @@ $recipients | select * -ExpandProperty address  -ExcludeProperty address | Expor
 Write-Log -message "Written results into file '$( $resultsFile )'"
 
 # Remove all recipients - DEBUG
+$deleted = @()
 if ( $removeRecipientsAfterUpload ) {
     $results.results.id | where { $_ -ne $null } | ForEach {
-        Invoke-RestMethod -Verbose -Uri "$( $settings.base )/v2/automations/$( $automationID )/recipients/$( $id )" -Method Delete -Headers $headers -ContentType $contentType
+        $id = $_
+        $deleted += Invoke-RestMethod -Verbose -Uri "$( $settings.base )/v2/automations/$( $automationID )/recipients/$( $id )" -Method Delete -Headers $headers -ContentType $contentType
     }
+    $deletedSum = ( $deleted | Measure-Object deleted -sum ).Sum
+    Write-Log -message "Removed $( $deletedSum ) records"
 }
 
 
@@ -467,6 +484,7 @@ $return = [Hashtable]@{
 
     # More information about the different status of the import
     "RecipientsIgnored" = $ignored
+    "RecipientsQueued" = $queued
 
 }
 

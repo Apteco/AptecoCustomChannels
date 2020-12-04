@@ -24,16 +24,21 @@ if ( $debug ) {
     $params = [hashtable]@{
         
         # Coming from PeopleStage
-        Password= "def"
-        scriptPath= "D:\Scripts\CleverReach\Tagging"
-	    MessageName= "-FreeTry.Login" # just add - to remove a tag like -test.tag or -test.*
-        Username= "abc"
-        ListName= "Free Try Automation"
+        Password = "b"
+        scriptPath = "D:\Scripts\Optilyz"
+        MessageName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+        EmailFieldName = "E-Mail"
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_5fc6ca6a89b5e200e0de42e0  Test Automation Apteco_aada3235-9bb8-44ad-9aee-63ef1ab74d0f.txt"
+        TransactionId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
+        Username = "a"
+        UrnFieldName = "Kunden ID"
+        ListName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
         
         # Coming from Upload
-        EmailFieldName= "Email"
-        Path= "D:\Apteco\Publish\CleverReach\system\Deliveries\PowerShell_1122853  Free Try Automation_fea11774-c67e-4081-8506-55303b0318d1.txt"
-        UrnFieldName= "RC Id"
+        ProcessId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
+        CustomProvider = "OPTLZUPLOAD"
+        RecipientsIgnored = "2000"
+        RecipientsQueued = "3000"
 
     }
 }
@@ -79,7 +84,7 @@ $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "OPTLZBRDCST"
-$processId = [guid]::NewGuid()
+$processId = $params.ProcessId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -167,7 +172,7 @@ if ( $paramsExisting ) {
 ################################################
 
 
-
+Write-Log -message "Nothing to do in the broadcast script"
 
 
 ################################################
@@ -176,10 +181,10 @@ if ( $paramsExisting ) {
 #
 ################################################
 
-# TODO [ ] Forward the right numbers here
+# TODO [x] Forward the right numbers here
 
 # count the number of successful upload rows
-$recipients = 0 #$upload.count
+$recipients = $params.RecipientsQueued #$upload.count
 
 # put in the source id as the listname
 $transactionId = $processId
