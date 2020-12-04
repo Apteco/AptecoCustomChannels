@@ -35,8 +35,8 @@ Integration|API|Type|Functionalities|Link
 -|-|-|-|-
 Deutsche Post|TriggerDialog|REST|:heavy_check_mark:/:o:Upload<br/>:heavy_check_mark:/:o:Broadcast|[TriggerDialog Integration Guideline](TriggerDialog)
 Bertelsmann|Campaign Automation|||Only on request
-Optilyz|S3|AWS-S3/REST
-Optilyz|REST|REST
+Optilyz|S3|AWS-S3/REST|:heavy_check_mark:/:heavy_check_mark:ChooseAutomation<br/>:heavy_check_mark:/:heavy_check_mark:Upload|[Optilyz Integration Guideline](Optilyz/AWS)
+Optilyz|REST|REST|:heavy_check_mark:/:heavy_check_mark:ChooseAutomation<br/>:heavy_check_mark:/:heavy_check_mark:Upload|[Optilyz Integration Guideline](Optilyz/REST)
 
 
 ### Mobile
