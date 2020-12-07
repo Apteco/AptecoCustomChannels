@@ -24,4 +24,6 @@ _archive
 _dev
 
 # test files
+*.debug
+*.txt
 *.csv
