@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -22,16 +22,21 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-        
-        scriptPath= "C:\FastStats\scripts\cleverreach"
-        MessageName = "275324762694 / Test: Smart Campaign Mailing"
-        abc = "def"
-        ListName = "275324762694 / Test: Smart Campaign Mailing"
-        Password = "def"
-        Username = "abc"
+
+        # Send from PeopleStage
+        MessageName = "7586236 / Newsletter September 2020"
+        ListName = "7586236 / Newsletter September 2020"
+        Username = "a"
+        Password = "b"
+
+        # Integration parameters
+        scriptPath = "D:\Scripts\CleverReach\Mailing"
+        deactivate = "true"
 
         # Send from upload
-        GroupId = "13245"
+        GroupId = "1128550"
+        TransactionId = "ff62edd3-add6-4638-9e63-26c6b622a316"
+
     }
 }
 
@@ -44,7 +49,7 @@ if ( $debug ) {
 
 <#
 
-TODO [ ] implement more logging
+TODO [x] implement more logging
 
 #>
 
@@ -78,7 +83,7 @@ $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "CLVRBRCST"
-$processId = [guid]::NewGuid()
+$processId = $params.TransactionId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -115,7 +120,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -129,7 +134,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -183,15 +188,15 @@ $header = @{
 # cut out the smart campaign id or mailing id
 #$messageName = $params.MessageName
 #$templateId = $messageName -split $settings.nameConcatChar | select -First 1
-$templateId = [Mailing]::new($params.MessageName).mailingId
-
-
-#-----------------------------------------------
-# GET MAILING TO COPY
-#-----------------------------------------------
+$template = [Mailing]::new($params.MessageName)
+$templateId = $template.mailingId
+Write-Log -message "Using mailing $( $templateId ) - $( $template.mailingName )"
 
 # get details
-$templateSource = Invoke-RestMethod -Method GET -Uri "$( $mailingsUrl )/$( $templateId )" -Headers $header -Verbose
+$object = "mailings"    
+$endpoint = "$( $apiRoot )$( $object )"
+$templateSource = Invoke-RestMethod -Method GET -Uri "$( $apiRoot )$( $object ).json/$( $templateId )" -Headers $header -Verbose
+Write-Log -message "Looked up the mailing"
 
 
 #-----------------------------------------------
@@ -201,11 +206,14 @@ $templateSource = Invoke-RestMethod -Method GET -Uri "$( $mailingsUrl )/$( $temp
 $object = "groups"    
 $endpoint = "$( $apiRoot )$( $object ).json/$( $params.GroupId )/stats"
 $groupDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+Write-Log -message "Using group $( $groupDetails.id ) - $( $groupDetails.name )"
 
 
 #-----------------------------------------------
 # COPY MAILING
 #-----------------------------------------------
+
+Write-Log -message "Creating a copy of the mailing"
 
 $mailingSettings = @{
     name = "$( $templateSource.name ) - $( $timestamp )"
@@ -242,6 +250,8 @@ $object = "mailings"
 $endpoint = "$( $apiRoot )$( $object ).json"
 $copiedMailing = Invoke-RestMethod -Method POST -Uri "$( $endpoint )" -Headers $header -Verbose -Body $rootJson -ContentType $contentType
 
+Write-Log -message "Created a copy of the mailing with the new id $( $copiedMailing.id )"
+
 
 #-----------------------------------------------
 # GET NEW CREATED MAILING
@@ -254,7 +264,9 @@ $mailingLinks | Out-GridView
 #>
 
 # get details
-$mailingDetails = Invoke-RestMethod -Method GET -Uri "$( $mailingsUrl )/$( $copiedMailing.id )" -Headers $header -Verbose -ContentType $contentType
+$object = "mailings"
+$endpoint = "$( $apiRoot )$( $object ).json/$( $copiedMailing.id )"
+$copiedMailingDetails = Invoke-RestMethod -Method GET -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
 <#
 # write html to file
@@ -266,16 +278,22 @@ $templateSource.body_html | Set-Content -Path "$( [datetime]::UtcNow.ToString("y
 # TRIGGER BROADCAST
 #-----------------------------------------------
 
+Write-Log -message "Release the mailing"
+
 # release mailing
 [int]$unixTimestamp = Get-Unixtime #Get-Date -uformat %s -Millisecond 0
-[int]$releaseTimestamp = $unixTimestamp + 60 -7200 # TODO [ ] check what this was about and create settings parameter for sending offset (or put in channel editor)
+[int]$releaseTimestamp = $unixTimestamp + 60 #-7200 # TODO [ ] check what this was about and create settings parameter for sending offset (or put in channel editor)
 $release = [PSCustomObject]@{
     "time" = $releaseTimestamp
 }
 $releaseJson = $release | ConvertTo-Json -Depth 8 -Compress
 
-# TODO [ ] use the id delivered by the upload
-$releaseMailing = Invoke-RestMethod -Method POST -Uri "$( $mailingsUrl )/$( $copiedMailing.id )/release" -Headers $header -Verbose -Body $releaseJson -ContentType $contentType
+# TODO [x] use the id delivered by the upload
+$object = "mailings"
+$endpoint = "$( $apiRoot )$( $object ).json/$( $copiedMailing.id )/release"
+$releaseMailing = Invoke-RestMethod -Method POST -Uri $endpoint -Headers $header -Verbose -Body $releaseJson -ContentType $contentType
+
+Write-Log -message "Released the mailing"
 
 
 ################################################
@@ -288,7 +306,7 @@ $releaseMailing = Invoke-RestMethod -Method POST -Uri "$( $mailingsUrl )/$( $cop
 $recipients = $groupDetails.active_count
 
 # put in the source id as the listname
-$transactionId = $copiedMailing.id
+$transactionId = $releaseMailing.id #$copiedMailing.id
 
 # return object
 $return = [Hashtable]@{

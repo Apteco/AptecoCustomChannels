@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -22,16 +22,36 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    EmailFieldName= "email"
-	    TransactionType= "Replace"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
-	    MessageName= "Test.Tag001" # just add - to remove a tag like -test.tag or -test.*
-	    SmsFieldName= ""
-	    Path= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach\CleverReach_Bewertung Post Stay_b33c83bc-d396-422c-abb8-f766826cb4e9.txt"
-	    UrnFieldName= "Urn"
-	    ListName= "CR Tag Test" # TODO [ ] if PeopleStage will offer lists as dropdown, we need to re-check this "text only" parameter
-        CommunicationKeyFieldName= "Communication Key"
-        deactivate="true"
+    <#
+        TransactionType = "Replace"
+        Password = "b"
+        scriptPath = "D:\Scripts\CleverReach\Mailing"
+        MessageName = ""
+        EmailFieldName = "email"
+        deactivate = "true"
+        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_6299985  1-to-1 Einladung dmexco_ceb0f74c-bc52-4a2f-9816-455a13689fd8.txt"
+        ReplyToEmail = ""
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Con Acc Id"
+        ListName = "6299985 / 1-to-1 Einladung dmexco"
+        CommunicationKeyFieldName = "Communication Key"
+        SmsFieldName = ""
+        #>
+        TransactionType = "Replace"
+        Password = "b"
+        scriptPath = "D:\Scripts\CleverReach\Mailing"
+        MessageName = ""
+        EmailFieldName = "email"
+        deactivate = "false"
+        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_7647164  Xmas Partner 2020_fa86bb85-5067-474a-8027-d5237b6dfa9a.txt"
+        ReplyToEmail = ""
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Con Acc Id"
+        ListName = "7647164 / Xmas Partner 2020"
+        CommunicationKeyFieldName = "Communication Key"
+        SmsFieldName = ""
     }
 }
 
@@ -220,31 +240,43 @@ $dataCsv += import-csv -Path $file.FullName -Delimiter "`t" -Encoding UTF8
 # if no list is present, just take the current date and time
 
 # If listname is valid -> contains an id, concatenation character and and a name -> use the id
-try {
+
+#-----------------------------------------------
+# CREATE GROUP IF NEEDED
+#-----------------------------------------------
+
+# TODO [ ] IT NEEDS TO CHECK THE EQUALITY OF MESSAGE AND LIST FIRST
+
+# If lists contains a concat character (id+name), use the list id
+# if no concat character is present, take the whole string as name for a new list and search for it... if not present -> new list!
+# if no list is present, just take the current date and time
+
+# If listname is valid -> contains an id, concatenation character and and a name -> use the id
+
+# Listname is the same as the message means nothing was entered -> check the name
+# Or MessageName is empty means "Upload only" from PeopleStage  and then it is worth to check, too
+
+$timestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
+if ($params.ListName -ne $params.MessageName -or $params.MessageName -eq "") {
+
+    # Download all groups first
+    $object = "groups"    
+    $endpoint = "$( $apiRoot )$( $object )"
+    $groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+
+    # Try to parse the group name and search for that group, but it could also be a messagename
+    try {
     
-    $createNewGroup = $false # No need for the group creation now
-    $group = [List]::new($params.ListName)
-    $listName = $group.listName
-    $groupId = $group.listId
-
-} catch {
-
-    # Listname is not empty, check it
-    if ($params.ListName -ne "") {
-
-        # Try to search for that group and select the first matching entry or throw exception
-        $object = "groups"    
-        $endpoint = "$( $apiRoot )$( $object )"
-        $groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+        $createNewGroup = $false # No need for the group creation now
+        $group = [List]::new($params.ListName)
+        $matchingGroups = @( $groups | where { $_.id -eq $group.listId } ) # put an array around because when the return is one object, it will become a pscustomobject
         
-        # Check how many matches are available
-        $matchingGroups = $groups | where { $_.name -eq $params.ListName }
         switch ( $matchingGroups.Count ) {
-
             # No match -> new group
             0 { 
                 $createNewGroup = $true                
-                $listName = $params.ListName
+                $listName = $timestamp #"$( $group.listName ) | $( $timestamp )"
+                Write-Log -message "No matched group -> create a new one"
             }
             
             # One match -> use that one!
@@ -252,23 +284,52 @@ try {
                 $createNewGroup = $false # No need for the group creation now
                 $listName = $matchingGroups.name
                 $groupId = $matchingGroups.id
+                Write-Log -message "Matched one group -> use that one"
+                Write-Log -message "Ready to use group with id $( $groupId )"
+            }
+        }
+
+    } catch {
+
+        # Parsing was not successful, check how many matches are available
+        $matchingGroups = @( $groups | where { $_.name -eq $params.ListName } ) # put an array around because when the return is one object, it will become a pscustomobject
+
+        switch ( $matchingGroups.Count ) {
+
+            # No match -> new group
+            0 { 
+                $createNewGroup = $true                
+                $listName = $params.ListName
+                Write-Log -message "No matched group -> create a new one"
+            }
+            
+            # One match -> use that one!
+            1 { 
+                $createNewGroup = $false # No need for the group creation now
+                $listName = $matchingGroups.name
+                $groupId = $matchingGroups.id
+                Write-Log -message "Matched one group -> use that one"
+                Write-Log -message "Ready to use group with id $( $groupId )"
             }
 
             # More than one match -> throw exception
             Default {
                 $createNewGroup = $false # No need for the group creation now
+                Write-Log -message "More than one match -> throw exception"
                 throw [System.IO.InvalidDataException] "More than two groups with that name. Please choose a unique list."              
             }
+
         }
 
-    # String is empty, create a generic group name
-    } else {
-        $listName = [datetime]::Now.ToString("yyyyMMdd HHmmss")
     }
 
-
-
+# String is empty, create a generic group name
+} else {
+    $createNewGroup = $true
+    $listName = $timestamp
+    Write-Log -message "Create a new group with a timestamp"
 }
+
 
 # Create a new group (if needed)
 if ( $createNewGroup ) {
@@ -286,8 +347,12 @@ if ( $createNewGroup ) {
 #-----------------------------------------------
 
 $requiredFields = @(,$params.EmailFieldName)
+$reservedFields = @("tags")
 
-# Load global attributes
+Write-Log -message "Required fields $( $requiredFields -join ", " )"
+Write-Log -message "Reserved fields $( $reservedFields -join ", " )"
+
+# Load online attributes
 
 $object = "attributes"
 $endpoint = "$( $apiRoot )$( $object ).json"
@@ -295,10 +360,14 @@ $globalAttributes = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $heade
 $localAttributes = Invoke-RestMethod -Method Get -Uri "$( $endpoint )?group_id=$( $groupId )" -Headers $header  -Verbose -ContentType $contentType
 $attributes = $globalAttributes + $localAttributes
 
-# TODO [ ] Implement re-using a group (with deactivation of receivers and comparation of local fields)
+Write-Log -message "Loaded global attributes $( $globalAttributes.name -join ", " )"
+Write-Log -message "Loaded local attributes $( $localAttributes.name -join ", " )"
+
+# TODO [x] Implement re-using a group (with deactivation of receivers and comparation of local fields)
 
 $attributesNames = $attributes | where { $_.name -notin $requiredFields }
-$csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
+$csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty | where { $_.Name -notin $reservedFields }
+Write-Log -message "Loaded csv attributes $( $csvAttributesNames.Name -join ", " )"
 
 # Check if email field is present
 
@@ -344,6 +413,8 @@ $colsInCsvButNotAttr | ForEach {
 
 }
 
+
+
 #-----------------------------------------------
 # DEACTIVATE ALL RECEIVERS FIRST IF NEEDED
 #-----------------------------------------------
@@ -358,7 +429,7 @@ if ( !$createNewGroup -and $params.deactivate -eq "true") {
     $upload = @()
     do {
 
-        $url = "$( $groupsUrl )/$( $groupId )/receivers?pagesize=$( $settings.pageLimitGet )&page=$( $page )&detail=$( $detailLevel )&type=active" # active|inactive
+        $url = "$( $groupsUrl )/$( $groupId )/receivers?pagesize=$( $settings.upload.rowsPerUpload )&page=$( $page )&detail=$( $detailLevel )&type=active" # active|inactive
         $result = Invoke-RestMethod -Method Get -Uri $url -Headers $header -Verbose
 
         if ( $result.Count -gt 0 ) {
@@ -413,8 +484,14 @@ if ( !$createNewGroup -and $params.deactivate -eq "true") {
 ]}
 #>
 
-$globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
+# Filenames
+$tempFolder = "$( $settings.upload.uploadsFolder )\$( $processId.guid )"
+New-Item -ItemType Directory -Path $tempFolder
+Write-Log -message "Creating files in $( $tempFolder )"
 
+$object = "groups"
+$endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
+$globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
 $uploadObject = @()
 For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
 
@@ -449,8 +526,9 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     In the array of tags, prepend a "-" to the tag you want to be removed.
     To remove all tags with a specific origin, simply specify "*" instead of any tag name.
     #>
-    $uploadEntry.tags = ,$params.MessageName -split ","
-
+    if ( $dataCsv[$i].tags.length -gt 0 ) {
+        $uploadEntry.tags += ( $dataCsv[$i].tags -split "," )
+    }
     <#
         #$props = Get-Member -InputObject $dataCsv[$i] -MemberType NoteProperty | where { $_.Name -ne "email" }
     ForEach($prop in $props) {
@@ -466,13 +544,18 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     #-----------------------------------------------
 
     # Batch upload every n records or at the end
-    if ( $i % $settings.upload.rowsPerUpload -or ($i - 1) -eq $dataCsv.count) {
+    #if ( $i % $settings.upload.rowsPerUpload -or ($i - 1) -eq $dataCsv.count) {
+    if ( ($i + 1) % $settings.upload.rowsPerUpload -eq 0 -or ($i + 1) -eq $dataCsv.count ) {
+
         $bodyJson = $uploadObject | ConvertTo-Json
+        $bodyJson | Set-Content -path "$( $tempFolder )\$( $i ).json" -Encoding UTF8
         $upload += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
         $uploadObject = @()
     }
 
 }
+
+Write-Log -message "UpsertPlus for $( $upload.count ) records"
 
 
 #-----------------------------------------------

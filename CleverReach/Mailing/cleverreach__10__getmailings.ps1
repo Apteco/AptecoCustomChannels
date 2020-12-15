@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -172,7 +172,7 @@ Write-Log -message "Downloading all mailings"
 
 # get all draft mailings
 $endpoint = "$( $apiRoot )$( $object )?state=draft&limit=999"
-$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
 Write-Log -message "Found $( $mailings.draft.count  ) mailings"
 

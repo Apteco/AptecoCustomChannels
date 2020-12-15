@@ -1,4 +1,4 @@
-################################################
+﻿################################################
 #
 # INPUT
 #
@@ -19,11 +19,14 @@ $debug = $false
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
-# TODO [ ] check input parameter
-
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
+        scriptPath = "D:\Scripts\CleverReach\Mailing"
+        TestRecipient = '{"Email":"user@example.com","Sms":null,"Personalisation":{"Con Acc Id":"Con Acc Id","firstname":"Florian","lastname":"von Bracht","anrede":"anrede","Communication Key":"506ba359-192a-4dd8-8665-3286a49cd029"}}'
+        MessageName = "6299985 / 1-to-1 Einladung dmexco"
+        ListName= ""
+        Password= "b"
+        Username= "a"
     }
 }
 
@@ -69,7 +72,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRTEST"
+$moduleName = "CLVRPREVIEW"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -152,7 +155,6 @@ if ( $paramsExisting ) {
 #
 ################################################
 
-
 #-----------------------------------------------
 # AUTHENTICATION
 #-----------------------------------------------
@@ -166,55 +168,44 @@ $header = @{
 
 
 #-----------------------------------------------
-# WHO AM I
+# GET MAILING
 #-----------------------------------------------
 
-# Load information about the account
+$object = "mailings"
 
-$object = "debug"
-$endpoint = "$( $apiRoot )$( $object )/whoami.json"
-$success = $false
-try {
-    $whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
-    $success = $true
-} catch {
+Write-Log -message "Downloading the corresponding mailing"
 
-    throw [System.IO.InvalidDataException] "Test was not successful"  
+# get all draft mailings
+$templateId = [Mailing]::new($params.MessageName).mailingId
+$endpoint = "$( $apiRoot )$( $object )/$( $templateId )"
+$mailing = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
-}
 
 #-----------------------------------------------
-# LOG
+# PERSONALISE TOKENS
 #-----------------------------------------------
 
-if ( $success ) {
+# TODO [ ] Personalise the most obvious tokens
 
-    Write-Log -message "Entries of WhoAmI"
-
-    $whoAmI | Get-Member -MemberType NoteProperty | ForEach {
-        $name = $_.Name
-        $value = $whoAmI.$name
-        Write-Host "$( $name ): $( $value )"
-        Write-Log -message "$( $name ): $( $value )"
-    }
-
-}
 
 ################################################
 #
-# RETURN VALUES TO PEOPLESTAGE AND BROADCAST
+# RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
-
-# TODO [ ] Is there something expected to return? Something like true or false?
-
 
 # return object
 $return = [Hashtable]@{
-
-    "Success"=$success
-
+    "Type" = "Email" #Email|Sms
+    "FromAddress"=$mailing.sender_email
+    "FromName"=$mailing.sender_name
+    "Html"=$mailing.body_html
+    "ReplyTo"=""
+    "Subject"=$mailing.subject
+    "Text"=$mailing.body_text
 }
 
 # return the results
 $return
+
+
