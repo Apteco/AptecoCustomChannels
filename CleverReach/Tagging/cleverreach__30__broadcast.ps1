@@ -22,26 +22,41 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-
-        # Coming from PeopleStage
-        MessageName = "LumaYoga.NewCustomer,-FreeTry.Login"
-        Username = "abc"
-        Password = "def"
-        ListName = "1123653 / shop.apteco.io Communication"
-        Path = "D:\FastStats\Publish\LumaYoga\system\Deliveries\PowerShell_1123653  shop.apteco.io Communication_1fdfdc58-366e-4394-a385-8cefdfac61bd.txt"
-        scriptPath = "D:\Scripts\CleverReach\Tagging72759"
-
-        uploadType = "single" # single|batch -> single is important when you want to trigger thea automations dependent on a new tag
-
-        # Coming from upload process
-        UrnFieldName = "Cu Entity Id"
-        EmailFieldName = "Email"
-        ProcessId = "2593a103-9e7a-43f7-8a3d-59377805b9c0"
+    <#
+        # PeopleStage Native Parameters
+        MessageName = "GV.Test"
+        Username = "a"
+        Password = "b"
+        ListName = "1128248 / AptecoTestGruppe2020"
+        
+        # Parameters handed over from Upload
         CustomProvider = "CLVRUPLOAD"
-        TransactionId = "2593a103-9e7a-43f7-8a3d-59377805b9c0"
+        ProcessId = "decc7ca6-2459-4050-bd0f-45169d6a51c3"
+        UrnFieldName = "Con Acc Id"
+        TransactionId = "decc7ca6-2459-4050-bd0f-45169d6a51c3"        
+        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_1128248  AptecoTestGruppe2020_e36faf87-bd78-401a-8a0a-777f57d28ef2.txt"
+        EmailFieldName = "email"
+
+        # PeopleStage Integration Parameters
+        uploadType = "batch"
+        scriptPath = "D:\Scripts\CleverReach\Tagging"
+        #>
+        ProcessId = "787a49fe-af48-4096-befb-603544570a10"
+        MessageName = "GV.Partner"
+        Username = "a"
+        TransactionId = "787a49fe-af48-4096-befb-603544570a10"
+        CustomProvider = "CLVRUPLOAD"
+        UrnFieldName = "Con Acc Id"
+        Password = "b"
+        ListName = "GV.Partner"
+        uploadType = "batch"
+        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_GV.Partner_103c4e7d-1105-4c74-993e-059c3e7e09dd.txt"
+        EmailFieldName = "email"
+        scriptPath = "D:\Scripts\CleverReach\Tagging"
 
     }
 }
+
 
 ################################################
 #
@@ -123,7 +138,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -137,7 +152,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -212,11 +227,6 @@ Write-Log -message "Loaded $( $dataCsv.count ) records"
 # CREATE GROUP IF NEEDED
 #-----------------------------------------------
 
-
-#-----------------------------------------------
-# CREATE GROUP IF NEEDED
-#-----------------------------------------------
-
 # If lists contains a concat character (id+name), use the list id
 # if no concat character is present, take the whole string as name for a new list and search for it... if not present -> new list!
 # if no list is present, just take the current date and time
@@ -228,11 +238,13 @@ try {
     $group = [List]::new($params.ListName)
     $listName = $group.listName
     $groupId = $group.listId
+    Write-Log -message "Ready to use group with id $( $groupId )"
+
 
 } catch {
 
-    # Listname is not empty, check it
-    if ($params.ListName -ne "") {
+    # Listname is the same as the message means nothing was entered -> check the name
+    if ($params.ListName -ne $params.MessageName) {
 
         # Try to search for that group and select the first matching entry or throw exception
         $object = "groups"    
@@ -240,13 +252,14 @@ try {
         $groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
         
         # Check how many matches are available
-        $matchingGroups = $groups | where { $_.name -eq $params.ListName }
+        $matchingGroups = @( $groups | where { $_.name -eq $params.ListName } ) # put an array around because when the return is one object, it will become a pscustomobject
         switch ( $matchingGroups.Count ) {
 
             # No match -> new group
             0 { 
                 $createNewGroup = $true                
                 $listName = $params.ListName
+                Write-Log -message "No matched group -> create a new one"
             }
             
             # One match -> use that one!
@@ -254,18 +267,23 @@ try {
                 $createNewGroup = $false # No need for the group creation now
                 $listName = $matchingGroups.name
                 $groupId = $matchingGroups.id
+                Write-Log -message "Matched one group -> use that one"
+
             }
 
             # More than one match -> throw exception
             Default {
                 $createNewGroup = $false # No need for the group creation now
+                Write-Log -message "More than one match -> throw exception"
                 throw [System.IO.InvalidDataException] "More than two groups with that name. Please choose a unique list."              
             }
         }
 
     # String is empty, create a generic group name
     } else {
-        $listName = [datetime]::Now.ToString("yyyyMMdd HHmmss")
+        $createNewGroup = $true
+        $listName = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
+        Write-Log -message "Create a new group with a timestamp"
     }
 
 }
@@ -332,11 +350,13 @@ if ( $createNewGroup ) {
 #-----------------------------------------------
 
 $requiredFields = @(,$params.EmailFieldName)
+$reservedFields = @("tags")
 
 Write-Log -message "Required fields $( $requiredFields -join ", " )"
+Write-Log -message "Reserved fields $( $reservedFields -join ", " )"
 
 
-# Load global attributes
+# Load online attributes
 
 $object = "attributes"
 $endpoint = "$( $apiRoot )$( $object ).json"
@@ -347,11 +367,10 @@ $attributes = $globalAttributes + $localAttributes
 Write-Log -message "Loaded global attributes $( $globalAttributes.name -join ", " )"
 Write-Log -message "Loaded local attributes $( $localAttributes.name -join ", " )"
 
-
-# TODO [ ] Implement re-using a group (with deactivation of receivers and comparation of local fields)
+# TODO [x] Implement re-using a group (with deactivation of receivers and comparation of local fields)
 
 $attributesNames = $attributes | where { $_.name -notin $requiredFields }
-$csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
+$csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty | where { $_.Name -notin $reservedFields }
 Write-Log -message "Loaded csv attributes $( $csvAttributesNames.Name -join ", " )"
 
 # Check if email field is present
@@ -369,6 +388,7 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
 # Compare columns
 # TODO [ ] Now the csv column headers are checked against the description of the cleverreach attributes and not the (technical name). Maybe put this comparation in here, too. E.g. description "Communication Key" get the name "communication_key"
 $differences = Compare-Object -ReferenceObject $attributesNames.description -DifferenceObject ( $csvAttributesNames  | where { $_.name -notin $requiredFields } ).name -IncludeEqual #-Property Name 
+#$differences = Compare-Object -ReferenceObject $attributesNames.name -DifferenceObject ( $csvAttributesNames  | where { $_.name -notin $requiredFields } ).name -IncludeEqual #-Property Name 
 $colsEqual = $differences | where { $_.SideIndicator -eq "==" } 
 $colsInAttrButNotCsv = $differences | where { $_.SideIndicator -eq "<=" } 
 $colsInCsvButNotAttr = $differences | where { $_.SideIndicator -eq "=>" }
@@ -489,8 +509,11 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
 
         $uploadObject += $uploadEntry
 
-        if ( $i % $settings.upload.rowsPerUpload -or ($i - 1) -eq $dataCsv.count) {
+        #if ( $i % $settings.upload.rowsPerUpload -eq 0 -or ($i - 1) -eq $dataCsv.count) {
+        if ( ($i + 1) % $settings.upload.rowsPerUpload -eq 0 -or ($i + 1) -eq $dataCsv.count ) {
+
             $bodyJson = $uploadObject | ConvertTo-Json
+            $bodyJson | Set-Content -path "$( $tempFolder )\$( $i ).json" -Encoding UTF8
             $upload += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
             $uploadObject = @()
         }

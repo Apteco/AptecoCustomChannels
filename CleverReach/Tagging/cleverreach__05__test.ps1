@@ -12,7 +12,8 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -102,7 +103,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -116,7 +117,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -172,12 +173,48 @@ $header = @{
 
 $object = "debug"
 $endpoint = "$( $apiRoot )$( $object )/whoami.json"
-$whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+$success = $false
+try {
+    $whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+    $success = $true
+} catch {
 
-exit 0
+    throw [System.IO.InvalidDataException] "Test was not successful"  
+
+}
 
 #-----------------------------------------------
-# RETURN
+# LOG
 #-----------------------------------------------
+
+if ( $success ) {
+
+    Write-Log -message "Entries of WhoAmI"
+
+    $whoAmI | Get-Member -MemberType NoteProperty | ForEach {
+        $name = $_.Name
+        $value = $whoAmI.$name
+        Write-Host "$( $name ): $( $value )"
+        Write-Log -message "$( $name ): $( $value )"
+    }
+
+}
+
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE AND BROADCAST
+#
+################################################
 
 # TODO [ ] Is there something expected to return? Something like true or false?
+
+
+# return object
+$return = [Hashtable]@{
+
+    "Success"=$success
+
+}
+
+# return the results
+$return

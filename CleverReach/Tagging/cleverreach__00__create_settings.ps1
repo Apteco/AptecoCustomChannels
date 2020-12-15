@@ -155,7 +155,6 @@ $foldersToCheck = @(
 $foldersToCheck | ForEach {
     $checkFolder = $_
     if ( !(Test-Path -Path $checkFolder) ) {
-        Write-Log -message "Upload $( $checkFolder ) does not exist. Creating the folder now!"
         New-Item -Path "$( $checkFolder )" -ItemType Directory
     }
 }
