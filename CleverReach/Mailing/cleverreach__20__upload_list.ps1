@@ -22,13 +22,12 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-    <#
+        
+        # Send from PeopleStage
         TransactionType = "Replace"
         Password = "b"
-        scriptPath = "D:\Scripts\CleverReach\Mailing"
         MessageName = ""
         EmailFieldName = "email"
-        deactivate = "true"
         Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_6299985  1-to-1 Einladung dmexco_ceb0f74c-bc52-4a2f-9816-455a13689fd8.txt"
         ReplyToEmail = ""
         Username = "a"
@@ -37,21 +36,11 @@ if ( $debug ) {
         ListName = "6299985 / 1-to-1 Einladung dmexco"
         CommunicationKeyFieldName = "Communication Key"
         SmsFieldName = ""
-        #>
-        TransactionType = "Replace"
-        Password = "b"
+
+        # Integration parameters
         scriptPath = "D:\Scripts\CleverReach\Mailing"
-        MessageName = ""
-        EmailFieldName = "email"
-        deactivate = "false"
-        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_7647164  Xmas Partner 2020_fa86bb85-5067-474a-8027-d5237b6dfa9a.txt"
-        ReplyToEmail = ""
-        Username = "a"
-        ReplyToSMS = ""
-        UrnFieldName = "Con Acc Id"
-        ListName = "7647164 / Xmas Partner 2020"
-        CommunicationKeyFieldName = "Communication Key"
-        SmsFieldName = ""
+        deactivate = "true"
+
     }
 }
 
@@ -394,7 +383,7 @@ $colsInCsvButNotAttr = $differences | where { $_.SideIndicator -eq "=>" }
 #-----------------------------------------------
 
 $object = "groups"
-$endpoint = "$( $apiRoot )$( $object ).json/$( $newGroup.id )/attributes"
+$endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/attributes"
 $newAttributes = @()
 $colsInCsvButNotAttr | ForEach {
 
