@@ -88,7 +88,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
