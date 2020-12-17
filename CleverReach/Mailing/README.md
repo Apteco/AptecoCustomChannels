@@ -1,7 +1,7 @@
 # Getting started
 
 * Create the token through FastStats or another 2fa
-
+* New tokens are only valid for 30 days, and they are getting refreshed automatically. But if you use cleverreach less than every 30 days, make sure you execute the `cleverreach__05__test.ps1` every day via a Windows Task.
 
 
 
