@@ -52,6 +52,8 @@ $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token
 
 $login = @{
     "accesstoken" = $tokenEncrypted
+    "refreshTokenAutomatically" = $true
+    "refreshTtl" = 604800 # seconds; refresh one week before expiration
 }
 
 
@@ -67,6 +69,7 @@ $previewSettings = @{
     #"Subject"="Test-Subject"
 }
 
+
 #-----------------------------------------------
 # UPLOAD SETTINGS
 #-----------------------------------------------
@@ -76,6 +79,7 @@ $uploadSettings = @{
     "uploadsFolder" = "$( $scriptPath )\uploads\"
     #"excludedAttributes" = @()
 }
+
 
 #-----------------------------------------------
 # BROADCAST SETTINGS

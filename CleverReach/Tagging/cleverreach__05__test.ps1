@@ -88,7 +88,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -141,7 +145,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = $( $params[$param] )"
     }
 }
 
@@ -166,6 +170,31 @@ $header = @{
 
 
 #-----------------------------------------------
+# VALIDATE
+#-----------------------------------------------
+
+$object = "debug"
+$validateParameters = @{
+    Uri = "$( $apiRoot )$( $object )/validate.json"
+    Method = "Get"
+    Headers = $header
+    Verbose = $true
+    ContentType = $contentType
+}
+
+$success = $false
+try {
+    $valid = Invoke-RestMethod @validateParameters
+    Write-Log "Test was successful"
+    $success = $true
+} catch {
+    Write-Log "Test was not successful, closing the script"
+    throw [System.IO.InvalidDataException] "Test was not successful"  
+}
+
+
+
+#-----------------------------------------------
 # WHO AM I
 #-----------------------------------------------
 
@@ -173,20 +202,72 @@ $header = @{
 
 $object = "debug"
 $endpoint = "$( $apiRoot )$( $object )/whoami.json"
-$success = $false
-try {
-    $whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
-    $success = $true
-} catch {
+$whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
-    throw [System.IO.InvalidDataException] "Test was not successful"  
-
+# Logging of whoami
+Write-Log -message "Entries of WhoAmI"
+$whoAmI | Get-Member -MemberType NoteProperty | ForEach {
+    $propName = $_.Name
+    Write-Log "    $( $propName ) = $( $whoAmI.$propName )"
 }
+
+
+#-----------------------------------------------
+# TTL
+#-----------------------------------------------
+
+$object = "debug"
+$validateParameters = @{
+    Uri = "$( $apiRoot )$( $object )/ttl.json"
+    Method = "Get"
+    Headers = $header
+    Verbose = $true
+    ContentType = $contentType
+}
+$ttl = Invoke-RestMethod @validateParameters
+Write-Log -message "Token is valid until $( $ttl.ttl ) - $( $ttl.date )"
+
+
+#-----------------------------------------------
+# EXCHANGE TOKEN IF NEEDED
+#-----------------------------------------------
+
+if ( $settings.login.refreshTokenAutomatically -and $ttl.ttl -lt $settings.login.refreshTtl ) {
+    
+    Write-Log -message "Creating new token, it will expire in $( $ttl.ttl ) seconds"
+
+    $object = "debug"
+    $validateParameters = @{
+        Uri = "$( $apiRoot )$( $object )/exchange.json"
+        Method = "Get"
+        Headers = $header
+        Verbose = $true
+        ContentType = $contentType
+    }
+    # TODO [ ] check the return value of the new created token
+    $newToken = Invoke-RestMethod @validateParameters
+
+    $settings.login.accesstoken = Get-PlaintextToSecure $newToken
+
+    # create json object
+    $json = $settings | ConvertTo-Json -Depth 8 # -compress
+
+    # save settings to file
+    $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+    Write-Log -message "Creating new token, it will expire in $( $ttl.ttl ) seconds"
+
+} else {
+   
+    Write-Log -message "No new token creation needed, still valid for $( $ttl.ttl ) seconds"
+    
+}
+
 
 #-----------------------------------------------
 # LOG
 #-----------------------------------------------
-
+<#
 if ( $success ) {
 
     Write-Log -message "Entries of WhoAmI"
@@ -199,6 +280,7 @@ if ( $success ) {
     }
 
 }
+#>
 
 ################################################
 #
