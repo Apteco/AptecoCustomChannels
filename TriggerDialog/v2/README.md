@@ -58,3 +58,4 @@ id|createdOn|changedOn|version|name|sortOrder|synonyms
 
 - [ ] Think about usage of response data and receiver download
 - [ ] Fill debug input parameters properly
+- [ ] Think about filling campaign name from PeopleStage
