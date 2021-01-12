@@ -426,7 +426,7 @@ $groups
 #-----------------------------------------------
 
 $function = "api_getDetails"
-$groupsDetails = @()
+$groupsDetails = [System.Collections.ArrayList]@()
 $groups | ForEach-Object {
 
     $groupId = $_
@@ -439,10 +439,12 @@ $groups | ForEach-Object {
         Method = "Get"
        # Body = ""
     }
-    $groupsDetails += Invoke-RestMethod @restParams
+    $res = Invoke-RestMethod @restParams
+    $groupsDetails.Add($res)
     
 }
-$groupsDetails | ft
+$groupDetailsFiltered = $groupsDetails | where { $_.ev_id -ne $null }
+$groupDetailsFiltered.Count
 
 
 #-----------------------------------------------
@@ -472,9 +474,9 @@ $groups | ForEach-Object {
 
 # Split everything in chunks if needed and execute
 $function = "api_getDetails"
-$batchsize = 50
+$batchsize = 10
 $chunks =  [Math]::Ceiling( $bulkCalls.count / $batchsize )
-$groupsDetails2 = @()
+$groupsDetails2 = [System.Collections.ArrayList]@()
 for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
             
     $start = $i*$batchsize
@@ -485,7 +487,7 @@ for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
         $end = $batchsize
     }
 
-    "$( $start ) : $( $end )"
+    "$( $i ) : $( $start ) : $( $end )"
 
     $bulkParams = [System.Collections.ArrayList]@()
     $bulkParams.Add( $bulkCalls.GetRange($start, $end) )
@@ -496,11 +498,14 @@ for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
         Body = "json=$( Format-ELAINE-Parameter $bulkParams )"
     }
 
-    $gt = Invoke-RestMethod @restParams
+    $gt = Invoke-RestMethod @restParams 
     $gt | ft
-    $groupsDetails2 += $gt
+    if ($gt -ne "" ) {
+        $groupsDetails2.AddRange($gt)
+    }
 }
 
+$groupsDetails2.Count
 $groupsDetails2 | ft
 $groupsDetails2 | Out-GridView
 
