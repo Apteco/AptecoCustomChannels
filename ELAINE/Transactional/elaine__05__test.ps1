@@ -509,6 +509,21 @@ $groupsDetails2.Count
 $groupsDetails2 | ft
 $groupsDetails2 | Out-GridView
 
+#-----------------------------------------------
+# ARTICLE FOLDERS
+#-----------------------------------------------
+<#
+This one returns the nl_id, nl_name and nl_status
+#>
+
+$function = "api_getFolders"
+$restParams = $defaultRestParams + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Method = "Get"
+}
+$articlesFolder = Invoke-RestMethod @restParams
+$articlesFolder | Out-GridView
+
 
 #-----------------------------------------------
 # ARTICLE LIST
@@ -531,20 +546,148 @@ $articles | Out-GridView
 
 
 #-----------------------------------------------
-# ARTICLE FOLDERS
+# ARTICLE DETAILS
 #-----------------------------------------------
-<#
-This one returns the nl_id, nl_name and nl_status
-#>
 
-$function = "api_getFolders"
+$function = "api_getArticleDetails"
+$jsonInput = @(
+    0      # int $part_id 
+) 
 $restParams = $defaultRestParams + @{
-    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
     Method = "Get"
 }
-$articlesFolder = Invoke-RestMethod @restParams
-$articlesFolder | Out-GridView
+$articleDetail = Invoke-RestMethod @restParams
+$articleDetail | Out-GridView
+
+# TODO [ ] Needs testing
 
 
+#-----------------------------------------------
+# GET IMPORT STATUS
+#-----------------------------------------------
+
+$function = "api_getImportStatus"
+$jsonInput = @(
+    ""      # string $filename
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$importStatus = Invoke-RestMethod @restParams
+$importStatus
+
+# TODO [ ] Needs testing
+
+
+#-----------------------------------------------
+# SEND SINGLE
+#-----------------------------------------------
+<#
+Send a message to a known user in ELAINE
+Recipients on black and bounce lists are automatically excluded
+BULK: Only possible for one mailing id and abortOnError will be ignored -> Either the whole call will be send out or not
+#>
+
+$function = "api_sendSingle"
+$jsonInput = @(
+    ""      # int $nl_id                        Mailing
+    ""      # int $p_id                         User
+    ""      # int $ev_id                        Group
+    ""      # int $priority : null
+    ""      # int $variant_position : null      Variant, e.g. with language templates
+    ""      # string $type : normal
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$send = Invoke-RestMethod @restParams
+$send
+
+# TODO [ ] Needs testing
+
+
+#-----------------------------------------------
+# SEND SINGLE TRANSACTIONAL
+#-----------------------------------------------
+<#
+Upload an array in the api call and send email directly
+Recipients on black and bounce lists are NOT automatically excluded, but this can be controlled via the blacklist parameter
+BULK: Additionally to the non-bulk mode, the bulk mechanism uses the bounce list; Only possible for one mailing id and abortOnError will be ignored -> Either the whole call will be send out or not
+#>
+
+$function = "api_sendSingleTransaction"
+$jsonInput = @(
+    ""      # array $data = null                    Recipient data
+    ""      # int $nl_id                            Mailing
+    ""      # int $ev_id                            Group is optional
+    ""      # int $variant_position : null
+    ""      # boolean|integer $blacklist : true     false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$send = Invoke-RestMethod @restParams
+$send
+
+# TODO [ ] Implement the data array
+# TODO [ ] Needs testing
+# TODO [ ] Add BULK and Single lookup the the settings creation or make id dependent on the version
+
+
+#-----------------------------------------------
+# RENDER MAILING
+#-----------------------------------------------
+<#
+Upload an array in the api call and send email directly
+#>
+
+$function = "api_mailingRender"
+$jsonInput = @(
+    ""      # int $elaine_id
+    ""      # int $mailing_id
+    ""      # array $userdata = array() 
+    ""      # int $group
+    ""      # bool $preview = false
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$render = Invoke-RestMethod @restParams
+$render
+
+# TODO [ ] Needs testing
+
+
+#-----------------------------------------------
+# TEST SEND
+#-----------------------------------------------
+<#
+Upload an array in the api call and send email directly
+#>
+
+$function = "api_mailingTestsend"
+$jsonInput = @(
+    ""      # int $nl_id
+    ""      # int $ev_id
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$testsend = Invoke-RestMethod @restParams
+$testsend
+
+# TODO [ ] Needs testing
+
+
+
+
+
+# TODO [ ] CHECK USE OF api_userParseText ( string $text = '' , int $p_id ) 
 
 exit 0
