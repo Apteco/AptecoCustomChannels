@@ -35,6 +35,12 @@ if ( $debug ) {
 
 <#
 
+# TODO [ ] CHECK USE OF api_userParseText ( string $text = '' , int $p_id ) 
+
+#>
+
+<#
+
 https://docs.artegic.com/display/APIDE/Funktionsreferenz
 
 # Good examples of possible formats to call the ELAINE API
@@ -285,6 +291,29 @@ $restParams = $defaultRestParams + @{
 }
 $errorCodes = Invoke-RestMethod @restParams
 
+# Lookup a specific error code
+#($errorCodes | gm -MemberType NoteProperty | where { $_.Name -eq "-18"  }).Definition.split("=")[1]
+
+
+#-----------------------------------------------
+# ELAINE VERSION
+#-----------------------------------------------
+<#
+This call should be made at the beginning of every script to be sure the version is filled (and the connection could be made)
+#>
+
+$function = "api_getElaineVersion"
+$restParams = $defaultRestParams + @{
+    Uri = "$( $apiRoot )$( $function )?p1=false&response=$( $settings.defaultResponseFormat )"
+    Method = "Get"
+}
+
+#$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
+$elaineVersion = Invoke-RestMethod @restParams
+
+# Use this function to check if a mininum version is needed to call the function
+Check-ELAINE-Version -minVersion "6.2.2"
+
 
 #-----------------------------------------------
 # BACKGROUND JOBS
@@ -311,20 +340,6 @@ $dataSources = Invoke-RestMethod @restParams
 
 
 #-----------------------------------------------
-# ELAINE VERSION
-#-----------------------------------------------
-
-$function = "api_getElaineVersion"
-$restParams = $defaultRestParams + @{
-    Uri = "$( $apiRoot )$( $function )?p1=false&response=$( $settings.defaultResponseFormat )"
-    Method = "Get"
-}
-
-#$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
-$version = Invoke-RestMethod @restParams
-
-
-#-----------------------------------------------
 # MAILINGS BY STATUS - METHOD 1
 #-----------------------------------------------
 <#
@@ -344,7 +359,7 @@ $restParams = $defaultRestParams + @{
     Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
     Method = "Get"
 }
-$mailings = Invoke-RestMethod @restParams
+$mailingsMethod1 = Invoke-RestMethod @restParams
 #$mailings | Out-GridView
 
 <#
@@ -370,38 +385,20 @@ Count Name
 #-----------------------------------------------
 <#
 This one returns the nl_id, nl_name and nl_status
+Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
 #>
 
 $function = "api_getMessageInfo"
 $jsonInput = @(
     ""      # message_name : string
-    "ready" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
+    "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
 ) 
 $restParams = $defaultRestParams + @{
     Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
     Method = "Get"
 }
-$mailings = Invoke-RestMethod @restParams
-#$mailings | Out-GridView
-
-
-
-#-----------------------------------------------
-# CONTENT OF A MAILING
-#-----------------------------------------------
-
-$selectedMailing = $mailings | Out-GridView -PassThru
-
-$function = "api_getMailingContent"
-$jsonInput = @(
-    $selectedMailing.nl_id      # nl_id : id of mailling to get content
-) 
-$restParams = $defaultRestParams + @{
-    Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
-    Method = "Get"
-}
-$mailingsContent = Invoke-RestMethod @restParams
-$mailingsContent
+$mailingsMethod2 = Invoke-RestMethod @restParams
+#$mailingsMethod2 | Out-GridView
 
 
 #-----------------------------------------------
@@ -422,7 +419,7 @@ $groups
 
 
 #-----------------------------------------------
-# GET ALL GROUPS DETAILS VIA SINGLE CALLS (FIRST 10)
+# GET ALL GROUPS DETAILS METHOD 1 - VIA SINGLE CALLS
 #-----------------------------------------------
 
 $function = "api_getDetails"
@@ -448,7 +445,21 @@ $groupDetailsFiltered.Count
 
 
 #-----------------------------------------------
-# GET ALL GROUPS DETAILS VIA BULK
+# EXIT
+#-----------------------------------------------
+
+exit 0
+
+
+################################################
+#
+# EXECUTE EVERY PART BELOW SELECTIVELY IF NEEDED
+#
+################################################
+
+
+#-----------------------------------------------
+# GET ALL GROUPS DETAILS METHOD 2 - VIA BULK
 #-----------------------------------------------
 
 <#
@@ -508,6 +519,78 @@ for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
 $groupsDetails2.Count
 $groupsDetails2 | ft
 $groupsDetails2 | Out-GridView
+
+
+#-----------------------------------------------
+# GET USER ID BY HASH
+#-----------------------------------------------
+
+$function = "api_getUserId"
+$jsonInput = @(
+    "florian.von.bracht@apteco.de"      # array $data
+    ""      # array $keys = array() 
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$userByHash = Invoke-RestMethod @restParams
+$userByHash
+# TODO [ ] Needs testing
+
+
+#-----------------------------------------------
+# GET USER ID BY EMAIL
+#-----------------------------------------------
+
+$function = "api_getUserIdByEmail"
+$jsonInput = @(
+    "testuser@example.tld"      # string email
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$userByEmail = Invoke-RestMethod @restParams
+$userByEmail
+
+
+#-----------------------------------------------
+# GET USER DETAILS
+#-----------------------------------------------
+
+$function = "api_getUser"
+$jsonInput = @(
+    [int]$userByEmail      # int $elaine_id
+    0 # int $group
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$userDetails = Invoke-RestMethod @restParams
+$userDetails
+
+
+#-----------------------------------------------
+# CONTENT OF A MAILING
+#-----------------------------------------------
+
+$selectedMailing = $mailings | Out-GridView -PassThru
+
+$function = "api_getMailingContent"
+$jsonInput = @(
+    $selectedMailing.nl_id      # nl_id : id of mailling to get content
+) 
+$restParams = $defaultRestParams + @{
+    Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
+    Method = "Get"
+}
+$mailingsContent = Invoke-RestMethod @restParams
+$mailingsContent
+
+
+
 
 #-----------------------------------------------
 # ARTICLE FOLDERS
@@ -618,24 +701,73 @@ Recipients on black and bounce lists are NOT automatically excluded, but this ca
 BULK: Additionally to the non-bulk mode, the bulk mechanism uses the bounce list; Only possible for one mailing id and abortOnError will be ignored -> Either the whole call will be send out or not
 #>
 
+# Choose the right parameters
+$selectedMailing = $mailingsMethod2 | Out-GridView -PassThru
+#$selectedGroup = $groupDetailsFiltered | Out-GridView -PassThru
+$selectedGroup = [System.Collections.ArrayList]@("")
+$variant = "" # TODO [ ] check if you can read the variants of a mailing
+
+# Create the upload data object
+$dataArr = [ordered]@{
+    "content" = [ordered]@{
+        "c_urn"             = "414596"
+        "c_email"          = "test@example.tld"
+        #"t_subject"        = "Test-Betreff"
+        #"t_sendername"     = "Apteco GmbH"
+        #"t_sender"         = "info@apteco.de"
+        #"t_replyto" $       = "antwort@example.tld"
+        #"t_cc"             = "cc_empfaenger@example.tld"
+        #"t_bcc"            = "bcc_empfaenger@example.tld"
+        #"t_attachment"     = @()
+        #"t_textcontent"    = "Text-Inhalt"
+        #"t_htmlcontent"    = "HTML-Inhalt"
+        #"t_xxx"            = "Hello World"
+    }
+    #"priority" = 99                 # 99 is default value, 100 is for emergency mails           
+    #"override" = $false             # overwrite array data with profile data
+    #"update_profile" = $false       # update existing contacts with array data
+    #"msgid" = [guid]::NewGuid()     # External message id / for identifying
+    #"notify_url" = ""              # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
+}
+
 $function = "api_sendSingleTransaction"
 $jsonInput = @(
-    ""      # array $data = null                    Recipient data
-    ""      # int $nl_id                            Mailing
-    ""      # int $ev_id                            Group is optional
-    ""      # int $variant_position : null
-    ""      # boolean|integer $blacklist : true     false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
+    $dataArr      # array $data = null                    Recipient data
+    [int]$selectedMailing[0].nl_id       # int $nl_id                            Mailing
+    #"" #$selectedGroup[0].ev_id         # int $ev_id                            Group is optional
+    #"" # $variant      # int $variant_position : null
+    #$false      # boolean|integer $blacklist : true     false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
+) 
+$restParams = $defaultRestParamsPost + @{
+    Uri = "$( $apiRoot )$( $function )"# ?&response=$( $settings.defaultResponseFormat )"
+    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
+}
+$send = Invoke-RestMethod @restParams
+$send 
+
+# TODO [x] Needs testing
+# TODO [ ] Add BULK and Single lookup the the settings creation or make id dependent on the version
+
+
+#-----------------------------------------------
+# GET TRANSACTIONAL MAILING STATUS
+#-----------------------------------------------
+
+$function = "api_getTransactionMailStatus"
+$jsonInput = @(
+    [int]$send      # int $id
+    $false          # bool $is_msgid -> true if the id is an external message id
+
 ) 
 $restParams = $defaultRestParamsPost + @{
     Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
     Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
 }
-$send = Invoke-RestMethod @restParams
-$send
+$transactionalStatus = Invoke-RestMethod @restParams
+$transactionalStatus
 
-# TODO [ ] Implement the data array
-# TODO [ ] Needs testing
-# TODO [ ] Add BULK and Single lookup the the settings creation or make id dependent on the version
+# status can be "sent" or "queued"
+# TODO [x] Needs testing
 
 
 #-----------------------------------------------
@@ -688,6 +820,4 @@ $testsend
 
 
 
-# TODO [ ] CHECK USE OF api_userParseText ( string $text = '' , int $p_id ) 
 
-exit 0
