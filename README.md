@@ -19,6 +19,7 @@ Legend:
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
+Bertelsmann eLettershop||REST/SFTP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:heavy_check_mark:Trigger FERGE|Code is private
 Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Flexmail Integration Guideline](Flexmail)
 Mailingwork|Standard|REST
 Mailingwork|Campaign|REST
