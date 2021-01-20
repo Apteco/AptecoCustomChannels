@@ -94,3 +94,54 @@ Function Check-ELAINE-Version {
     }
 
 } 
+
+
+<#
+
+# This should return a string "ELAINE_ERROR_INVALID_INPUT"
+Get-ELAINE-ErrorDescription -errCode "-18"
+
+# This should return a string "Unknown Error"
+Get-ELAINE-ErrorDescription -errCode "18"
+
+#>
+Function Get-ELAINE-ErrorDescription {
+
+    [CmdletBinding()]
+    param (
+         [Parameter(Mandatory=$true)][String] $errCode
+    )
+
+    begin {
+
+
+    }
+    
+    process {
+
+                
+        $function = "api_errorCodes"
+        $restParams = $script:defaultRestParams + @{
+            Uri = "$( $script:apiRoot )$( $function )?&response=$( $script:settings.defaultResponseFormat )"
+            Method = "Get"
+        }
+        $errorCodes = Invoke-RestMethod @restParams
+
+        # Lookup a specific error code
+        $errObj = $errorCodes | gm -MemberType NoteProperty | where { $_.Name -eq $errCode }
+        if ( $errObj -ne $null ) { 
+            $errDesc = $errObj.Definition.split("=")[1]
+        } else {
+            $errDesc = "Unknown Error"
+        }
+    }
+    
+    end {
+
+        $errDesc
+
+    }
+
+
+}
+
