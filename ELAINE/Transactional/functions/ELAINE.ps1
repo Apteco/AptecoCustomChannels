@@ -145,3 +145,147 @@ Function Get-ELAINE-ErrorDescription {
 
 }
 
+<#
+Required variables
+
+$script:apiRoot
+$script:defaultRestParams
+$script:defaultRestParamsPost
+$script:settings.defaultResponseFormat
+
+# Call it like
+Invoke-ELAINE -function "api_getElaineVersion"
+Invoke-ELAINE -function "api_getElaineVersion" -parameters @($true)
+Invoke-ELAINE -function "api_getElaineVersion" -parameters @($false)
+Invoke-ELAINE -function "api_getElaineVersion" -parameters @($false) -method "Post"
+Invoke-ELAINE -function "api_getElaineVersion" -parameters @($true) -method "Post" 
+
+#>
+Function Invoke-ELAINE {
+
+    [CmdletBinding()]
+    param (
+          [Parameter(Mandatory=$true)][String] $function
+         ,[Parameter(Mandatory=$false)][Microsoft.PowerShell.Commands.WebRequestMethod] $method = "Get"
+         ,[Parameter(Mandatory=$false)][System.Collections.ArrayList] $parameters = $null
+    )
+
+    begin {
+        if ( $parameters -ne $null ) {
+            $param = "json=$( Format-ELAINE-Parameter $parameters )"
+        } else {
+            $param = ""
+        }
+    }
+    
+    process {
+        
+        Switch ( $method.toString() ) {
+
+            "Get" {
+                
+                $restParams = $script:defaultRestParams + @{
+                    Uri = "$( $script:apiRoot )$( $function )?$( $param )&response=$( $script:settings.defaultResponseFormat )"
+                    Method = "Get"
+                }
+            }
+
+            "Post" {
+                $restParams = $defaultRestParamsPost + @{
+                    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
+                    Body = $param
+                }                
+            }
+
+            Default {
+                throw [System.IO.InvalidDataException] "Method not implemented yet"  
+            }
+
+        }
+
+        $result = Invoke-RestMethod @restParams
+
+        # Check if the result is an integer
+        If ( Is-Int($result) ) {
+            # If negative, it is definitely an error
+            If ( $result -lt 0 ) {
+                # Get the error description
+                $errMsg = "Got error '$( $result ) : $( Get-ELAINE-ErrorDescription -errCode $result )'"
+                Write-Log -message $errMsg
+                throw [System.IO.InvalidDataException] $errMsg  
+                $errMsg = ""
+            }
+        }
+
+    }
+    
+    end {
+
+        $result
+
+    }
+}
+
+
+<#
+Needs the $settings object first with 
+$settings.login.username
+$settings.login.token
+$settings.base
+#>
+Function Create-ELAINE-Parameters {
+
+    [CmdletBinding()]
+    param ()
+
+    begin {
+
+    }
+    
+    process {
+
+
+        #-----------------------------------------------
+        # AUTH
+        #-----------------------------------------------
+
+        # https://pallabpain.wordpress.com/2016/09/14/rest-api-call-with-basic-authentication-in-powershell/
+
+        # Step 2. Encode the pair to Base64 string
+        $encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$( $settings.login.username ):$( Get-SecureToPlaintext $settings.login.token )"))
+        
+        # Step 3. Form the header and add the Authorization attribute to it
+        $script:headers = @{ Authorization = "Basic $encodedCredentials" }
+
+        
+        #-----------------------------------------------
+        # HEADER + CONTENTTYPE + BASICS
+        #-----------------------------------------------
+
+        $script:apiRoot = $settings.base
+        $contentType = "application/json; charset=utf-8"
+
+        $script:headers += @{
+
+        }
+
+        $script:defaultRestParams = @{
+            Headers = $headers
+            Verbose = $true
+            ContentType = $contentType
+        }
+
+        $script:defaultRestParamsPost = @{
+            Headers = $headers
+            Verbose = $true
+            Method = "Post"
+            ContentType = "application/x-www-form-urlencoded"
+        }
+
+    }
+    
+    end {
+
+    }
+
+}

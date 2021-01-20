@@ -100,9 +100,10 @@ $mailingsSettings = @{
 #-----------------------------------------------
 
 $uploadSettings = @{
-    rowsPerUpload = 800
-    uploadsFolder = "$( $scriptPath )\uploads\"
-    timeout = 30 # seconds
+    #rowsPerUpload = 800
+    #uploadsFolder = "$( $scriptPath )\uploads\"
+    #timeout = 30 # seconds
+    requiredFields = @()
     #excludedAttributes = @()							# Will be defined later in the process
     #recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
     #recipientListUrnField = ""							# Will be defined later in the process
@@ -127,7 +128,7 @@ $settings = @{
     logfile="$( $scriptPath )\elaine.log"               # path and name of log file
     providername = "ELN"                                # identifier for this custom integration, this is used for the response allocation
     checkVersion = $true                                # check elaine version for some specific calls
-
+    
     # Session 
     aesFile = $keyFile
     #sessionFile = "$( $scriptPath )\session.json"                        # name of the session file
@@ -138,7 +139,7 @@ $settings = @{
     # aws = $awsSettings
     login = $loginSettings
     #mailings = $mailingsSettings
-    #upload = $uploadSettings
+    upload = $uploadSettings
 
 }
 
@@ -148,6 +149,46 @@ $settings = @{
 # PACK TOGETHER SETTINGS AND SAVE AS JSON
 #
 ################################################
+
+# create json object
+$json = $settings | ConvertTo-Json -Depth 8 # -compress
+
+# print settings to console
+$json
+
+# save settings to file
+$json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+
+
+################################################
+#
+# LAST SETTINGS USING THE NEW LOGIN DATA
+#
+################################################
+
+#-----------------------------------------------
+# CREATE HEADERS AND LOGIN SETUP
+#-----------------------------------------------
+
+Create-ELAINE-Parameters
+
+
+#-----------------------------------------------
+# CHOOSE REQUIRED FIELDS
+#-----------------------------------------------
+
+<#
+Choose some fields like c_email and c_urn
+#>
+$fields = Invoke-ELAINE -function "api_getDatafields"
+$requiredFields = $fields | Out-GridView -PassThru
+$settings.upload.requiredFields = $requiredFields.f_name
+
+
+#-----------------------------------------------
+# SAVE
+#-----------------------------------------------
 
 # create json object
 $json = $settings | ConvertTo-Json -Depth 8 # -compress

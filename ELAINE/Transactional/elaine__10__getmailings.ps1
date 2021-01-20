@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 
 #-----------------------------------------------
@@ -159,41 +159,10 @@ if ( $paramsExisting ) {
 
 
 #-----------------------------------------------
-# AUTH
+# PREPARE CALLING ELAINE
 #-----------------------------------------------
 
-# https://pallabpain.wordpress.com/2016/09/14/rest-api-call-with-basic-authentication-in-powershell/
-
-# Step 2. Encode the pair to Base64 string
-$encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$( $settings.login.username ):$( Get-SecureToPlaintext $settings.login.token )"))
- 
-# Step 3. Form the header and add the Authorization attribute to it
-$headers = @{ Authorization = "Basic $encodedCredentials" }
-
-
-#-----------------------------------------------
-# HEADER + CONTENTTYPE + BASICS
-#-----------------------------------------------
-
-$apiRoot = $settings.base
-$contentType = "application/json; charset=utf-8"
-
-$headers += @{
-
-}
-
-$defaultRestParams = @{
-    Headers = $headers
-    Verbose = $true
-    ContentType = $contentType
-}
-
-$defaultRestParamsPost = @{
-    Headers = $headers
-    Verbose = $true
-    Method = "Post"
-    ContentType = "application/x-www-form-urlencoded"
-}
+Create-ELAINE-Parameters
 
 
 #-----------------------------------------------
@@ -205,19 +174,17 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    $function = "api_getElaineVersion"
-    $restParams = $defaultRestParams + @{
-        Uri = "$( $apiRoot )$( $function )?p1=false&response=$( $settings.defaultResponseFormat )"
-        Method = "Get"
-    }
-
     #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
-    $elaineVersion = Invoke-RestMethod @restParams
+    $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
+    # or like this to get it back as number
+    #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
+
+    Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
 
 }
+
 # Use this function to check if a mininum version is needed to call the function
 #Check-ELAINE-Version -minVersion "6.2.2"
-
 
 #-----------------------------------------------
 # MAILINGS BY STATUS - METHOD 2
@@ -227,17 +194,11 @@ This one returns the nl_id, nl_name and nl_status
 Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
 #>
 
-$function = "api_getMessageInfo"
 $jsonInput = @(
     ""      # message_name : string
     "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
 ) 
-$restParams = $defaultRestParams + @{
-    Uri = "$( $apiRoot )$( $function )?json=$( Format-ELAINE-Parameter $jsonInput )&response=$( $settings.defaultResponseFormat )"
-    Method = "Get"
-}
-$templates = Invoke-RestMethod @restParams
-#$mailings | Out-GridView
+$templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
 
 
 #-----------------------------------------------
