@@ -126,7 +126,8 @@ $settings = @{
     nameConcatChar = " / "                              # character to concat mailing/campaign id with mailing/campaign name
     logfile="$( $scriptPath )\elaine.log"               # path and name of log file
     providername = "ELN"                                # identifier for this custom integration, this is used for the response allocation
- 
+    checkVersion = $true                                # check elaine version for some specific calls
+
     # Session 
     aesFile = $keyFile
     #sessionFile = "$( $scriptPath )\session.json"                        # name of the session file
