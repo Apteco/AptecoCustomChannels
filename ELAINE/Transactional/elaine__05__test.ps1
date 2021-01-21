@@ -1,4 +1,4 @@
-﻿################################################
+################################################
 #
 # INPUT
 #
@@ -12,19 +12,17 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
-
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
+# TODO [ ] check input parameter
+
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\ELAINE\Transactional"
-	    abc= "def"
-	    Username= "abc"
+	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
     }
 }
 
@@ -39,7 +37,6 @@ if ( $debug ) {
 
 
 #>
-
 
 ################################################
 #
@@ -70,7 +67,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "ELNMAILINGS"
+$moduleName = "ELNTEST"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -81,23 +78,20 @@ $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encodin
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
 # more settings
 $logfile = $settings.logfile
-#$guid = ([guid]::NewGuid()).Guid # TODO [ ] use this guid for a specific identifier of this job in the logfiles
-
-# append a suffix, if in debug mode
-if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
-}
+#$contentType = $settings.contentType
 
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
@@ -122,7 +116,6 @@ $libExecutables | ForEach {
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
 #>
-
 
 ################################################
 #
@@ -186,53 +179,10 @@ if ( $settings.checkVersion ) {
 
 }
 
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
+exit 0
 
 #-----------------------------------------------
-# MAILINGS BY STATUS - METHOD 2
-#-----------------------------------------------
-<#
-This one returns the nl_id, nl_name and nl_status
-Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
-#>
-
-$jsonInput = @(
-    ""      # message_name : string
-    "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
-) 
-$templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
-
-
-#-----------------------------------------------
-# BUILD MAILING OBJECTS
-#-----------------------------------------------
-
-$mailings = @()
-$templates | foreach {
-
-    # Load data
-    $template = $_
-    #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
-
-    # Create mailing objects
-    $mailings += [Mailing]@{
-        mailingId=$template.nl_id
-        mailingName=$template.nl_name
-    }
-
-}
-
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
-
-
-################################################
-#
 # RETURN
-#
-################################################
+#-----------------------------------------------
 
-# real messages
-return $messages
-
-
+# TODO [ ] Is there something expected to return? Something like true or false?

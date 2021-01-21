@@ -1,4 +1,5 @@
-﻿################################################
+
+################################################
 #
 # INPUT
 #
@@ -12,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -21,13 +22,26 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\ELAINE\Transactional"
-	    abc= "def"
-	    Username= "abc"
+        
+        # Coming from PeopleStage
+        Password = "b"
+        scriptPath = "D:\Scripts\Optilyz"
+        MessageName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+        EmailFieldName = "E-Mail"
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_5fc6ca6a89b5e200e0de42e0  Test Automation Apteco_aada3235-9bb8-44ad-9aee-63ef1ab74d0f.txt"
+        TransactionId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
+        Username = "a"
+        UrnFieldName = "Kunden ID"
+        ListName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+        
+        # Coming from Upload
+        ProcessId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
+        CustomProvider = "OPTLZUPLOAD"
+        RecipientsIgnored = "2000"
+        RecipientsQueued = "3000"
+
     }
 }
-
 
 ################################################
 #
@@ -39,7 +53,6 @@ if ( $debug ) {
 
 
 #>
-
 
 ################################################
 #
@@ -70,8 +83,8 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "ELNMAILINGS"
-$processId = [guid]::NewGuid()
+$moduleName = "ELNBRDCST"
+$processId = $params.ProcessId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -81,13 +94,14 @@ $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encodin
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
 # more settings
 $logfile = $settings.logfile
-#$guid = ([guid]::NewGuid()).Guid # TODO [ ] use this guid for a specific identifier of this job in the logfiles
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -97,7 +111,7 @@ if ( $debug ) {
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
@@ -122,7 +136,6 @@ $libExecutables | ForEach {
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
 #>
-
 
 ################################################
 #
@@ -154,6 +167,7 @@ if ( $paramsExisting ) {
 }
 
 
+
 ################################################
 #
 # PROGRAM
@@ -161,78 +175,30 @@ if ( $paramsExisting ) {
 ################################################
 
 
-#-----------------------------------------------
-# PREPARE CALLING ELAINE
-#-----------------------------------------------
-
-Create-ELAINE-Parameters
-
-
-#-----------------------------------------------
-# ELAINE VERSION
-#-----------------------------------------------
-<#
-This call should be made at the beginning of every script to be sure the version is filled (and the connection could be made)
-#>
-
-if ( $settings.checkVersion ) { 
-
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
-    $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
-    # or like this to get it back as number
-    #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
-
-    Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
-
-}
-
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
-
-#-----------------------------------------------
-# MAILINGS BY STATUS - METHOD 2
-#-----------------------------------------------
-<#
-This one returns the nl_id, nl_name and nl_status
-Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
-#>
-
-$jsonInput = @(
-    ""      # message_name : string
-    "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
-) 
-$templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
-
-
-#-----------------------------------------------
-# BUILD MAILING OBJECTS
-#-----------------------------------------------
-
-$mailings = @()
-$templates | foreach {
-
-    # Load data
-    $template = $_
-    #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
-
-    # Create mailing objects
-    $mailings += [Mailing]@{
-        mailingId=$template.nl_id
-        mailingName=$template.nl_name
-    }
-
-}
-
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+Write-Log -message "Nothing to do in the broadcast script"
 
 
 ################################################
 #
-# RETURN
+# RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
 
-# real messages
-return $messages
+# TODO [x] Forward the right numbers here
 
+# count the number of successful upload rows
+$recipients = $params.RecipientsQueued #$upload.count
 
+# put in the source id as the listname
+$transactionId = $processId
+
+# return object
+$return = [Hashtable]@{
+    "Recipients"=$recipients
+    "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
+}
+
+# return the results
+$return

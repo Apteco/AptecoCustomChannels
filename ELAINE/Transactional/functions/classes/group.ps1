@@ -15,14 +15,14 @@ Good hints here: https://xainey.github.io/2016/powershell-classes-and-concepts/
 
 
 #>
-class Mailing {
+class Group {
 
     #-----------------------------------------------
     # PROPERTIES (can be public by default, static or hidden)
     #-----------------------------------------------
 
-    [String]$mailingId
-    [String]$mailingName = ""
+    [String]$groupId
+    [String]$groupName = ""
     hidden [String]$nameConcatChar = " / "
 
 
@@ -45,12 +45,12 @@ class Mailing {
 
     #>
 
-    Mailing () {} # empty default constructor needed to support hashtable constructor
+    Group () {} # empty default constructor needed to support hashtable constructor
     
-    Mailing ( [String]$mailingId, [String]$mailingName ) {
+    Group ( [String]$groupId, [String]$groupName ) {
 
-        $this.mailingId = $mailingId
-        $this.mailingName = $mailingName
+        $this.groupId = $groupId
+        $this.mailingName = $groupName
 
         # If we have a nameconcat char in the settings variable, just use it
         if ( $script:settings.nameConcatChar ) {
@@ -59,16 +59,16 @@ class Mailing {
 
     }
 
-    Mailing ( [String]$mailingString ) {        
+    Group ( [String]$groupString ) {        
         
         # If we have a nameconcat char in the settings variable, just use it
         if ( $script:settings.nameConcatChar ) {
             $this.nameConcatChar = $script:settings.nameConcatChar
         }
 
-        $stringParts = $mailingString -split $this.nameConcatChar.trim(),2
-        $this.mailingId = $stringParts[0].trim()
-        $this.mailingName = $stringParts[1].trim()
+        $stringParts = $groupString -split $this.nameConcatChar.trim(),2
+        $this.groupId = $stringParts[0].trim()
+        $this.groupName = $stringParts[1].trim()
         
     }
 
@@ -78,7 +78,7 @@ class Mailing {
 
     [String] toString()
     {
-        return $this.mailingId, $this.mailingName -join $this.nameConcatChar
+        return $this.groupId, $this.groupName -join $this.nameConcatChar
     }    
 
 }

@@ -103,7 +103,13 @@ $uploadSettings = @{
     #rowsPerUpload = 800
     #uploadsFolder = "$( $scriptPath )\uploads\"
     #timeout = 30 # seconds
-    requiredFields = @()
+    "requiredFields" = @()
+    "variantColumn" = ""
+    "emailColumn" = ""
+    "urnColumn" = ""
+    "priority" = 99                                     # 99 is default value, 100 is for emergency mails           
+    "override" = $false                                 # overwrite array data with profile data
+    "updateProfile" = $false                            # update existing contacts with array data
     #excludedAttributes = @()							# Will be defined later in the process
     #recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
     #recipientListUrnField = ""							# Will be defined later in the process
@@ -160,7 +166,6 @@ $json
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
 
 
-
 ################################################
 #
 # LAST SETTINGS USING THE NEW LOGIN DATA
@@ -175,11 +180,55 @@ Create-ELAINE-Parameters
 
 
 #-----------------------------------------------
-# CHOOSE REQUIRED FIELDS
+# LOAD FIELDS
+#-----------------------------------------------
+
+$fields = Invoke-ELAINE -function "api_getDatafields"
+
+
+#-----------------------------------------------
+# CHOOSE EMAIL FIELD
 #-----------------------------------------------
 
 <#
-Choose some fields like c_email and c_urn
+Choose the email field
+#>
+$emailField = $fields | Out-GridView -PassThru
+$settings.upload.emailColumn = $emailField.f_name
+
+
+#-----------------------------------------------
+# CHOOSE URN FIELD
+#-----------------------------------------------
+
+<#
+Choose the urn field for the primary key
+#>
+$urnField = $fields | Out-GridView -PassThru
+$settings.upload.urnColumn = $urnField.f_name
+
+
+#-----------------------------------------------
+# CHOOSE VARIANT FIELD
+#-----------------------------------------------
+
+
+<#
+Choose the variant field, e.g. for language dependent accounts/templates
+If there is no variant field, just cancel
+#>
+$variantField = $fields | Out-GridView -PassThru
+$settings.upload.variantColumn = $variantField.f_name
+
+
+#-----------------------------------------------
+# CHOOSE OTHER REQUIRED FIELDS
+#-----------------------------------------------
+
+<#
+Choose some fields
+c_email and c_urn are not needed as required
+If there are not more fields, just cancel
 #>
 $fields = Invoke-ELAINE -function "api_getDatafields"
 $requiredFields = $fields | Out-GridView -PassThru

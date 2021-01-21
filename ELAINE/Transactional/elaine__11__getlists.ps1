@@ -189,8 +189,10 @@ if ( $settings.checkVersion ) {
 # Use this function to check if a mininum version is needed to call the function
 #Check-ELAINE-Version -minVersion "6.2.2"
 
+
+
 #-----------------------------------------------
-# MAILINGS BY STATUS - METHOD 2
+# GET GROUPS
 #-----------------------------------------------
 <#
 This one returns the nl_id, nl_name and nl_status
@@ -198,32 +200,57 @@ Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have 
 #>
 
 $jsonInput = @(
-    ""      # message_name : string
-    "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
-) 
-$templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
+    ""      # user_id : filter only allowed groups for the user
+)
+
+$groups = Invoke-ELAINE -function "api_getGroups" -parameters $jsonInput -method Post
+
+
+#-----------------------------------------------
+# GET ALL GROUPS DETAILS METHOD 1 - VIA SINGLE CALLS
+#-----------------------------------------------
+
+# TODO [ ] add bulk support for this
+
+$groupsDetails = [System.Collections.ArrayList]@()
+$groups | ForEach-Object {
+
+    $groupId = $_
+    $jsonInput = @(
+        "Group"       # objectType : Datafield|Mailing|Group|Segment
+        [int]$groupId      # objectID
+    ) 
+
+    $group = Invoke-ELAINE -function "api_getDetails" -parameters $jsonInput
+
+    $groupsDetails.Add($group)
+    
+}
+
+$groupDetailsFiltered = $groupsDetails | where { $_.ev_id -ne $null }
+#$groupDetailsFiltered.Count
 
 
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
 #-----------------------------------------------
 
-$mailings = @()
-$templates | foreach {
+$groups = [System.Collections.ArrayList]@()
+$groupDetailsFiltered | foreach {
 
     # Load data
-    $template = $_
+    $group = $_
     #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
 
-    # Create mailing objects
-    $mailings += [Mailing]@{
-        mailingId=$template.nl_id
-        mailingName=$template.nl_name
-    }
+    # Create group objects
+    $groups.add([Group]@{
+        groupId=$group.ev_id
+        groupName=$group.ev_name
+    })
 
 }
 
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+$lists = $groups | Select @{name="id";expression={ $_.groupId }}, @{name="name";expression={ $_.toString() }}
 
 
 ################################################
@@ -233,6 +260,4 @@ $messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name=
 ################################################
 
 # real messages
-return $messages
-
-
+return $lists
