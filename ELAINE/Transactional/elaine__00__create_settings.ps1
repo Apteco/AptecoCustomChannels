@@ -100,20 +100,23 @@ $mailingsSettings = @{
 #-----------------------------------------------
 
 $uploadSettings = @{
-    #rowsPerUpload = 800
-    #uploadsFolder = "$( $scriptPath )\uploads\"
-    #timeout = 30 # seconds
-    "requiredFields" = @()
-    "variantColumn" = ""
-    "emailColumn" = ""
-    "urnColumn" = ""
+
+    "rowsPerUpload" = 80                                # rows per upload, if BULK is used (available since 6.2.2)
+    "uploadsFolder" = "$( $scriptPath )\uploads\"       # upload folder where the message status is stored
+    "timeout" = 60                                      # max seconds to wait until the message status check will fail
     "priority" = 99                                     # 99 is default value, 100 is for emergency mails           
     "override" = $false                                 # overwrite array data with profile data
     "updateProfile" = $false                            # update existing contacts with array data
-    #excludedAttributes = @()							# Will be defined later in the process
-    #recipientListUrnFieldname = 'ID-Feld'				# Normally no need to change
-    #recipientListUrnField = ""							# Will be defined later in the process
-    #recipientListEmailField = "email"					# Normally no need to change
+    "notifyUrl" = ""                                    # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
+    "blacklist" = $true                                 # false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
+    "waitForSuccess" = $true                            # 
+
+    # Those will be filled later in the script
+    "requiredFields" = @()                              # additional fields that are required
+    "variantColumn" = ""                                # column for variants
+    "emailColumn" = ""                                  # column for email
+    "urnColumn" = ""                                    # column for urn (primary key)
+
 }
 
 

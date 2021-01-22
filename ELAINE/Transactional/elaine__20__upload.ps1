@@ -172,13 +172,13 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 # CHECK RESULTS FOLDER
 #-----------------------------------------------
-<#
+
 $uploadsFolder = $settings.upload.uploadsFolder
 if ( !(Test-Path -Path $uploadsFolder) ) {
     Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
     New-Item -Path "$( $uploadsFolder )" -ItemType Directory
 }
-#>
+
 
 #-----------------------------------------------
 # PREPARE CALLING ELAINE
@@ -394,6 +394,10 @@ $remainingColumns | ForEach {
     
 }
 
+Write-Log -message "Current field mapping is:"
+$colMap | ForEach {
+    Write-Log -message "    $( $_.source ) -> '$( $_.target )'"
+}
 
 # TODO [ ] Test required fields object in settings
 # TODO [ ] Test with and without variant field defined in settings
@@ -421,6 +425,7 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
 $urnFieldName = $params.UrnFieldName
 $commkeyFieldName = $params.CommunicationKeyFieldName
 $variantColumnName = $settings.upload.variantColumn
+$emailFieldName = $params.EmailFieldName
 
 $recipients = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
@@ -428,7 +433,7 @@ $dataCsv | ForEach {
     $row = $_
 
     # Use variant column
-    if ( $variantColumnName -ne "" ) {
+    if ( $variantColumnName -ne $null ) {
         $variant = $row.$variantColumnName
     } else {
         $variant = ""
@@ -436,6 +441,9 @@ $dataCsv | ForEach {
 
     $entry = [PSCustomObject]@{
         "variant" = $variant
+        "communicationKey" = $row.$commkeyFieldName
+        "urn" = $row.$urnFieldName
+        "email" = $row.$emailFieldName
         "data" = [PSCustomObject]@{}
     }
 
@@ -448,7 +456,10 @@ $dataCsv | ForEach {
     $recipients.Add($entry)
 
 }
-exit 0
+
+Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
+
+
 
 #-----------------------------------------------
 # SEND SINGLE TRANSACTIONAL
@@ -458,43 +469,67 @@ Upload an array in the api call and send email directly
 Recipients on black and bounce lists are NOT automatically excluded, but this can be controlled via the blacklist parameter
 BULK: Additionally to the non-bulk mode, the bulk mechanism uses the bounce list; Only possible for one mailing id and abortOnError will be ignored -> Either the whole call will be send out or not
 #>
+# TODO [ ] Check BULK and Version
+# TODO [ ] Check usage of group
 
-$variant = "" # TODO [ ] check if you can read the variants of a mailing
+<#
+This is how the content could look like:
 
-# TODO [ ] Check the usage of the notification url with webhooks
-# Create the upload data object
-$dataArr = [ordered]@{
-    "content" = [ordered]@{
-        "c_urn"             = "414596"
-        "c_email"          = "test@example.tld"
-        #"t_subject"        = "Test-Betreff"
-        #"t_sendername"     = "Apteco GmbH"
-        #"t_sender"         = "info@apteco.de"
-        #"t_replyto" $       = "antwort@example.tld"
-        #"t_cc"             = "cc_empfaenger@example.tld"
-        #"t_bcc"            = "bcc_empfaenger@example.tld"
-        #"t_attachment"     = @()
-        #"t_textcontent"    = "Text-Inhalt"
-        #"t_htmlcontent"    = "HTML-Inhalt"
-        #"t_xxx"            = "Hello World"
-    }
-    "priority" = $settings.upload.priority        
-    "override" = $settings.upload.override
-    "update_profile" = $settings.upload.updateProfile
-    "msgid" = $processId    # External message id / for identifying
-    #"notify_url" = ""              # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
+[ordered]@{
+    "c_urn"             = "414596"
+    "c_email"          = "test@example.tld"
+    #"t_subject"        = "Test-Betreff"
+    #"t_sendername"     = "Apteco GmbH"
+    #"t_sender"         = "info@apteco.de"
+    #"t_replyto" $       = "antwort@example.tld"
+    #"t_cc"             = "cc_empfaenger@example.tld"
+    #"t_bcc"            = "bcc_empfaenger@example.tld"
+    #"t_attachment"     = @()
+    #"t_textcontent"    = "Text-Inhalt"
+    #"t_htmlcontent"    = "HTML-Inhalt"
+    #"t_xxx"            = "Hello World"
 }
 
-$jsonInput = @(
-    $dataArr                        # array $data = null                    Recipient data
-    [int]$mailing.mailingId         # int $nl_id                            Mailing
-    "" #$selectedGroup[0].ev_id    # int $ev_id                            Group is optional
-    $variant                        # int $variant_position : null
-    #$false                         # boolean|integer $blacklist : true     false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
-) 
-$send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parameters $jsonInput
+#>
 
-# TODO [x] Needs testing
+$t1 = Measure-Command {
+    $sends = [System.Collections.ArrayList]@()
+    $recipients | ForEach {
+
+        $recipient = $_
+
+        # TODO [ ] Check the usage of the notification url with webhooks
+        # Create the upload data object
+        $dataArr = [ordered]@{
+            "content" = $recipient.data
+            "priority" = $settings.upload.priority        
+            "override" = $settings.upload.override
+            "update_profile" = $settings.upload.updateProfile
+            "msgid" = $recipient.communicationKey
+            "notify_url" = $settings.upload.notifyUrl
+        }
+
+        $jsonInput = @(
+            $dataArr                        # array $data = null                    Recipient data
+            [int]$mailing.mailingId         # int $nl_id                            Mailing
+            "" #$selectedGroup[0].ev_id     # int $ev_id                            Group is optional
+            "" # $recipient.variant              # int $variant_position : null
+            $settings.upload.blacklist      # boolean|integer $blacklist : true     
+        )
+        $send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parameters $jsonInput
+        $sends.Add(
+            [PSCustomObject]@{
+                "urn" = $recipient.urn
+                "email" = $recipient.email
+                "sendId" = $send
+                "communicationKey" = $recipient.communicationKey
+            }
+        )
+
+    }
+}
+Write-Log -message "Send out '$( $sends.Count )' messages in '$( $t1.TotalSeconds )' seconds"
+
 # TODO [ ] Add BULK and Single send to the the settings creation or make id dependent on the version
 
 
@@ -502,159 +537,62 @@ $send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parame
 # GET TRANSACTIONAL MAILING STATUS
 #-----------------------------------------------
 
-# TODO [ ] Define max timeout for checking status or use sync and async mode like in Epi
+# TODO [ ] put this into bulk in future, too
 
-$function = "api_getTransactionMailStatus"
-$jsonInput = @(
-    [int]$send      # int $id
-    $false          # bool $is_msgid -> true if the id is an external message id
+# Wait until all mails have been send out successfully or timeout expired
+$sendsStatus = [System.Collections.ArrayList]@()
+if ( $settings.upload.waitForSuccess ) {
 
-) 
-$restParams = $defaultRestParamsPost + @{
-    Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
-    Body = "json=$( Format-ELAINE-Parameter $jsonInput )"
-}
-$transactionalStatus = Invoke-RestMethod @restParams
-$transactionalStatus
+    # Initial wait of 5 seconds, so there is a good chance the messages are already send
+    Start-Sleep -Seconds 5 # TODO [ ] put this into settings
 
-
-
-
-
-
-
-
-
-
-
-
-#-----------------------------------------------
-# CREATE UPLOAD OBJECT
-#-----------------------------------------------
-
-
-$urnFieldName = $params.UrnFieldName
-$commkeyFieldName = $params.CommunicationKeyFieldName
-$recipients = @()
-$dataCsv | ForEach {
-
-    $addr = $_
-
-    $address = [PSCustomObject]@{}
-    $requiredFields | ForEach {
-        $address | Add-Member -MemberType NoteProperty -Name $_ -Value $addr.$_
-    }
-    $colsEqual.InputObject | ForEach {
-        $address | Add-Member -MemberType NoteProperty -Name $_ -Value $addr.$_
-    }
-
-    $recipient = [PSCustomObject]@{
-        "urn" = $addr.$urnFieldName
-        "communicationkey" = $addr.$commkeyFieldName #[guid]::NewGuid()
-        "address" = $address <#[PSCustomObject]@{
-            #"title" = ""
-            #"otherTitles" = ""
-            #"jobTitle" = ""
-            #"gender" = ""
-            #"companyName1" = ""
-            #"companyName2" = ""
-            #"companyName3" = ""
-            #"individualisation1" = ""
-            #"individualisation2" = ""
-            #"individualisation3" = "" # could be used also with 4,5,6....
-            #"careOf" = ""
-            "firstName" = $firstnames | Get-Random
-            "lastName" = $lastnames | Get-Random
-            #"fullName" = ""
-            "houseNumber" = $addr.hnr
-            "street" = $addr.strasse
-            #"address1" = ""
-            #"address2" = ""
-            "zipCode" = $addr.plz
-            "city" = $addr.stadtbezirk
-            #"country" = ""
-        }#>
-        "variation" = $addr.variation #$variations | Get-Random 
-        "vouchers" = @() # array of @{"code"="XCODE123";"name"="voucher1"}
-    }
-    $recipients += $recipient
-}
-
-
-# $recipients | ConvertTo-Json -Depth 20 | set-content -Path ".\recipients.json" -Encoding UTF8 
-
-Write-Log -message "Loaded $( $dataCsv.Count ) records"
-
-$url = "$( $settings.base )/v2/automations/$( $automationID )/recipients"
-$results = @()
-if ( $recipients.Count -gt 0 ) {
-    
-    $chunks = [Math]::Ceiling( $recipients.count / $batchsize )
-
-    $t = Measure-Command {
-        for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
-            
-            $start = $i*$batchsize
-            $end = ($i + 1)*$batchsize - 1
-
-            # Create body for API call
-            $body = @{
-                "addresses" = $recipients[$start..$end] | Select * -ExcludeProperty Urn,communicationkey
+    $stopWatch = [System.Diagnostics.Stopwatch]::new()
+    $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
+    $stopWatch.Start()
+    do
+    {
+        $sends | where { $_.sendId -notin $sendsStatus.sendId } | ForEach {
+            $sendOut = $_
+            $jsonInput = @(
+                [int]$sendOut.sendId    # int $id
+                $false                  # bool $is_msgid -> true if the id is an external message id
+            ) 
+            $status = Invoke-ELAINE -function "api_getTransactionMailStatus" -method Post -parameters $jsonInput
+            if ( $status.status -eq "sent" ) {
+                $sendOut | Add-Member -MemberType NoteProperty -Name "sendStatus" -Value $status.status                    
+                $sendsStatus.Add($sendOut)
             }
-
-            # Check size of recipients object
-            Write-Host "start $($start) - end $($end) - $( $body.addresses.Count ) objects"
-
-            # Do API call
-            $bodyJson = $body | ConvertTo-Json -Verbose -Depth 20
-            $result = Invoke-RestMethod -Verbose -Uri $url -Method Post -Headers $headers -ContentType $contentType -Body $bodyJson -TimeoutSec $maxTimeout
-            $results += $result
-            
-            # Append result to the record
-            for ($j = 0 ; $j -lt $result.results.Count ; $j++) {
-                $singleResult = $result.results[$j] 
-                if ( ( $singleResult | Get-Member -MemberType NoteProperty | where { $_.Name -eq "id" } ).Count -gt 0) {
-                    # If the result contains an id
-                    $recipients[$start + $j] | Add-Member -MemberType NoteProperty -Name "success" -Value 1
-                    $recipients[$start + $j] | Add-Member -MemberType NoteProperty -Name "result" -Value $singleResult.id
-                } else {
-                    # If the results contains an error
-                    $recipients[$start + $j] | Add-Member -MemberType NoteProperty -Name "success" -Value 0
-                    $recipients[$start + $j] | Add-Member -MemberType NoteProperty -Name "result" -Value $singleResult.error.message
-
-                }
-                #$recipients[$start + $j].Add("result",$value)
-                
-            }
-
-            # Log results of this chunk
-            Write-Host "Result of request $( $result.requestId ): $( $result.queued ) queued, $( $result.ignored ) ignored"
-            Write-Log -message "Result of request $( $result.requestId ): $( $result.queued ) queued, $( $result.ignored ) ignored"
-
         }
+        # wait another n seconds
+        Start-Sleep -Seconds 10 # TODO [ ] put this into settings
     }
+    until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
+    
+    Write-Log -message "Got back $( $sendsStatus.count ) successful sents"
+
+
 }
+
+# Put queued, but not sent uploads into object, too
+$queue = @( $sends | where { $_.sendId -notin $sendsStatus.sendId } | select *, @{name="sendStatus";expression={ "queued" }} )
+if ( $queue ) {
+    $sendsStatus.AddRange( $queue )
+}
+
+# Write results into uploads folder
+$exportTimestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
+$resultsFile = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId ).csv"
+$sendsStatus | Export-Csv -Path $resultsFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+Write-Log -message "Written results into $( $resultsFile )"
+
 
 # Calculate results in total
-$queued = ( $results | Measure-Object queued -sum ).Sum
-$ignored = ( $results | Measure-Object ignored -sum ).Sum
-if ( $ignored -gt 0 ) {
-    $errMessages = $results.results.error.message | group -NoElement
-}
+$queued = $sends.Count
+$sent = ( $sendsStatus | where { $_.sendStatus -eq "sent" } ).Count
+$ignored = $sent - $queued
 
 # Log the results
-Write-Log -message "Queued $( $queued ) of $( $dataCsv.Count  ) records in $( $chunks ) chunks and $( $t.TotalSeconds   ) seconds"
-Write-Log -message "Ignored $( $ignored ) records in total"
-$errMessages | ForEach {
-    $err = $_
-    Write-Log -message "Error '$( $err.Name )' happened $( $err.Count ) times"
-}
-
-# Export the results
-$resultsFile = "$( $uploadsFolder )$( $processId ).csv"
-$recipients | select * -ExpandProperty address  -ExcludeProperty address | Export-Csv -Path $resultsFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
-Write-Log -message "Written results into file '$( $resultsFile )'"
-
+Write-Log -message "Queued $( $queued ) of $( $dataCsv.Count  ) records in $( $t1.TotalSeconds   ) seconds"
 
 
 
@@ -688,6 +626,7 @@ $return = [Hashtable]@{
     # More information about the different status of the import
     "RecipientsIgnored" = $ignored
     "RecipientsQueued" = $queued
+    "RecipientsSent" = $sent
 
 }
 
