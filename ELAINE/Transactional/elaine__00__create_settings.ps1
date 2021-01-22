@@ -68,6 +68,18 @@ $loginSettings = @{
 $mailingsSettings = @{
 }
 
+#-----------------------------------------------
+# PREVIEW SETTINGS
+#-----------------------------------------------
+
+$previewSettings = @{
+    "Type" = "Email" #Email|Sms
+    #"FromAddress"="info@apteco.de"
+    #"FromName"="Apteco"
+    "ReplyTo"="info@apteco.de"
+    #"Subject"="Test-Subject"
+}
+
 
 #-----------------------------------------------
 # UPLOAD SETTINGS
@@ -114,13 +126,11 @@ $settings = @{
     
     # Session 
     aesFile = $keyFile
-    #sessionFile = "$( $scriptPath )\session.json"                        # name of the session file
-    #ttl = 15                                            # Time to live in minutes for the current session, normally 20 minutes for EpiServer Campaign
     encryptToken = $true                                # $true|$false if the session token should be encrypted
     
     # Detail settings
-    # aws = $awsSettings
     login = $loginSettings
+    preview = $previewSettings
     #mailings = $mailingsSettings
     upload = $uploadSettings
 
