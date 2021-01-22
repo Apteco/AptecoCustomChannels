@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 
 #-----------------------------------------------
@@ -189,63 +189,86 @@ if ( $settings.checkVersion ) {
 # Use this function to check if a mininum version is needed to call the function
 #Check-ELAINE-Version -minVersion "6.2.2"
 
-$newMethod = $false # TODO [ ] put this into settings or check with version number
-if ( $newMethod ) {
+$mailingMethod = 2 # TODO [ ] put this into settings or check with version number
+switch ( $mailingMethod ) {
 
+    1 {
 
-    #-----------------------------------------------
-    # MAILINGS BY STATUS - METHOD 1
-    #-----------------------------------------------
-    <#
-    This one returns the nl_id, nl_name and nl_status
-    Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
-    #>
+        #-----------------------------------------------
+        # MAILINGS BY STATUS - METHOD 1
+        #-----------------------------------------------
+        <#
+        This one returns the nl_id, nl_name and nl_status
+        Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
+        #>
 
-    $jsonInput = @(
-        ""      # message_name : string
-        "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
-    ) 
-    $templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
-
-
-} else {
-
-        
-    #-----------------------------------------------
-    # MAILINGS BY STATUS - METHOD 2
-    #-----------------------------------------------
-    <#
-    This one returns nl_id,nl_status,nl_failure_code,nl_start_time,nl_finish_time,nl_nr_of_mails,nl_sent_mails,nl_mails_failed,nl_send_limit
-    Possible status
-    on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> leerer string ist auch möglich für alle
-    #>
-
-    $function = "api_getMailingsByStatus"
-    $jsonInput = @(
-        "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
-    ) 
-    $mailingsByStatus = Invoke-ELAINE -function "api_getMailingsByStatus" -parameters $jsonInput
-
-
-    #-----------------------------------------------
-    # GET ALL MAILINGS DETAILS VIA SINGLE CALLS
-    #-----------------------------------------------
-
-    $templates = [System.Collections.ArrayList]@()
-    $mailingsByStatus | ForEach-Object {
-
-        $nl = $_
         $jsonInput = @(
-            "Mailing"       # objectType : Datafield|Mailing|Group|Segment
-            "$( $nl.nl_id )"      # objectID
+            ""      # message_name : string
+            "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
         ) 
-        $res = Invoke-ELAINE -function "api_getDetails" -parameters $jsonInput
-        $templates.Add(@($res))
+        $templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
         
+
+    }
+
+    2 {
+
+        #-----------------------------------------------
+        # MAILINGS BY STATUS - METHOD 2 - SINCE 5.12.0 
+        #-----------------------------------------------
+
+        $check = Check-ELAINE-Version -minVersion "5.12.2"
+
+        if ( $check ) {
+            $jsonInput = @(
+                ""      # message_name : string
+            ) 
+            $templates = Invoke-ELAINE -function "api_getActionmails" -parameters $jsonInput
+        } else {
+            throw [System.IO.InvalidDataException] "You need version 5.12.2 to run this function."
+        }
+
+    }
+
+    Default {
+
+        
+        #-----------------------------------------------
+        # MAILINGS BY STATUS - METHOD 3
+        #-----------------------------------------------
+        <#
+        This one returns nl_id,nl_status,nl_failure_code,nl_start_time,nl_finish_time,nl_nr_of_mails,nl_sent_mails,nl_mails_failed,nl_send_limit
+        Possible status
+        on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> leerer string ist auch möglich für alle
+        #>
+
+        $function = "api_getMailingsByStatus"
+        $jsonInput = @(
+            "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
+        ) 
+        $mailingsByStatus = Invoke-ELAINE -function "api_getMailingsByStatus" -parameters $jsonInput
+
+
+        #-----------------------------------------------
+        # GET ALL MAILINGS DETAILS VIA SINGLE CALLS
+        #-----------------------------------------------
+
+        $templates = [System.Collections.ArrayList]@()
+        $mailingsByStatus | ForEach-Object {
+
+            $nl = $_
+            $jsonInput = @(
+                "Mailing"       # objectType : Datafield|Mailing|Group|Segment
+                "$( $nl.nl_id )"      # objectID
+            ) 
+            $res = Invoke-ELAINE -function "api_getDetails" -parameters $jsonInput
+            $templates.Add(@($res))
+            
+        }
+
     }
 
 }
-
 
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
