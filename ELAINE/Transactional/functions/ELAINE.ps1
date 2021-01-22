@@ -2,9 +2,7 @@ Function Format-ELAINE-Parameter {
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]
-        [Array]
-        $arr
+        [Parameter(Mandatory=$true)][Array]$arr
     )
 
     begin {
@@ -286,6 +284,31 @@ Function Create-ELAINE-Parameters {
     
     end {
 
+    }
+
+}
+
+
+function Match-ELAINE-Columns {
+
+    [CmdletBinding()]
+
+    param (
+         [Parameter(Mandatory=$true)][String] $sourceColumns                  # array of csv column names
+        ,[Parameter(Mandatory=$true)][String] $targetColumns                  # mixture of technical names and labels of fields
+        ,[Parameter(Mandatory=$false)][String ]$prefixAdditionalColumns = "e_" # use this to create additional columns with e_ for groups or t_ for transactional mailings
+    )
+
+    begin {
+        
+    }
+
+    process {
+        # TODO [ ] implement this function
+    }
+
+    end {
+        
     }
 
 }

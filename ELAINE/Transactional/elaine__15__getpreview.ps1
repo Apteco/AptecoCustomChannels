@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -290,14 +290,52 @@ $userDetails = Invoke-ELAINE -function "api_getUser" -method Post -parameters $j
 
 # TODO [ ] implement group usage
 $jsonInput = @(
-    $userDetails.p_id      # int $elaine_id # TODO [ ] Check if this can be left out
-    $mailingDetails.nl_id      # int $mailing_id
-    ""      # array $userdata = array() optional
+    [int]$userDetails.p_id      # int $elaine_id # TODO [ ] Check if this can be left out
+    [int]$mailingDetails.nl_id      # int $mailing_id
+    @{
+        "t_vorname" = "Florian"
+        "t_nachname" = "von Bracht"
+        "c_prename" = "Flo1"
+        "c_name" = "Flo2"
+    }      # array $userdata = array() optional
     ""      # int $group optional
-    $false      # bool $preview = false
+    $false      # bool $preview = false -> should a [PREVIEW] prefix added to the subject?
 ) 
 
 $render = Invoke-ELAINE -function "api_mailingRender" -method Post -parameters $jsonInput
+#$render.bodies.html | Set-Content -Path "dummy.html" -Encoding UTF8
+
+
+#-----------------------------------------------
+# EMBED HTML INTO BOILERPLATE
+#-----------------------------------------------
+
+$htmlBoilerplate = @"
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        #BODY#
+        <script src="" async defer></script>
+    </body>
+</html>
+"@
+
+$html = $htmlBoilerplate -replace "#BODY#",$render.bodies.html
 
 
 ################################################
@@ -312,7 +350,7 @@ $return = [Hashtable]@{
     "Type" = $settings.preview.Type
     "FromAddress" = $render.headers.from
     "FromName" = $render.headers.fromname
-    "Html" = $render.bodies.html #$htmlArr -join "<p>&nbsp;</p>"
+    "Html" = $html #$htmlArr -join "<p>&nbsp;</p>"
     "ReplyTo" = $render.headers.replyto
     "Subject" = $render.headers.subject
     "Text" = $render.bodies.text
