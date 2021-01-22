@@ -19,3 +19,5 @@ _archive
 _dev
 *.debug
 EpiServerCampaign/MarketingAutomation/recipientlists.json
+*.csv
+*.txt
