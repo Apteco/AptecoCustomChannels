@@ -62,36 +62,10 @@ $loginSettings = @{
 
 
 #-----------------------------------------------
-# AWS SETTINGS
-#-----------------------------------------------
-<#
-$accessKey = Read-Host -AsSecureString "Please enter the access key for AWS S3"
-$accessKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$accessKey).GetNetworkCredential().Password) -keyFile $keyFile
-
-$secretKey = Read-Host -AsSecureString "Please enter the secret key for AWS S3"
-$secretKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$secretKey).GetNetworkCredential().Password) -keyFile $keyFile
-
-
-$awsSettings = @{
-
-    accessKey = $accessKeyEncrypted # enter your access key
-    secretKey = $secretKeyEncrypted # enter the secret key
-    region = "eu-central-1"
-    service = "s3"
-    endpoint = "https://s3-eu-central-1.amazonaws.com"
-
-}
-#>
-
-
-#-----------------------------------------------
 # MAILINGS SETTINGS
 #-----------------------------------------------
 
 $mailingsSettings = @{
-    #states = @("paused","live") # paused|live
-    #recipientListFile = "$( $scriptPath )\recipientlists.json"
-    #status = "NEW" # NEW|SENDING|DONE|CANCELED -> default should be "SENDING" for productive use, for testing purposes and fill the lists without an email send, use "NEW"
 }
 
 
