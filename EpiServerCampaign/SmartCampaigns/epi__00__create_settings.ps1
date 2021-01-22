@@ -244,6 +244,7 @@ $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttribut
 $listAttributes = $listAttributesRaw | Out-GridView -PassThru
 $settings.excludedAttributes = $listAttributes
 
+
 #-----------------------------------------------
 # URN FIELD
 #-----------------------------------------------
