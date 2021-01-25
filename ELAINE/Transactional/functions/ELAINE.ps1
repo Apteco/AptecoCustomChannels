@@ -27,6 +27,7 @@ Check-ELAINE-Version -minVersion "6.2.2" -currentVersion "6.2.2"
 Check-ELAINE-Version -minVersion "6.2.2" -currentVersion "6.2.1"
 Check-ELAINE-Version -minVersion "6.2.2" -currentVersion "6.1.2"
 Check-ELAINE-Version -minVersion "6.2.2" -currentVersion "5.2.2"
+Check-ELAINE-Version -minVersion "6.2.2" -currentVersion "5.14.0~78933"
 #>
 Function Check-ELAINE-Version {
 
