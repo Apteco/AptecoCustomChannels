@@ -102,7 +102,7 @@ $uploadSettings = @{
     "variantColumn" = ""                                # column for variants
     "emailColumn" = ""                                  # column for email
     "urnColumn" = ""                                    # column for urn (primary key)
-
+    "urnContainsEmail" = $true                          # If this is set, the email will be concatenated with the URN like "123|user@example.tld"
 }
 
 

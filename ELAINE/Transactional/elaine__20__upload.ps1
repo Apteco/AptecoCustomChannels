@@ -319,9 +319,10 @@ Write-Log -message "Loaded fields $( $fields.f_name -join ", " )"
 # FIELD MAPPING
 #-----------------------------------------------
 
+
 # Check csv fields
 $csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
-Write-Log -message "Loaded csv attributes $( $csvAttributesNames.Name -join ", " )"
+Write-Log -message "Loaded csv attributes '$( $csvAttributesNames.Name -join ", " )'"
 
 # Create mapping for source and target
 $colMap = [System.Collections.ArrayList]@()
@@ -414,6 +415,7 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
     Write-Log -message "All required fields are present"
 } else {
     # Required fields not equal -> error!
+    Write-Log -message "Not all required fields are present!"  
     throw [System.IO.InvalidDataException] "Not all required fields are present!"  
 }
 
@@ -439,10 +441,16 @@ $dataCsv | ForEach {
         $variant = ""
     }
 
+    If ( $settings.urnContainsEmail ) {
+        $urn = "$( $row.$urnFieldName )|$( $row.$emailFieldName )"
+    } else {
+        $urn = $row.$urnFieldName
+    }
+
     $entry = [PSCustomObject]@{
         "variant" = $variant
         "communicationKey" = $row.$commkeyFieldName
-        "urn" = $row.$urnFieldName
+        "urn" = $urn
         "email" = $row.$emailFieldName
         "data" = [PSCustomObject]@{}
     }
@@ -452,6 +460,9 @@ $dataCsv | ForEach {
         $target = $_.target
         $entry.data | Add-Member -MemberType NoteProperty -Name $target -Value $row.$source
     }
+
+
+    
 
     $recipients.Add($entry)
 
@@ -498,6 +509,11 @@ $t1 = Measure-Command {
 
         $recipient = $_
 
+        # variant
+        if ( $recipient.variant -eq $null -or $recipient.variant -eq "" ) {
+            $variant = ""
+        }
+
         # TODO [ ] Check the usage of the notification url with webhooks
         # Create the upload data object
         $dataArr = [ordered]@{
@@ -513,7 +529,7 @@ $t1 = Measure-Command {
             $dataArr                        # array $data = null                    Recipient data
             [int]$mailing.mailingId         # int $nl_id                            Mailing
             "" #$selectedGroup[0].ev_id     # int $ev_id                            Group is optional
-            "" # $recipient.variant              # int $variant_position : null
+            $variant                        # int $variant_position : null
             $settings.upload.blacklist      # boolean|integer $blacklist : true     
         )
         $send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parameters $jsonInput
