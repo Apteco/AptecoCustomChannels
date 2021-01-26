@@ -346,14 +346,16 @@ $colMap.Add(
 # Save which fields are required
 $requiredFields = $colMap.source
 if ( $settings.upload.requiredFields -ne $null ) {
-    $requiredFields += $settings.upload.requiredFields
+    $settings.upload.requiredFields | ForEach {
+        $requiredFields += $_
+    }
 }
 Write-Log -message "Required fields '$( $requiredFields -join ", " )'"
 
 # Which columns are remaining in csv?
 $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
 
-# Check corresponding field names
+# Check corresponding field NAMES
 $compareNames = Compare-Object -ReferenceObject $fields.f_name -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
 $compareNames | ForEach {
     $fieldname = $_
@@ -368,7 +370,7 @@ $compareNames | ForEach {
 # Which columns are still remaining in csv?
 $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
 
-# Check corresponding field labels
+# Check corresponding field LABELS
 $compareLabels = Compare-Object -ReferenceObject $fields.f_label -DifferenceObject $remainingColumns.Name  -IncludeEqual -PassThru  | where { $_.SideIndicator -eq "==" }
 $compareLabels | ForEach {
     $fieldlabel = $_
@@ -392,7 +394,6 @@ $remainingColumns | ForEach {
             "target" = "t_$( $columnName.Name.ToLower().replace(" ","_") )" # TODO [ ] check if maybe more is needed
         }
     )
-    
 }
 
 Write-Log -message "Current field mapping is:"
@@ -409,14 +410,15 @@ if ( $settings.upload.variantColumn -ne $null ) {
 }
 
 # Check if required fields are present
-$equalWithRequirements = Compare-Object -ReferenceObject $csvAttributesNames.Name -DifferenceObject $requiredFields -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
+$compareRequirements = Compare-Object -ReferenceObject $csvAttributesNames.Name -DifferenceObject $requiredFields -IncludeEqual -PassThru
+$equalWithRequirements = $compareRequirements | where { $_.SideIndicator -eq "==" }
 if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
     # Required fields are all included
     Write-Log -message "All required fields are present"
 } else {
     # Required fields not equal -> error!
-    Write-Log -message "Not all required fields are present!"  
-    throw [System.IO.InvalidDataException] "Not all required fields are present!"  
+    Write-Log -message "Not all required fields are present, missing $( ( $compareRequirements | where { $_.SideIndicator -eq "=>" } ) -join ", " )!"  
+    throw [System.IO.InvalidDataException] "Not all required fields are present, missing $( ( $compareRequirements | where { $_.SideIndicator -eq "=>" } ) -join ", " )!"  
 }
 
 
