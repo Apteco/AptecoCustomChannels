@@ -350,7 +350,6 @@ if ( $settings.upload.requiredFields -ne $null ) {
         $requiredFields += $_
     }
 }
-Write-Log -message "Required fields '$( $requiredFields -join ", " )'"
 
 # Which columns are remaining in csv?
 $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
@@ -408,6 +407,7 @@ $colMap | ForEach {
 if ( $settings.upload.variantColumn -ne $null ) {
     $requiredFields += $settings.upload.variantColumn
 }
+Write-Log -message "Required fields '$( $requiredFields -join ", " )'"
 
 # Check if required fields are present
 $compareRequirements = Compare-Object -ReferenceObject $csvAttributesNames.Name -DifferenceObject $requiredFields -IncludeEqual -PassThru
