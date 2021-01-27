@@ -56,7 +56,6 @@ $token = Read-Host -AsSecureString "Please enter the password for artegic ELAINE
 $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password) #-keyFile $keyFile
 
 $loginSettings = @{
-    username = "<username>"
     token = $tokenEncrypted 
 }
 
@@ -66,6 +65,13 @@ $loginSettings = @{
 #-----------------------------------------------
 
 $mailingsSettings = @{
+
+    # There are three methods available to load the actionmailings
+    # 1 = api_getMessageInfo
+    # 2 = api_getActionmails
+    # 3 = api_getMailingsByStatus + api_getDetails
+    loadMailingsMethod = 2 # 1|2|3
+    
 }
 
 #-----------------------------------------------
@@ -131,7 +137,7 @@ $settings = @{
     # Detail settings
     login = $loginSettings
     preview = $previewSettings
-    #mailings = $mailingsSettings
+    mailings = $mailingsSettings
     upload = $uploadSettings
 
 }

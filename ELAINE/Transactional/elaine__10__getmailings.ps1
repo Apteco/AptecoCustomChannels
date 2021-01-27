@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -184,13 +184,14 @@ if ( $settings.checkVersion ) {
 
     Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
 
+    # Use this function to check if a mininum version is needed to call the function
+    #Check-ELAINE-Version -minVersion "6.2.2"
+
 }
 
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
 
-$mailingMethod = 2 # TODO [ ] put this into settings or check with version number
-switch ( $mailingMethod ) {
+
+switch ( $settings.mailings.loadMailingsMethod ) {
 
     1 {
 
