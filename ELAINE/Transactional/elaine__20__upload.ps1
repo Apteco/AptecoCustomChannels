@@ -434,6 +434,7 @@ $emailFieldName = $params.EmailFieldName
 $recipients = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
 
+    # Use current row
     $row = $_
 
     # Use variant column
@@ -443,12 +444,14 @@ $dataCsv | ForEach {
         $variant = ""
     }
 
-    If ( $settings.urnContainsEmail ) {
+    # Generate the correct URN, which could contain email and URN
+    If ( $settings.upload.urnContainsEmail ) {
         $urn = "$( $row.$urnFieldName )|$( $row.$emailFieldName )"
     } else {
         $urn = $row.$urnFieldName
     }
 
+    # Generate the receiver meta data
     $entry = [PSCustomObject]@{
         "variant" = $variant
         "communicationKey" = $row.$commkeyFieldName
@@ -457,15 +460,19 @@ $dataCsv | ForEach {
         "data" = [PSCustomObject]@{}
     }
 
-    $colMap | where { $_.target -ne $variantColumnName } | ForEach {
+    # Generate the custom receiver columns data
+    $colMap | ForEach {
         $source = $_.source
         $target = $_.target
         $entry.data | Add-Member -MemberType NoteProperty -Name $target -Value $row.$source
     }
 
+    # Changing the urn colum to the correct value
+    If ( $settings.upload.urnContainsEmail ) {
+        $entry.data.($settings.upload.urnColumn) = $urn
+    }
 
-    
-
+    # Add recipient to array
     $recipients.Add($entry)
 
 }
@@ -505,15 +512,19 @@ This is how the content could look like:
 
 #>
 
+# Measure the seconds in total
 $t1 = Measure-Command {
     $sends = [System.Collections.ArrayList]@()
     $recipients | ForEach {
 
+        # Use current row
         $recipient = $_
 
-        # variant
+        # variant, if needed
         if ( $recipient.variant -eq $null -or $recipient.variant -eq "" ) {
             $variant = ""
+        } else {
+            $variant = $recipient.variant
         }
 
         # TODO [ ] Check the usage of the notification url with webhooks
@@ -527,6 +538,7 @@ $t1 = Measure-Command {
             "notify_url" = $settings.upload.notifyUrl
         }
 
+        # Create payload and upload json object
         $jsonInput = @(
             $dataArr                        # array $data = null                    Recipient data
             [int]$mailing.mailingId         # int $nl_id                            Mailing
@@ -535,6 +547,8 @@ $t1 = Measure-Command {
             $settings.upload.blacklist      # boolean|integer $blacklist : true     
         )
         $send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parameters $jsonInput
+        
+        # Add the results
         $sends.Add(
             [PSCustomObject]@{
                 "urn" = $recipient.urn
@@ -597,12 +611,27 @@ if ( $queue ) {
     $sendsStatus.AddRange( $queue )
 }
 
+#-----------------------------------------------
+# OUTPUT RESULTS TO FILE
+#-----------------------------------------------
+
 # Write results into uploads folder
 $exportTimestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
 $resultsFile = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId ).csv"
 $sendsStatus | Export-Csv -Path $resultsFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
 Write-Log -message "Written results into $( $resultsFile )"
 
+
+#-----------------------------------------------
+# OUTPUT RESULTS TO DATABASE
+#-----------------------------------------------
+
+# TODO [ ] implement database insert
+
+
+#-----------------------------------------------
+# FINAL RESULTS
+#-----------------------------------------------
 
 # Calculate results in total
 $queued = $sends.Count
