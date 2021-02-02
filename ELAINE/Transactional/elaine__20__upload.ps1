@@ -27,12 +27,12 @@ if ( $debug ) {
         "MessageName" = "1875 / Apteco PeopleStage Training Automation"
         "EmailFieldName" = "c_email"
         "SmsFieldName" = ""
-        "Path" = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\ELAINE\Transactional\PowerShell_1875  Apteco PeopleStage Training Automation_272d3042-885e-4191-bea8-6d1a54f3bb3f.txt"
+        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_1875  Apteco PeopleStage Training Automation_f29a31c9-7935-4bf6-b55c-e2794ea36dba.txt"
         "ReplyToEmail" = ""
         "Username" = "a"
         "ReplyToSMS" = ""
         "UrnFieldName" = "Kunden ID"
-        "ListName" = "1935 / FERGETestInitialList-20210120-100246"
+        "ListName" = "1875 / Apteco PeopleStage Training Automation"
         "CommunicationKeyFieldName" = "Communication Key"
     }
 }
@@ -110,6 +110,8 @@ if ( $debug ) {
 # FUNCTIONS & ASSEMBLIES
 #
 ################################################
+
+Add-Type -AssemblyName System.Data
 
 # Load all PowerShell Code
 "Loading..."
@@ -555,6 +557,8 @@ $t1 = Measure-Command {
                 "email" = $recipient.email
                 "sendId" = $send
                 "communicationKey" = $recipient.communicationKey
+                "broadcastTransactionId" = $processId.Guid
+                "mailingId" = $mailing.mailingId
             }
         )
 
@@ -591,7 +595,7 @@ if ( $settings.upload.waitForSuccess ) {
             ) 
             $status = Invoke-ELAINE -function "api_getTransactionMailStatus" -method Post -parameters $jsonInput
             if ( $status.status -eq "sent" ) {
-                $sendOut | Add-Member -MemberType NoteProperty -Name "sendStatus" -Value $status.status                    
+                $sendOut | Add-Member -MemberType NoteProperty -Name "lastStatus" -Value $status.status                    
                 $sendsStatus.Add($sendOut)
             }
         }
@@ -602,14 +606,14 @@ if ( $settings.upload.waitForSuccess ) {
     
     Write-Log -message "Got back $( $sendsStatus.count ) successful sents"
 
-
 }
 
 # Put queued, but not sent uploads into object, too
-$queue = @( $sends | where { $_.sendId -notin $sendsStatus.sendId } | select *, @{name="sendStatus";expression={ "queued" }} )
+$queue = @( $sends | where { $_.sendId -notin $sendsStatus.sendId } | select *, @{name="lastStatus";expression={ "queued" }} )
 if ( $queue ) {
     $sendsStatus.AddRange( $queue )
 }
+
 
 #-----------------------------------------------
 # OUTPUT RESULTS TO FILE
@@ -617,8 +621,8 @@ if ( $queue ) {
 
 # Write results into uploads folder
 $exportTimestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
-$resultsFile = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId ).csv"
-$sendsStatus | Export-Csv -Path $resultsFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+$resultsFile = "$( $uploadsFolder )$( $exportTimestamp )_$( $processId ).csv"
+$sendsStatus | select * | Export-Csv -Path $resultsFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
 Write-Log -message "Written results into $( $resultsFile )"
 
 
@@ -626,7 +630,109 @@ Write-Log -message "Written results into $( $resultsFile )"
 # OUTPUT RESULTS TO DATABASE
 #-----------------------------------------------
 
-# TODO [ ] implement database insert
+# TODO [x] implement database insert
+# TODO [x] implement insertion via datatable if needed
+# TODO [x] put creation statement for another persistent table into the readme file
+# TODO [x] put database and instance into settings 
+
+<#
+[dbo].[ELAINETransactional](
+	[Urn] [nvarchar](255) NULL,
+	[Email] [nvarchar](255) NULL,
+	[SendId] [int] NULL,
+	[CommunicationKey] [uniqueidentifier] NULL,
+	[BroadcastTransactionId] [uniqueidentifier] NULL,
+	[MailingId] [int] NULL,
+	[LastStatus] [nvarchar](50) NULL,
+    [Timestamp] [datetime] NULL
+#>
+
+if ( $settings.upload.writeToDatabase ) {
+
+    # TODO [ ] put parameters in @calls, so there is only one call
+    $writtenRecords = 0
+    switch ( $settings.upload.writeMethod ) {
+
+        "SqlClient" {
+
+            $insertStatementTemplate = Get-Content -Path ".\sql\insert_elaine_transactional.sql" -Encoding UTF8
+
+            $sendsStatus | ForEach {
+
+                $row = $_
+
+                $insertStatement = $insertStatementTemplate
+<#
+                # TODO [ ] Read sqlstatement from file and replace tokens
+                $insertStatement = @"
+INSERT INTO [$( $settings.upload.databaseSchema )].[$( $settings.upload.databaseTable )] (Urn,Email,SendId,CommunicationKey,BroadcastTransactionId,MailingId,LastStatus)
+VALUES ('$( $row.urn )','$( $row.email )',$( $row.sendId ),'$( $row.communicationKey )','$( $row.broadcastTransactionId )',$( $row.mailingId ),'$( $row.lastStatus )')
+"@
+#>
+                # Replace fields/tokens
+                $row.psobject.properties.name | foreach {
+                    $prop = $_
+                    $token = "#$( $prop.ToUpper() )#"
+                    $insertStatement = $insertStatement -replace $token,$row.$prop
+                }
+
+                # Replace database and schema
+                $insertStatement = $insertStatement -replace "#TABLE#",$settings.upload.databaseTable
+                $insertStatement = $insertStatement -replace "#SCHEMA#",$settings.upload.databaseSchema
+
+                # Prepare statement
+                $statementParams = @{
+                    "query" = $insertStatement
+                    "instance" = $settings.upload.databaseInstance
+                    "database" = $settings.upload.databaseName
+                    "executeNonQuery" = $true
+                }
+
+                # Prepare authentication
+                if ( $settings.upload.trustedConnection ) {
+
+                    $statementParams += @{
+                        "trustedConnection" = $true
+                    }
+
+                } else {
+
+                    $securePass = ConvertTo-SecureString ( Get-SecureToPlaintext $settings.upload.databasePass ) -AsPlainText -Force
+                    $securePass.MakeReadOnly()
+                    $sqlcred = New-Object -TypeName System.Data.SqlClient.SqlCredential -ArgumentList $settings.upload.databaseUser, $securePass
+                    $statementParams += @{
+                        "sqlCredential" = $sqlCred
+                    }
+
+                }
+
+                # Invoke sqlserver
+                # TODO [ ] hold connection open to ensure better performance
+                $writtenRecords += Invoke-SqlServer @statementParams
+        
+            }
+
+        }
+        <#
+        # TODO [ ] Implement this one if wished
+        "SqlServer" {
+            if ( $settings.upload.trustedConnection ) {
+                $sendsStatus | Write-SqlTableData -ServerInstance $settings.upload.databaseInstance -DatabaseName $settings.upload.databaseName -SchemaName $settings.upload.databaseSchema -TableName $settings.upload.databaseTable -Force
+            } else {
+                $sqlcred = New-Object PSCredential $settings.upload.databaseUser,(ConvertTo-SecureString ( Get-SecureToPlaintext $settings.upload.databasePass ) -AsPlainText -Force)
+                $sendsStatus | Write-SqlTableData -ServerInstance $settings.upload.databaseInstance -DatabaseName $settings.upload.databaseName -SchemaName $settings.upload.databaseSchema -TableName $settings.upload.databaseTable -Force -Credential $sqlcred
+            }
+        
+        }
+        #>
+
+    }
+
+    Write-Log -message "INSERT $( $writtenRecords ) records into database"
+
+}
+
+
 
 
 #-----------------------------------------------
@@ -634,13 +740,12 @@ Write-Log -message "Written results into $( $resultsFile )"
 #-----------------------------------------------
 
 # Calculate results in total
-$queued = $sends.Count
-$sent = ( $sendsStatus | where { $_.sendStatus -eq "sent" } ).Count
+$queued = $dataCsv.count
+$sent = ( $sendsStatus | where { $_.lastStatus -eq "sent" } ).Count
 $ignored = $sent - $queued
 
 # Log the results
-Write-Log -message "Queued $( $queued ) of $( $dataCsv.Count  ) records in $( $t1.TotalSeconds   ) seconds"
-
+Write-Log -message "Imported '$( $dataCsv.Count  )' -> Queued '$( $sends.Count )' -> Already sent '$( $sent )' records in $( $t1.TotalSeconds   ) seconds "
 
 
 ################################################
@@ -649,7 +754,7 @@ Write-Log -message "Queued $( $queued ) of $( $dataCsv.Count  ) records in $( $t
 #
 ################################################
 
-If ( $queued -eq 0 ) {
+If ( $sent -eq 0 ) {
     Write-Host "Throwing Exception because of 0 records"
     throw [System.IO.InvalidDataException] "No records were successfully uploaded"  
 }
