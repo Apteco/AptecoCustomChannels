@@ -175,7 +175,54 @@ if ( $paramsExisting ) {
 ################################################
 
 
-Write-Log -message "Nothing to do in the broadcast script"
+#-----------------------------------------------
+# PREPARE CALLING ELAINE
+#-----------------------------------------------
+
+Create-ELAINE-Parameters
+
+
+#-----------------------------------------------
+# ELAINE VERSION
+#-----------------------------------------------
+<#
+This call should be made at the beginning of every script to be sure the version is filled (and the connection could be made)
+#>
+
+if ( $settings.checkVersion ) { 
+
+    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
+    $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
+    # or like this to get it back as number
+    #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
+
+    Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
+
+}
+
+# Use this function to check if a mininum version is needed to call the function
+#Check-ELAINE-Version -minVersion "6.2.2"
+
+
+#-----------------------------------------------
+# PARSE MAILING AND LOAD DETAILS
+#-----------------------------------------------
+
+<#
+mailingId mailingName
+--------- -----------
+1875      Apteco PeopleStage Training Automation
+#>
+$mailing = [Mailing]::New($params.MessageName)
+
+# Load details from ELAINE to check if it still exists
+$mailingDetails = Invoke-ELAINE -function "api_getDetails" -parameters @("Mailing",[int]$mailing.mailingId)
+if ( $mailingDetails.status_data.is_transactionmail ) {
+    Write-Log -message "Mailing is confirmed as a transactional mailing"
+} else {
+    Write-Log -message "Mailing is no transactional mailing"
+    throw [System.IO.InvalidDataException] "Mailing is no transactional mailing"
+}
 
 
 ################################################
@@ -190,7 +237,7 @@ Write-Log -message "Nothing to do in the broadcast script"
 $recipients = $params.RecipientsQueued #$upload.count
 
 # put in the source id as the listname
-$transactionId = $processId
+$transactionId = $mailing.mailingId #$processId
 
 # return object
 $return = [Hashtable]@{
