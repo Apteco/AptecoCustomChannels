@@ -24,7 +24,7 @@ if ( $debug ) {
 	    TransactionType= "Replace"
 	    Password= "def"
 	    scriptPath= "C:\FastStats\scripts\flexmail"
-	    MessageName= "1631416 | Testmail_2"
+	    MessageName= "123456 | 123456 | Regain"
 	    abc= "def"
 	    SmsFieldName= ""
 	    Path= "c:\faststats\Publish\Handel\system\Deliveries\PowerShell_252060_e4ed1786-ce5d-4e51-af54-e97bb45d73a4.txt"
@@ -32,7 +32,7 @@ if ( $debug ) {
 	    Username= "abc"
 	    ReplyToSMS= ""
 	    UrnFieldName= "Kunden ID"
-	    ListName= "252060"
+	    ListName= "123456 | 123456 | Regain"
 	    CommunicationKeyFieldName= "Communication Key"
     }
 }
@@ -47,8 +47,6 @@ if ( $debug ) {
 #
 ################################################
 
-
-# TODO [ ] abc
 
 
 ################################################
@@ -78,11 +76,18 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
-$uploadsSubfolder = "uploads"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
+$moduleName = "FLXUPLOAD"
+$processId = [guid]::NewGuid()
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+if ( $params.settingsFile -ne $null ) {
+    # Load settings file from parameters
+    $settings = Get-Content -Path "$( $params.settingsFile )" -Encoding UTF8 -Raw | ConvertFrom-Json
+} else {
+    # Load default settings
+    $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+}
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
@@ -96,20 +101,42 @@ if ( $settings.changeTLS ) {
 }
 
 # more settings
-$uploadsFolder = ".\$( $uploadsSubfolder )"
 $logfile = $settings.logfile
 
-
-################################################
-#
-# FUNCTIONS
-#
-################################################
-
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
-    . $_.FullName
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
 }
 
+
+################################################
+#
+# FUNCTIONS & ASSEMBLIES
+#
+################################################
+
+Add-Type -AssemblyName System.Data
+
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+    . $_.FullName
+    "... $( $_.FullName )"
+}
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################
@@ -118,13 +145,27 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUPLOAD" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
 }
 
 
@@ -135,15 +176,15 @@ $params.Keys | ForEach {
 #
 ################################################
 
-
 #-----------------------------------------------
-# CHECK UPLOAD FOLDER
+# CHECK RESULTS FOLDER
 #-----------------------------------------------
 
+$uploadsFolder = $settings.uploadsFolder
 if ( !(Test-Path -Path $uploadsFolder) ) {
-    New-Item -Path $uploadsFolder -ItemType Directory
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
 }
-Set-Location -Path $uploadsFolder
 
 
 #-----------------------------------------------
@@ -153,12 +194,12 @@ Set-Location -Path $uploadsFolder
 # TODO [ ] make sources available in dropdown boxes?
 
 $sources = Invoke-Flexmail -method "GetSources" -param @{} -responseNode "sources"
-$listId = ( $params.ListName -split $settings.messageNameConcatChar )[0]
+$listId = ( $params.ListName -split $settings.messageNameConcatChar,3 )[2]
 
 if ( $listId -notin $sources.id ) {
     $sourcesString = ( $sources | select @{name="concat";expression={ "$( $_.id ) ($( $_.name ))" }} ).concat -join "`n"
     $exceptionText = "List-ID $( $listId ) not found. Please use one of the following IDs without the description in the brackets:`n$( $sourcesString )" 
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tThrowing Exception: $( $exceptionText )" >> $logfile
+    Write-Log -message "Throwing Exception: $( $exceptionText )"
     throw [System.IO.InvalidDataException] $exceptionText 
     
 }
@@ -193,22 +234,28 @@ voucher_3         Voucher_3         Text
 # merge fixed/standard fields with existing custom fields
 $fields = $settings.uploadFields + $customFields.id
 
+# Move file to temporary uploads folder
+$source = Get-Item -Path $params.path
+$destination = "$( $uploadsFolder )\$( $source.name )"
+Copy-Item -path $source.FullName -Destination $destination
+
+# Split file in parts
 $t = Measure-Command {
-    $fileItem = Get-Item -Path $params.Path
+    $fileItem = Get-Item -Path $destination
     $exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $fields -writeCount $settings.rowsPerUpload -outputDoubleQuotes $true
 }
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDone with export id $( $exportId ) in $( $t.Seconds ) seconds!" >> $logfile
+Write-Log -message "Done with export id $( $exportId ) in $( $t.Seconds ) seconds!"
 
 
 #-----------------------------------------------
 # RECIPIENT LIST ID
 #-----------------------------------------------
 
-#$campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
+$campaignId = ( $params.ListName -split $settings.messageNameConcatChar,2 )[0]
 $recipientListID = $settings.masterListId
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
+Write-Log -message "Using the recipient list $( $recipientListID )"
 
 
 #-----------------------------------------------
@@ -244,9 +291,10 @@ if ( $debug ) {
 #-----------------------------------------------
 
 # upload in batches of x
-$partFiles = Get-ChildItem -Path ".\$( $exportId )"
+$exportPath = "$( $uploadsFolder )\$( $exportId )"
+$partFiles = Get-ChildItem -Path "$( $exportPath )"
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUploading the data in $( $partFiles.count ) files" >> $logfile
+Write-Log -message "Uploading the data in $( $partFiles.count ) files"
 
 $importResults = @()
 $partFiles | ForEach {
@@ -256,7 +304,7 @@ $partFiles | ForEach {
     $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
 
     # if the source name does not exist, Flexmail create a new one automatically
-    $importSourcesName = $sources.where( { $_.id -eq $params.ListName } ).name
+    $importSourcesName = $sources.where( { $_.id -eq $listId } ).name
     $importSources = [array]@( [PSCustomObject]@{"name"=$importSourcesName } )
     
     # pack everything together
@@ -264,7 +312,7 @@ $partFiles | ForEach {
         "mailingListId"=$recipientListID
         "emailAddressTypeItems"=@{value=$importRecipients;type="EmailAddressType"}
         "overwrite"=$settings.importSettings.overwrite
-        "synchronise"=1#$settings.importSettings.synchronise
+        "synchronise"=$settings.importSettings.synchronise
         "allowDuplicates"=$settings.importSettings.allowDuplicates
         "allowBouncedOut"=$settings.importSettings.allowBouncedOut
         "defaultLanguage"=$settings.importSettings.defaultLanguage
@@ -273,13 +321,16 @@ $partFiles | ForEach {
     }
  
     $importResult = Invoke-Flexmail -method "ImportEmailAddresses" -param $importParams -customFields $customFields #-verboseCall
+    
+    # TODO [ ] Check if arraylist is maybe more performant
     $importResults += $importResult
 
 } 
 
-$importResults | Export-Csv -Path "$( $exportId )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+$importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUploaded the data with $($importResults.Count) import results" >> $logfile
+Write-Log -message "Uploaded the data with $($importResults.Count) import results"
+
 
 #-----------------------------------------------
 # DEBUG - SHOW MAILINGLIST AFTER CHANGE
@@ -298,15 +349,31 @@ if ( $debug ) {
 #-----------------------------------------------
 
 # count the number of successful upload rows
-$recipients = ( $importResults | where { $_.errorCode -eq 0} ).count
+$recipients = $importResults.count # | where { $_.Result -ne 0} | Select Urn
 
 # put in the source id as the listname
-$transactionId = $params.ListName
+#$transactionId = $params.ListName
 
 # return object
 $return = [Hashtable]@{
+
+    # Mandatory return values
     "Recipients"=$recipients
-    "TransactionId"=$transactionId
+    "TransactionId"=$campaignId
+
+    # General return value to identify this custom channel in the broadcasts detail tables
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
+
+    # Some more information for the broadcasts script
+    "EmailFieldName"= $params.EmailFieldName
+    "Path"= $params.Path
+    "UrnFieldName"= $params.UrnFieldName
+
+    # More information about the different status of the import
+    #"RecipientsIgnored" = $ignored
+    #"RecipientsQueued" = $queued
+    #"RecipientsSent" = $sent
 }
 
 # return the results

@@ -220,6 +220,8 @@ Function Invoke-Flexmail {
         #    "SOAPACTION" = $method
         #}
 
+        #$soapEnvelopeXml | Out-File -FilePath "$( $Path )\..\log\env_out.xml"
+
         $contentType = "text/xml;charset=""utf-8"""
         $res = Invoke-RestMethod -Uri "$( $baseUri )" -ContentType $contentType -Method Post -Body $soapEnvelopeXml -Verbose #-OutFile "$( ([guid]::NewGuid()).Guid ).xml"
         $response = $res #[xml]$res.Content

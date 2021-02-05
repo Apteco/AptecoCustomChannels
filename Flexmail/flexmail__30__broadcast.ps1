@@ -1,5 +1,15 @@
 ﻿################################################
 #
+# NOTES
+#
+################################################
+#
+# In diesem Skript müssen keine Anpassungen vorgenommen werden.
+#
+
+
+################################################
+#
 # INPUT
 #
 ################################################
@@ -19,24 +29,23 @@ $debug = $false
 #-----------------------------------------------
 
 if ( $debug ) {
-    $params = [hashtable]@{
-        scriptPath= "C:\FastStats\scripts\flexmail"
-        MessageName= "1631416 | Testmail_2"
-        abc= "def"
-        ListName= "252060"
-        Password= "def"
-        Username= "abc" 
-    }
+        $params = [hashtable]@{
+
+                # Integration Parameters
+                scriptPath= "C:\FastStats\scripts\flexmail"
+                settingsFile = "C:\Users\Florian\Documents\GitHub\AptecoPrivateCustomChannels\eLettershop\settings.json"
+
+                # Parameters coming from PeopleStage
+                MessageName= "1631416 | Testmail_2"
+                abc= "def"
+                ListName= "252060"
+                Password= "def"
+                Username= "abc"
+
+                # Coming from Upload script
+
+        }
 }
-
-
-
-################################################
-#
-# NOTES
-#
-################################################
-
 
 
 ################################################
@@ -66,7 +75,19 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
+$moduleName = "FLXBRDCST"
+$processId = $params.ProcessId #[guid]::NewGuid()
+
+if ( $params.settingsFile -ne $null ) {
+    # Load settings file from parameters
+    $settings = Get-Content -Path "$( $params.settingsFile )" -Encoding UTF8 -Raw | ConvertFrom-Json
+} else {
+    # Load default settings
+    $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+}
+
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -76,24 +97,45 @@ $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encodin
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
-        #[System.Net.SecurityProtocolType]::Tls13,
-        ,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
+# more settings
 $logfile = $settings.logfile
 
-
-################################################
-#
-# FUNCTIONS
-#
-################################################
-
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
-    . $_.FullName
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
 }
+
+
+################################################
+#
+# FUNCTIONS & ASSEMBLIES
+#
+################################################
+
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+    . $_.FullName
+    "... $( $_.FullName )"
+}
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################
@@ -102,13 +144,27 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
 }
 
 
@@ -126,7 +182,8 @@ $params.Keys | ForEach {
 # RECIPIENT LIST ID
 #-----------------------------------------------
 
-$campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
+$campaignId = ( $params.ListName -split $settings.messageNameConcatChar,2 )[0]
+Write-log -message "Using the campaign id '$( $campaignId )'"
 
 
 #-----------------------------------------------
@@ -142,17 +199,21 @@ $campaignId = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
 #-----------------------------------------------
 
 
-# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is fixed
+# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is working
 $recipients = 1
 
 # return the campaign id because this will be the reference for the response data
-$transactionId = $campaignId
+#$transactionId = $campaignId
 
 # build return object
 $return = [Hashtable]@{
-    "Recipients"=$recipients
-    "TransactionId"=$transactionId
+    "Recipients" = $recipients
+    "TransactionId" = $campaignId
+    "CustomProvider" = $moduleName
+    "ProcessId" = $processId
 }
 
 # return the results
 $return
+
+
