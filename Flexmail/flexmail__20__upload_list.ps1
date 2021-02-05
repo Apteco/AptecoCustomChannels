@@ -186,6 +186,24 @@ if ( !(Test-Path -Path $uploadsFolder) ) {
     New-Item -Path "$( $uploadsFolder )" -ItemType Directory
 }
 
+#-----------------------------------------------
+# AUTH FOR REST API
+#-----------------------------------------------
+
+# Step 2. Encode the pair to Base64 string
+$encodedCredentials = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$( $settings.login.user ):$( Get-SecureToPlaintext $settings.login.token )"))
+
+# Step 3. Form the header and add the Authorization attribute to it
+$script:headers = @{
+    Authorization = "Basic $encodedCredentials"
+}
+
+#-----------------------------------------------
+# OTHER HEADERS
+#-----------------------------------------------
+
+$contentType = "application/json; charset=utf-8" # possibly only "application/json"
+
 
 #-----------------------------------------------
 # CHECK SOURCES
@@ -216,7 +234,7 @@ $customFields = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNo
 # DATA MAPPING
 #-----------------------------------------------
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tStart to create a new file" >> $logfile
+Write-Log -message "Start to create a new file"
 
 <#
 
@@ -286,10 +304,112 @@ if ( $debug ) {
     $emails | Out-GridView
 }
 
+
 #-----------------------------------------------
-# IMPORT RECIPIENTS
+# IMPORT RECIPIENTS VIA REST
 #-----------------------------------------------
 
+# Create an import id
+$url = "$( $settings.baseREST )/contacts/imports"
+$jobBody = @{
+    "id" = $exportId
+    "resubscribe_blacklisted_contacts" = $settings.resubscribeBlacklistedContacts
+}
+$jobBodyJson = ConvertTo-Json -InputObject $jobBody -Verbose -Depth 8 -Compress
+$jobUrl = Invoke-RestMethod -Uri $url -Method Post -Headers $script:headers -Verbose -ContentType $contentType -Body $jobBodyJson
+
+# Import the data
+$url = "$( $settings.baseREST )/contacts/imports/$( $exportId )/records"
+
+$exportPath = "$( $uploadsFolder )\$( $exportId )"
+$partFiles = Get-ChildItem -Path "$( $exportPath )"
+Write-Log -message "Uploading the data in $( $partFiles.count ) files"
+
+# https://api.flexmail.eu/documentation/#post-/contacts/imports
+$partFiles | ForEach {
+
+    $f = $_
+
+    # Data
+    $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
+
+    # if the source name does not exist, Flexmail create a new one automatically
+    $importSourcesName = $sources.where( { $_.id -eq $listId } ).name
+    $importSources = [array]@( [PSCustomObject]@{"name"=$importSourcesName } )
+    
+    $recipientListID
+    $importRecipients
+    $importSources
+    $customFields
+
+    
+<#
+[
+  {
+    "email": "john@flexmail.be",
+    "first_name": "John",
+    "name": "Doe",
+    "language": "nl",
+    "custom_fields": {
+      "organisation": "Flexmail",
+      "myOtherCustomField": "42"
+    },
+    "sources": [
+      42
+    ],
+    "interest_labels": [
+      42
+    ],
+    "preferences": [
+      42
+    ]
+  }
+]
+#>
+
+
+    $uploadBodyJson = ConvertTo-Json -InputObject $uploadBody -Verbose -Depth 8 -Compress
+    $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $script:headers -Verbose -ContentType $contentType -Body $uploadBodyJson
+    
+
+} 
+
+# Queue the import for processing
+$url = "$( $settings.baseREST )/contacts/imports/$( $exportId )"
+$queueBody = @{
+    "status" = "queued"
+}
+$queueBodyJson = ConvertTo-Json -InputObject $queueBody -Verbose -Depth 8 -Compress
+$queue = Invoke-RestMethod -Uri $url -Method Patch -Headers $script:headers -Verbose -ContentType $contentType -Body $queueBodyJson
+
+# Loop the import status
+Do {
+    Start-Sleep -Seconds 10 # TODO [ ] put this into settings
+    $status = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
+} while ( $status.status -eq "idle" )
+
+<#
+{
+    id: "e8f4143f-edd0-4f0a-8ea9-c674c049fe4f",
+    status: "idle",
+    message: "string",
+    report: {
+        total_added: 0,
+        total_updated: 0,
+        total_ignored: 0
+    }
+}
+#>
+
+#$importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+#Write-Log -message "Uploaded the data with $($importResults.Count) import results"
+
+
+
+#-----------------------------------------------
+# IMPORT RECIPIENTS VIA SOAP
+#-----------------------------------------------
+<#
 # upload in batches of x
 $exportPath = "$( $uploadsFolder )\$( $exportId )"
 $partFiles = Get-ChildItem -Path "$( $exportPath )"
@@ -330,7 +450,7 @@ $partFiles | ForEach {
 $importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
 
 Write-Log -message "Uploaded the data with $($importResults.Count) import results"
-
+#>
 
 #-----------------------------------------------
 # DEBUG - SHOW MAILINGLIST AFTER CHANGE

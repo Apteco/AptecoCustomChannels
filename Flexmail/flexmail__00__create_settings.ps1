@@ -122,7 +122,7 @@ $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token
 
 $login = @{
     user = $user
-    token = $tokenEncrypted
+    token = $tokenEncrypted # TODO [ ] check if this token is also valid for REST API
 }
 
 
@@ -199,6 +199,7 @@ $settings = [PSCustomObject]@{
     
     # General settings
     base="https://soap.flexmail.eu/3.0.0/flexmail.php"
+    baseREST = "https://api.flexmail.eu"
     logfile = $logfile
     messageNameConcatChar = " | "
 
@@ -208,6 +209,7 @@ $settings = [PSCustomObject]@{
     changeTLS = $true
     uploadFields = $uploadFields
     uploadFolder = $upload
+    resubscribeBlacklistedContacts = $true
     
     # Detail settings
     login = $login    
