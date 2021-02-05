@@ -14,13 +14,19 @@ Param(
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach\Mailing"
+        scriptPath = "D:\Scripts\CleverReach\Mailing"
+        TestRecipient = '{"Email":"user@example.com","Sms":null,"Personalisation":{"Con Acc Id":"Con Acc Id","firstname":"Florian","lastname":"von Bracht","anrede":"anrede","Communication Key":"506ba359-192a-4dd8-8665-3286a49cd029"}}'
+        MessageName = "6299985 / 1-to-1 Einladung dmexco"
+        ListName= ""
+        Password= "b"
+        Username= "a"
     }
 }
 
@@ -66,7 +72,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "CLVRGETGROUPS"
+$moduleName = "CLVRPREVIEW"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -166,50 +172,44 @@ $header = @{
 
 
 #-----------------------------------------------
-# GET GROUPS
+# GET MAILING
 #-----------------------------------------------
 
-$object = "groups"
+$object = "mailings"
 
-Write-Log -message "Downloading all groups"
+Write-Log -message "Downloading the corresponding mailing"
 
-# get all groups
-$endpoint = "$( $apiRoot )$( $object )"
-$groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
-
-Write-Log -message "Found $( $groups.count  ) groups"
+# get all draft mailings
+$templateId = [Mailing]::new($params.MessageName).mailingId
+$endpoint = "$( $apiRoot )$( $object )/$( $templateId )"
+$mailing = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
 
 #-----------------------------------------------
-# BUILD GROUPS OBJECTS
+# PERSONALISE TOKENS
 #-----------------------------------------------
 
-$groupObjects = @()
-$groups | foreach {
+# TODO [ ] Personalise the most obvious tokens
 
-    # Load data
-    $groupObject = $_
 
-    # Create mailing objects
-    $groupObjects += [List]@{listId=$_.id;listName=$_.name}
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE
+#
+################################################
 
+# return object
+$return = [Hashtable]@{
+    "Type" = "Email" #Email|Sms
+    "FromAddress"=$mailing.sender_email
+    "FromName"=$mailing.sender_name
+    "Html"=$mailing.body_html
+    "ReplyTo"=""
+    "Subject"=$mailing.subject
+    "Text"=$mailing.body_text
 }
 
+# return the results
+$return
 
-#-----------------------------------------------
-# GET GROUPS
-#-----------------------------------------------
-
-$lists = $groupObjects | Select @{name="id";expression={ $_.listId }}, @{name="name";expression={ $_.toString() }}
-#$lists = $groups | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
-
-
-################################################
-#
-# RETURN
-#
-################################################
-
-# real messages
-return $lists
 

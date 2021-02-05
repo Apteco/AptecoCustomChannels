@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -87,7 +87,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -102,7 +106,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -116,7 +120,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -140,7 +144,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = $( $params[$param] )"
     }
 }
 
@@ -150,7 +154,6 @@ if ( $paramsExisting ) {
 # PROGRAM
 #
 ################################################
-
 
 #-----------------------------------------------
 # AUTHENTICATION
@@ -165,6 +168,31 @@ $header = @{
 
 
 #-----------------------------------------------
+# VALIDATE
+#-----------------------------------------------
+
+$object = "debug"
+$validateParameters = @{
+    Uri = "$( $apiRoot )$( $object )/validate.json"
+    Method = "Get"
+    Headers = $header
+    Verbose = $true
+    ContentType = $contentType
+}
+
+$success = $false
+try {
+    $valid = Invoke-RestMethod @validateParameters
+    Write-Log "Test was successful"
+    $success = $true
+} catch {
+    Write-Log "Test was not successful, closing the script"
+    throw [System.IO.InvalidDataException] "Test was not successful"  
+}
+
+
+
+#-----------------------------------------------
 # WHO AM I
 #-----------------------------------------------
 
@@ -172,12 +200,101 @@ $header = @{
 
 $object = "debug"
 $endpoint = "$( $apiRoot )$( $object )/whoami.json"
-$whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+$whoAmI = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
-exit 0
+# Logging of whoami
+Write-Log -message "Entries of WhoAmI"
+$whoAmI | Get-Member -MemberType NoteProperty | ForEach {
+    $propName = $_.Name
+    Write-Log "    $( $propName ) = $( $whoAmI.$propName )"
+}
+
 
 #-----------------------------------------------
-# RETURN
+# TTL
 #-----------------------------------------------
+
+$object = "debug"
+$validateParameters = @{
+    Uri = "$( $apiRoot )$( $object )/ttl.json"
+    Method = "Get"
+    Headers = $header
+    Verbose = $true
+    ContentType = $contentType
+}
+$ttl = Invoke-RestMethod @validateParameters
+Write-Log -message "Token is valid until $( $ttl.ttl ) - $( $ttl.date )"
+
+
+#-----------------------------------------------
+# EXCHANGE TOKEN IF NEEDED
+#-----------------------------------------------
+
+if ( $settings.login.refreshTokenAutomatically -and $ttl.ttl -lt $settings.login.refreshTtl ) {
+    
+    Write-Log -message "Creating new token, it will expire in $( $ttl.ttl ) seconds"
+
+    $object = "debug"
+    $validateParameters = @{
+        Uri = "$( $apiRoot )$( $object )/exchange.json"
+        Method = "Get"
+        Headers = $header
+        Verbose = $true
+        ContentType = $contentType
+    }
+    # TODO [ ] check the return value of the new created token
+    $newToken = Invoke-RestMethod @validateParameters
+
+    $settings.login.accesstoken = Get-PlaintextToSecure $newToken
+
+    # create json object
+    $json = $settings | ConvertTo-Json -Depth 8 # -compress
+
+    # save settings to file
+    $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+    Write-Log -message "Creating new token, it will expire in $( $ttl.ttl ) seconds"
+
+} else {
+   
+    Write-Log -message "No new token creation needed, still valid for $( $ttl.ttl ) seconds"
+    
+}
+
+
+#-----------------------------------------------
+# LOG
+#-----------------------------------------------
+<#
+if ( $success ) {
+
+    Write-Log -message "Entries of WhoAmI"
+
+    $whoAmI | Get-Member -MemberType NoteProperty | ForEach {
+        $name = $_.Name
+        $value = $whoAmI.$name
+        Write-Host "$( $name ): $( $value )"
+        Write-Log -message "$( $name ): $( $value )"
+    }
+
+}
+#>
+
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE AND BROADCAST
+#
+################################################
 
 # TODO [ ] Is there something expected to return? Something like true or false?
+
+
+# return object
+$return = [Hashtable]@{
+
+    "Success"=$success
+
+}
+
+# return the results
+$return

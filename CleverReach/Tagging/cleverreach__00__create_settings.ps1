@@ -52,6 +52,8 @@ $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token
 
 $login = @{
     "accesstoken" = $tokenEncrypted
+    "refreshTokenAutomatically" = $true
+    "refreshTtl" = 604800 # seconds; refresh one week before expiration
 }
 
 
@@ -133,6 +135,31 @@ $json
 
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+
+
+################################################
+#
+# CHECK SUBFOLDERS EXISTING
+#
+################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.upload.uploadsFolder
+
+$foldersToCheck = @(
+    $uploadsFolder
+)
+
+$foldersToCheck | ForEach {
+    $checkFolder = $_
+    if ( !(Test-Path -Path $checkFolder) ) {
+        New-Item -Path "$( $checkFolder )" -ItemType Directory
+    }
+}
 
 
 

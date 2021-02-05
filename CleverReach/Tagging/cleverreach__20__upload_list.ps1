@@ -22,19 +22,25 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        TransactionType= "Replace"
-        Password= "def"
-        scriptPath= "D:\Scripts\CleverReach\Tagging"
-        MessageName= ""
-        EmailFieldName= "Email"
-        SmsFieldName= ""
-        Path= "D:\Apteco\Publish\CleverReach\system\Deliveries\PowerShell_Free Try Automation_25cb7d21-58d9-4136-a1a0-ca1886a0670b.txt"
-        ReplyToEmail= ""
-        Username= "abc"
-        ReplyToSMS= ""
-        UrnFieldName= "RC Id"
-        ListName= "Free Try Automation"
-        CommunicationKeyFieldName= "Communication Key"
+
+        # PeopleStage Native Parameters
+        EmailFieldName = "email"
+        TransactionType = "Replace"
+        Password = "b"
+        MessageName = "GV.Test"
+        SmsFieldName = ""
+        Path = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_GV.Test_bea06b6d-8842-4f17-a1e0-2a9ca114ba63.txt"
+        ReplyToEmail = ""
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Con Acc Id"
+        ListName = "GV.Test"
+        CommunicationKeyFieldName = "Communication Key"
+
+        # PeopleStage Integration Parameters
+        scriptPath = "D:\Scripts\CleverReach\Tagging"
+        uploadType = "batch"
+
     }
 }
 
@@ -116,7 +122,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -130,7 +136,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -165,6 +171,31 @@ if ( $paramsExisting ) {
 # PROGRAM
 #
 ################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.upload.uploadsFolder
+
+$foldersToCheck = @(
+    $uploadsFolder
+    ".\$( $libSubfolder )"
+)
+
+$foldersToCheck | ForEach {
+    $checkFolder = $_
+    if ( !(Test-Path -Path $checkFolder) ) {
+        Write-Log -message "Folder $( $checkFolder ) does not exist. Creating the folder now!"
+        New-Item -Path "$( $checkFolder )" -ItemType Directory
+    }
+}
+
+
+#-----------------------------------------------
+# FORWARDING PARAMETERS
+#-----------------------------------------------
+
 
 <#
 

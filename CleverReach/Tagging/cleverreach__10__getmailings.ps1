@@ -21,7 +21,9 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
+        Password = "b"
+        scriptPath = "D:\Scripts\CleverReach\Tagging"
+        Username = "a"
     }
 }
 
@@ -86,7 +88,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -101,7 +107,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
+<#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
 $libExecutables | ForEach {
@@ -115,7 +121,7 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-
+#>
 
 ################################################
 #
@@ -175,6 +181,8 @@ $endpoint = "$( $apiRoot )$( $object ).json?group_id=0&origin=*&order_by=tag&lim
 $tags = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
 
 Write-Log -message "Found $( $mailings.draft.count  ) mailings"
+
+# TODO [ ] implement mailing class
 
 
 #-----------------------------------------------

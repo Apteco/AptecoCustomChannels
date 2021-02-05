@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -21,7 +21,7 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach"
+	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\CleverReach\Mailing"
     }
 }
 
@@ -86,7 +86,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-#$contentType = $settings.contentType
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -172,16 +176,33 @@ Write-Log -message "Downloading all mailings"
 
 # get all draft mailings
 $endpoint = "$( $apiRoot )$( $object )?state=draft&limit=999"
-$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
+$mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
 
 Write-Log -message "Found $( $mailings.draft.count  ) mailings"
 
 
 #-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
+# BUILD MAILING OBJECTS
 #-----------------------------------------------
 
-$messages = $mailings.draft | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
+$mailingObjects = @()
+$mailings.draft | foreach {
+
+    # Load data
+    $mailingObject = $_
+
+    # Create mailing objects
+    $mailingObjects += [Mailing]@{mailingId=$_.id;mailingName=$_.name}
+
+}
+
+
+#-----------------------------------------------
+# GET MAILINGS
+#-----------------------------------------------
+
+$messages = $mailingObjects | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+#$messages = $mailings.draft | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
 
 
 ################################################
