@@ -84,6 +84,33 @@ if(Test-Path -LiteralPath $logfile -IsValid ) {
 
 
 #-----------------------------------------------
+# ASK FOR LOCKFILE
+#-----------------------------------------------
+
+# Default file
+$lockfileDefault = "$( $scriptPath )\flexmail.lock"
+
+# Ask for another path
+$lockfile = Read-Host -Prompt "Where do you want the lock file to be saved? Just press Enter for this default [$( $lockfileDefault )]"
+
+# ALTERNATIVE: The file dialog is not working from Visual Studio Code, but is working from PowerShell ISE or "normal" PowerShell Console
+#$settingsFile = Set-FileName -initialDirectory "$( $scriptPath )" -filter "JSON files (*.json)|*.json"
+
+# If prompt is empty, just use default path
+if ( $lockfile -eq "" -or $null -eq $lockfile) {
+    $lockfile = $lockfileDefault
+}
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $logfile -IsValid ) {
+    Write-Host "Lockfile '$( $lockfile )' is valid"
+} else {
+    Write-Host "Lockfile '$( $lockfile )' contains invalid characters"
+}
+
+
+
+#-----------------------------------------------
 # ASK FOR UPLOAD FOLDER
 #-----------------------------------------------
 
@@ -116,13 +143,17 @@ if(Test-Path -LiteralPath $upload -IsValid ) {
 # SECURITY / LOGIN
 #-----------------------------------------------
 
-$user = Read-Host -Prompt "Please enter the userid for flexmail"
-$token = Read-Host -AsSecureString "Please enter the token for flexmail"
+$keyfile = "$( $scriptPath )\aes.key"
+$user = Read-Host -Prompt "Please enter the account id for flexmail"
+$token = Read-Host -AsSecureString "Please enter the SOAP token for flexmail"
+$tokenRest = Read-Host -AsSecureString "Please enter the REST token for flexmail"
 $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password)
+$tokenRestEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$tokenRest).GetNetworkCredential().Password)
 
 $login = @{
     user = $user
-    token = $tokenEncrypted # TODO [ ] check if this token is also valid for REST API
+    token = $tokenEncrypted
+    tokenREST = $tokenRestEncrypted
 }
 
 
@@ -192,6 +223,21 @@ $previewSettings = @{
 
 
 #-----------------------------------------------
+# UPLOAD SETTINGS
+#-----------------------------------------------
+
+$uploadSettings = @{
+    sleepTime = 10                      # seconds to wait between import checks
+    maxSecondsWaiting = 360             # how many seconds to wait at maximum
+    resubscribeBlacklistedContacts = $true
+    firstNameFieldname = "first_name"
+    lastNameFieldname = "name"
+    languageFieldname = "language"
+}
+
+
+
+#-----------------------------------------------
 # ALL SETTINGS TOGETHER
 #-----------------------------------------------
 
@@ -199,21 +245,24 @@ $settings = [PSCustomObject]@{
     
     # General settings
     base="https://soap.flexmail.eu/3.0.0/flexmail.php"
+    aesFile = $keyFile
     baseREST = "https://api.flexmail.eu"
     logfile = $logfile
-    messageNameConcatChar = " | "
+    messageNameConcatChar = " | "                               # should be deprecated
+    nameConcatChar = " | "
 
     # Upload settings
     #masterListId = "1669666"
-    rowsPerUpload = 800
+    lockfile = $lockfile                                        # The file that locks to queuing process
+    rowsPerUpload = 800                                         # should be max 100k rows
     changeTLS = $true
     uploadFields = $uploadFields
-    uploadFolder = $upload
-    resubscribeBlacklistedContacts = $true
+    uploadsFolder = $upload
     
     # Detail settings
     login = $login    
     importSettings = $importSettings
+    uploadSettings = $uploadSettings
     previewSettings = $previewSettings
     #responseSettings = $responseSettings
 }
@@ -240,7 +289,7 @@ $json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 ################################################
 
 #-----------------------------------------------
-# CHOOSE THE MASTERLIST
+# CHOOSE THE MASTERLIST - DEPRECATED IF USING REST
 #-----------------------------------------------
 
 # TODO [ ] implement choosing the masterlist id
