@@ -30,6 +30,7 @@
 # Hints
 
 * The Upload script has to send back an object, otherwise the broadcast script won't be executed
+* If you setup Upload, but don't broadcast the parameter `MessageName` won't be send to the script
 * The integration parameters in the channel editor can consume a value like:
 
 ```
