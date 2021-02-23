@@ -206,12 +206,17 @@ Create-Flexmail-Parameters
 
 # Load sources from Flexmail
 $url = "$( $apiRoot )/sources"
-#$sources = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
-$sources = Invoke-Flexmail -method "GetSources" -param @{} -responseNode "sources" # load via SOAP
+$sources = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
+#$sources = Invoke-Flexmail -method "GetSources" -param @{} -responseNode "sources" # load via SOAP
 
 # Extract the source id
-$listId = [FlxWorkflow]::new($params.ListName).workflowSource
-$listId = 255044 # TODO [ ] remove this fakeid after tests
+$listId = [FlxWorkflow]::new($params.MessageName).workflowSource
+
+# TODO [ ] Migrate using the messagename with the source id to use the source id from the listname
+<#
+$source = [Source]::new($params.ListName)
+#>
+
 
 # Check the source id against Flexmail
 if ( $listId -notin $sources.id ) {
@@ -222,13 +227,21 @@ if ( $listId -notin $sources.id ) {
 }
 
 
+
+
+
 #-----------------------------------------------
 # IDENTIFY CUSTOM FIELDS
 #-----------------------------------------------
 
-$customFields = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNode "customFields"
+#$customFieldsSOAP = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNode "customFields"
+#$customFields = $customFieldsSOAP | Select @{name="placeholder";expression={ $_.id }}, *
 
-exit 0
+$url = "$( $apiRoot )/custom-fields"
+$customFieldsREST = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
+$customFields = $customFieldsREST | Select * -ExpandProperty name | select @{name="label";expression={ $_.value }}, * -ExcludeProperty name
+
+
 
 #-----------------------------------------------
 # FIELD MAPPING
@@ -248,7 +261,7 @@ $colMap = [System.Collections.ArrayList]@()
 $colMap.Add(
     [PSCustomObject]@{
         "source" = $params.UrnFieldName
-        "target" = $settings.upload.urnColumn
+        "target" = $settings.uploadSettings.urnColumn
     }
 )
 #>
@@ -264,24 +277,24 @@ $colMap.Add(
 # Add first name column
 $colMap.Add(
     [PSCustomObject]@{
-        "source" = $settings.upload.firstNameFieldname
-        "target" = $settings.upload.firstNameFieldname
+        "source" = $settings.uploadSettings.firstNameFieldname
+        "target" = $settings.uploadSettings.firstNameFieldname
     }
 )
 
 # Add last name column
 $colMap.Add(
     [PSCustomObject]@{
-        "source" = $settings.upload.lastNameFieldname
-        "target" = $settings.upload.lastNameFieldname
+        "source" = $settings.uploadSettings.lastNameFieldname
+        "target" = $settings.uploadSettings.lastNameFieldname
     }
 )
 
 # Add language column
 $colMap.Add(
     [PSCustomObject]@{
-        "source" = $settings.upload.languageFieldname
-        "target" = $settings.upload.languageFieldname
+        "source" = $settings.uploadSettings.languageFieldname
+        "target" = $settings.uploadSettings.languageFieldname
     }
 )
 <#
@@ -298,7 +311,7 @@ if ( $settings.upload.requiredFields -ne $null ) {
 $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
 
 # Check corresponding field NAMES
-$compareNames = Compare-Object -ReferenceObject $customFields.id -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
+$compareNames = Compare-Object -ReferenceObject $customFields.placeholder -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
 $compareNames | ForEach {
     $fieldname = $_
     $colMap.Add(
@@ -319,7 +332,7 @@ $compareLabels | ForEach {
     $colMap.Add(
         [PSCustomObject]@{
             "source" = $fieldlabel
-            "target" = $fields.where({ $_.label -eq $fieldlabel }).f_name
+            "target" = $customFields.where({ $_.label -eq $fieldlabel }).placeholder
         }
     )
 }
@@ -341,13 +354,31 @@ $remainingColumns | ForEach {
 
 Write-Log -message "Current field mapping is:"
 $colMap | ForEach {
-    Write-Log -message "    $( $_.source ) -> '$( $_.target )'"
+    Write-Log -message "    '$( $_.source )' -> '$( $_.target )'"
 }
 
 Write-Log -message "Those fields are remaining in csv:"
 $remainingColumns | ForEach {
-    Write-Log -message "    $( $_.name )"
+    Write-Log -message "    '$( $_.name )'"
 }
+
+# Special field names
+$urnFieldName = $params.UrnFieldName
+$commkeyFieldName = $params.CommunicationKeyFieldName
+$emailFieldName = $params.EmailFieldName
+$firstNameFieldname = $settings.uploadSettings.firstNameFieldname
+$lastNameFieldname = $settings.uploadSettings.lastNameFieldname 
+$languageFieldname = $settings.uploadSettings.languageFieldname
+
+$basicFields = [System.Collections.ArrayList]@(
+    $urnFieldName
+    $commkeyFieldName
+    $emailFieldName
+    $firstNameFieldname
+    $lastNameFieldname
+    $languageFieldname
+)
+
 
 <#
 # TODO [ ] Test required fields object in settings
@@ -383,7 +414,7 @@ Write-Log -message "Start to create a new file"
 
 custom fields
 
-id                label             type
+placeholder       label             type
 --                -----             ----
 custom_salutation Custom_Salutation Text
 voucher_1         Voucher_1         Text
@@ -397,13 +428,17 @@ $fields = $colMap.source #$settings.uploadFields + $customFields.id
 
 # Create temporary directory
 $exportTimestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
-$exportFolder = "$( $uploadsFolder )$( $exportTimestamp )_$( $processId.Guid )"
+$exportFolder = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId.Guid )"
 New-Item -Path $exportFolder -ItemType Directory
 
 # Move file to temporary uploads folder
 $source = Get-Item -Path $params.path
 $destination = "$( $exportFolder )\$( $source.name )"
 Copy-Item -path $source.FullName -Destination $destination
+
+# Remember the current location and change to the export dir
+$currentLocation = Get-Location
+Set-Location $exportFolder
 
 # Split file in parts
 $t = Measure-Command {
@@ -415,12 +450,15 @@ $t = Measure-Command {
         inputDelimiter = "`t"
         outputDelimiter = "`t"
         outputColumns = $fields
-        writeCount = $settings.rowsPerUpload
+        writeCount = 2 #$settings.rowsPerUpload
         outputDoubleQuotes = $true
     }
     $exportId = Split-File @splitParams
     #$exportId = Split-File -inputPath $fileItem.FullName -header $true -writeHeader $true -inputDelimiter "`t" -outputDelimiter "`t" -outputColumns $fields -writeCount $settings.rowsPerUpload -outputDoubleQuotes $true
 }
+
+# Set the location back
+Set-Location $exportFolder
 
 Write-Log -message "Done with export id $( $exportId ) in $( $t.Seconds ) seconds!"
 
@@ -428,12 +466,12 @@ Write-Log -message "Done with export id $( $exportId ) in $( $t.Seconds ) second
 #-----------------------------------------------
 # RECIPIENT LIST ID
 #-----------------------------------------------
-
+<#
 $campaignId = [FlxWorkflow]::new($params.ListName).workflowId
 $recipientListID = $settings.masterListId
 
 Write-Log -message "Using the recipient list $( $recipientListID )"
-
+#>
 
 #-----------------------------------------------
 # DEBUG - CHOOSE MAILINGLISTS
@@ -469,37 +507,36 @@ if ( $debug ) {
 #-----------------------------------------------
 
 # Create an import id
-$url = "$( $apiRoot )/contacts/imports"
+$url = "$( $settings.baseREST )/contacts/imports"
 $jobBody = @{
     "id" = $exportId
-    "resubscribe_blacklisted_contacts" = $settings.upload.resubscribeBlacklistedContacts
+    "resubscribe_blacklisted_contacts" = $settings.uploadSettings.resubscribeBlacklistedContacts
 }
 $jobBodyJson = ConvertTo-Json -InputObject $jobBody -Verbose -Depth 8 -Compress
 $jobUrl = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $jobBodyJson
 
-# Import the data
+# Checking the import creation
+$url = "$( $settings.baseREST )/contacts/imports/$( $exportId )"
+$job = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -Verbose -ContentType $contentType
+Write-Log -message "Job is created with id  '$( $job.id )' and status '$( $job.status )'"
+
+# Preparing the import
 $url = "$( $settings.baseREST )/contacts/imports/$( $exportId )/records"
 $exportPath = "$( $exportFolder )\$( $exportId )"
 $partFiles = Get-ChildItem -Path "$( $exportPath )"
 Write-Log -message "Uploading the data in $( $partFiles.count ) files"
 
-# Special field names
-$urnFieldName = $params.UrnFieldName
-$commkeyFieldName = $params.CommunicationKeyFieldName
-$emailFieldName = $params.EmailFieldName
-$firstNameFieldname = $settings.upload.firstNameFieldname
-$lastNameFieldname = $settings.upload.lastNameFieldname 
-$languageFieldname = $settings.upload.languageFieldname
-
 # https://api.flexmail.eu/documentation/#post-/contacts/imports
+# Import the data in parts
+$importCalls = [System.Collections.ArrayList]@()
 $partFiles | ForEach {
 
     $f = $_
 
     # Data
-    $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
+    $importRecipients = [System.Collections.ArrayList]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
 
-    $recipients = [System.Collections.ArrayList]
+    $recipients = [System.Collections.ArrayList]@()
     $importRecipients | ForEach {
 
         $row = $_
@@ -518,22 +555,34 @@ $partFiles | ForEach {
             email = $row.$emailFieldName
             first_name = $row.$firstNameFieldname
             name = $row.$lastNameFieldname
-            language = $row.$languageFieldname
+            language = "de" #$row.$languageFieldname # TODO [ ] change this back
             custom_fields = [PSCustomObject]@{}
-            sources = @($listId)
+            sources = @( $listId )
             interest_labels = @()
             preferences = @()
         }
 
         # Generate the custom receiver columns data
-        $colMap | ForEach {
+        $colMap | where { $_.target -notin $basicFields } | ForEach {
             $source = $_.source
             $target = $_.target
-            $recipient.custom_fields | Add-Member -MemberType NoteProperty -Name $target -Value $row.$source
+            $dataType = $customFields.where({ $_.placeholder -eq $target })[0].type
+            $value = switch ( $dataType ) {
+                "numeric" {
+                    [int]$row.$source
+                }
+                "free_text" {
+                    [String]$row.$source
+                }
+                Default {
+                    [String]$row.$source
+                }
+            }
+            $recipient.custom_fields | Add-Member -MemberType NoteProperty -Name $target -Value $value
         }
         
         # Add to array
-        $recipients.Add($recipient)
+        [void]$recipients.Add($recipient)
 
     }
 
@@ -564,10 +613,21 @@ $partFiles | ForEach {
 #>
 
     $uploadBodyJson = ConvertTo-Json -InputObject $recipients -Verbose -Depth 8 -Compress
-    $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $uploadBodyJson
-    
+    try {
+        $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $uploadBodyJson
+        [void]$importCalls.Add( $importRecords )
+    } catch {
+
+        $e = ParseErrorForResponseBody($_)
+        Write-Log -message ( $e | ConvertTo-Json -Depth 20 )
+        throw $_.exception
+
+        #Write-Host $_ -fore green
+    }
 
 } 
+
+exit 0
 
 # Wait for the upload slot to be free
 $randomDelay = Get-Random -Maximum 1000
@@ -584,7 +644,7 @@ $t = Measure-Command {
         $processId.Guid | Set-Content -Path $settings.lockfile -Verbose -Force -Encoding UTF8
 
         # Queue the import for processing
-        $url = "$( $apiRoot )/contacts/imports/$( $exportId )"
+        $url = "$( $settings.baseREST )/contacts/imports/$( $exportId )"
         $queueBody = @{
             "status" = "queued"
         }
@@ -592,8 +652,8 @@ $t = Measure-Command {
         $queue = Invoke-RestMethod -Uri $url -Method Patch -Headers $headers -Verbose -ContentType $contentType -Body $queueBodyJson
 
         # Loop the import status
-        $sleepTime = $settings.upload.sleepTime
-        $maxWaitTimeTotal = $settings.upload.maxSecondsWaiting
+        $sleepTime = $settings.uploadSettings.sleepTime
+        $maxWaitTimeTotal = $settings.uploadSettings.maxSecondsWaiting
         $startTime = Get-Date
         Do {
             Start-Sleep -Seconds $sleepTime
@@ -612,6 +672,7 @@ $t = Measure-Command {
 
 Write-Log -message "Import done in $( $t.TotalSeconds ) seconds"
 
+exit 0
 
 <#
 {
@@ -676,7 +737,7 @@ $importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encod
 
 Write-Log -message "Uploaded the data with $($importResults.Count) import results"
 #>
-
+<#
 #-----------------------------------------------
 # DEBUG - SHOW MAILINGLIST AFTER CHANGE
 #-----------------------------------------------
@@ -688,6 +749,7 @@ if ( $debug ) {
     $emails = Invoke-Flexmail -method "GetEmailAddresses" -param $emailsParams
     $emails | Out-GridView
 }
+#>
 
 #-----------------------------------------------
 # RETURN VALUES TO PEOPLESTAGE
