@@ -627,14 +627,12 @@ $partFiles | ForEach {
 
 } 
 
-exit 0
-
 # Wait for the upload slot to be free
-$randomDelay = Get-Random -Maximum 1000
 $outArgs = @{
     Path = $settings.lockfile
+    fireExceptionIfUsed = $true
 }
-Retry-Command -Command '!(Test-Path)' -Args $outArgs -retries 10 -MillisecondsDelay $randomDelay
+Retry-Command -Command 'Is-PathFree' -Args $outArgs -retries $settings.lockfileRetries -MillisecondsDelay $settings.lockfileDelayWhileWaiting
 
 # Queue the import and set the lock file
 $t = Measure-Command {
@@ -670,9 +668,12 @@ $t = Measure-Command {
     }
 }
 
-Write-Log -message "Import done in $( $t.TotalSeconds ) seconds"
+Write-Log -message "Import done in $( $t.TotalSeconds ) seconds with status '$( $status.status )'"
+Write-Log -message "Stats:"
+Write-Log -message "    Added: $( $status.report.total_added )"
+Write-Log -message "    Updated: $( $status.report.total_updated )"
+Write-Log -message "    Ignored: $( $status.report.total_ignored )"
 
-exit 0
 
 <#
 {
@@ -778,9 +779,10 @@ $return = [Hashtable]@{
     "UrnFieldName"= $params.UrnFieldName
 
     # More information about the different status of the import
-    #"RecipientsIgnored" = $ignored
+    "RecipientsIgnored" = $status.report.total_ignored
     #"RecipientsQueued" = $queued
-    #"RecipientsSent" = $sent
+    "RecipientsSent" = $status.report.total_added + $status.report.total_updated
+
 }
 
 # return the results

@@ -248,14 +248,21 @@ $settings = [PSCustomObject]@{
     aesFile = $keyFile
     baseREST = "https://api.flexmail.eu"
     logfile = $logfile
+
     messageNameConcatChar = " | "                               # should be deprecated
     nameConcatChar = " | "
 
     # Upload settings
     #masterListId = "1669666"
     lockfile = $lockfile                                        # The file that locks to queuing process
-    rowsPerUpload = 800                                         # should be max 100k rows
+    lockfileRetries = 20                                        # How often should the 
+    lockfileDelayWhileWaiting = 10000                           # Milliseconds
+    rowsPerUpload = 50000                                       # should be max 100k rows
+    
+    # Network
     changeTLS = $true
+
+    # More settings
     uploadFields = $uploadFields
     uploadsFolder = $upload
     

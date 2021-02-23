@@ -22,7 +22,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -43,6 +43,7 @@ if ( $debug ) {
                 Username= "abc"
 
                 # Coming from Upload script
+                RecipientsSent = 4
 
         }
 }
@@ -182,8 +183,9 @@ if ( $paramsExisting ) {
 # RECIPIENT LIST ID
 #-----------------------------------------------
 
-$campaignId = ( $params.ListName -split $settings.messageNameConcatChar,2 )[0]
-Write-log -message "Using the campaign id '$( $campaignId )'"
+#$campaignId = ( $params.ListName -split $settings.messageNameConcatChar,2 )[0]
+#Write-log -message "Using the campaign id '$( $campaignId )'"
+Write-log -message "Nothing to do in broadcast script"
 
 
 #-----------------------------------------------
@@ -199,8 +201,8 @@ Write-log -message "Using the campaign id '$( $campaignId )'"
 #-----------------------------------------------
 
 
-# TODO [ ] this is only a workaround until the handover from the return upload hashtable to the broadcast is working
-$recipients = 1
+# TODO [x] this is only a workaround until the handover from the return upload hashtable to the broadcast is working
+$recipients = $params.RecipientsSent
 
 # return the campaign id because this will be the reference for the response data
 #$transactionId = $campaignId
