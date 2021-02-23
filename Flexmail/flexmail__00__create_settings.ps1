@@ -293,12 +293,12 @@ $json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 #-----------------------------------------------
 
 # TODO [ ] implement choosing the masterlist id
-
+<#
 $mailingListsReturn = Invoke-Flexmail -method "GetMailingLists"
 $mailingLists = $mailingListsReturn | select @{name="mailingListId";expression={ $_.mailingListId }}, @{name="mailingListName";expression={ $_.mailingListName }} | Out-GridView -PassThru
 
 $settings | Add-Member -MemberType NoteProperty -Name "masterListId" -Value ( ( $mailingLists | select -first 1 ).mailingListId )
-
+#>
 
 #-----------------------------------------------
 # RESPONSE DOWNLOAD SETTINGS
@@ -335,3 +335,14 @@ $json
 # save settings to file
 $json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 
+
+################################################
+#
+# CREATE FOLDERS IF NEEDED
+#
+################################################
+
+if ( !(Test-Path -Path $settings.uploadsFolder) ) {
+    Write-Log -message "Upload $( $settings.uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $settings.uploadsFolder )" -ItemType Directory
+}
