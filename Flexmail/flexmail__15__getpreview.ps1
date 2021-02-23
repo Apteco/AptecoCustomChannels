@@ -8,11 +8,13 @@ Param(
     [hashtable] $params
 )
 
+
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -31,17 +33,6 @@ if ( $debug ) {
 }
 
 
-
-
-
-################################################
-#
-# NOTES
-#
-################################################
-
-
-
 ################################################
 #
 # SCRIPT ROOT
@@ -56,9 +47,10 @@ if ( $debug ) {
         $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
     }
 } else {
-    $scriptPath = "$( $params.scriptPath )"
+    $scriptPath = "$( $params.scriptPath )" 
 }
 Set-Location -Path $scriptPath
+
 
 
 ################################################
@@ -69,37 +61,65 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
+$moduleName         = "FLEXMAILPREVIEW"
+$processId = [guid]::NewGuid()
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+if ( $params.settingsFile -ne $null ) {
+    # Load settings file from parameters
+    $settings = Get-Content -Path "$( $params.settingsFile )" -Encoding UTF8 -Raw | ConvertFrom-Json
+} else {
+    # Load default settings
+    $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+}
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
-        #[System.Net.SecurityProtocolType]::Tls13,
-        ,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
-
+# more settings
 $logfile = $settings.logfile
 
-
-################################################
-#
-# FUNCTIONS
-#
-################################################
-
-# Please note this path is relative to the $scriptPath
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
-    . $_.FullName
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
 }
 
+
+################################################
+#
+# FUNCTIONS & ASSEMBLIES
+#
+################################################
+
+Add-Type -AssemblyName System.Data
+
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+    . $_.FullName
+    "... $( $_.FullName )"
+}
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 ################################################
 #
@@ -107,15 +127,28 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tPREVIEW" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
 }
 
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
+}
 
 
 ################################################
@@ -124,12 +157,38 @@ $params.Keys | ForEach {
 #
 ################################################
 
-$messages = Invoke-Flexmail -method "GetMessages" -param @{"metaDataOnly"="true"}
-$message = $params.MessageName -split $settings.messageNameConcatChar
-$messageUrl = ( $messages | where { $_.messageId -eq $message[0] } ).messageWebLink
+#-----------------------------------------------
+# LOAD WORKFLOWS
+#-----------------------------------------------
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoading preview for $( $message[0] ) with link $( $messageUrl )" >> $logfile
-$html = Invoke-RestMethod -Method Get -Uri $messageUrl -Verbose
+$Workflows = Invoke-Flexmail -method "GetCampaigns" | where campaignType -eq Workflow
+Write-Log -message "Loaded $( $Workflows.count ) workflows from flexmail"  
+
+
+
+#-----------------------------------------------
+# IDENTIFY TEMPLATE
+#-----------------------------------------------
+
+$messages = Invoke-Flexmail -method "GetMessages" -responseNode "MessageTypeItems" -param @{"metaDataOnly"="true"}
+Write-Log -message "Loaded $( $messages.count ) messages / templates from flexmail"
+
+
+# Extract the workflow
+$workflow = [FlxWorkflow]::new($params.MessageName)
+#$message = $params.MessageName -split $settings.messageNameConcatChar
+$messageid = ( $Workflows | where { $_.campaignId -eq $workflow.workflowId } ).campaignMessageId
+$messageDetails = ( $messages | where { $_.messageId -eq $messageid } )
+
+#-----------------------------------------------
+# HTML CONTENT
+#-----------------------------------------------
+
+Write-Log -message "Loading preview for $( $messageid ) with link $(($messageDetails.messageWebLink).Replace("http:","https:"))"
+Write-Log -message "PreLoaded html sourcecode with $( ($messageDetails.messageWebLink).Length ) characters"
+
+$html = Invoke-RestMethod -Method Get -Uri($messageDetails.messageWebLink).Replace("http:","https:") -Verbose -UseBasicParsing
+Write-Log -message "Loaded html sourcecode with $( $html.Length ) characters"
 
 
 ################################################
@@ -145,7 +204,7 @@ $return = [Hashtable]@{
     "Html"=$html
     "ReplyTo"=$settings.previewSettings.ReplyTo
     "Subject"=$settings.previewSettings.Subject
-    "Text"="Lorem Ipsum"
+    "Text"="Testing"
 }
 
-return $return
+$return

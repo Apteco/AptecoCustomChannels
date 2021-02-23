@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -428,13 +428,18 @@ $fields = $colMap.source #$settings.uploadFields + $customFields.id
 
 # Create temporary directory
 $exportTimestamp = [datetime]::Now.ToString("yyyyMMdd_HHmmss")
-$exportFolder = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId.Guid )"
+$exportFolder = "$( $uploadsFolder )\$( $exportTimestamp )_$( $processId.Guid )\"
 New-Item -Path $exportFolder -ItemType Directory
 
 # Move file to temporary uploads folder
-$source = Get-Item -Path $params.path
-$destination = "$( $exportFolder )\$( $source.name )"
-Copy-Item -path $source.FullName -Destination $destination
+#$source = Get-Item -LiteralPath "$( $params.path )"
+#Write-Log -message "$( $params.Path )"
+#Write-Log -message "$( $source.FullName )"
+
+#$destination = "$( $exportFolder )\$( $source.name )"
+Copy-Item -path $params.Path -Destination $exportFolder
+
+Write-Log -message "Copy file '$( $params.Path )' to $( $exportFolder )"
 
 # Remember the current location and change to the export dir
 $currentLocation = Get-Location
@@ -442,7 +447,7 @@ Set-Location $exportFolder
 
 # Split file in parts
 $t = Measure-Command {
-    $fileItem = Get-Item -Path $destination
+    $fileItem = Get-ChildItem -Path $exportFolder | Select -First 1
     $splitParams = @{
         inputPath = $fileItem.FullName
         header = $true
