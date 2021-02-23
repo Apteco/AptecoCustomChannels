@@ -1,14 +1,35 @@
-﻿################################################
+﻿
+################################################
 #
 # INPUT
 #
 ################################################
+
+Param(
+    [hashtable] $params
+)
+
 
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
 
 $debug = $true
+
+
+#-----------------------------------------------
+# INPUT PARAMETERS, IF DEBUG IS TRUE
+#-----------------------------------------------
+
+if ( $debug ) {
+    $params = [hashtable]@{
+	    Password= "def"
+	    scriptPath = "D:\Scripts\Flexmail"
+        settingsFile = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Flexmail\settings.json"
+	    abc= "def"
+	    Username= "abc"
+    }
+}
 
 
 ################################################
@@ -167,6 +188,7 @@ Create-Flexmail-Parameters
 $url = "$( $apiRoot )/sources"
 $sourcesReturn = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
 
+
 #-----------------------------------------------
 # BUILD SOURCE OBJECTS
 #-----------------------------------------------
@@ -188,14 +210,14 @@ $sourcesReturn | foreach {
 
 }
 
-Write-Log -message "Got back $( $sources.count ) sources"
+Write-Log -message "Got back $( $sourcesList.count ) sources"
 
 
 #-----------------------------------------------
 # WRAP UP
 #-----------------------------------------------
 
-$sources = $sourcesList | Select @{name="id";expression={ $_.sourceId }}, @{name="name";expression={ $_.sourceName }} | Sort id
+$sources = $sourcesList | Select @{name="id";expression={ $_.sourceId }}, @{name="name";expression={ $_.toString() }} | Sort id
 
 
 
@@ -205,4 +227,4 @@ $sources = $sourcesList | Select @{name="id";expression={ $_.sourceId }}, @{name
 #
 ################################################
 
-$sources
+return $sources
