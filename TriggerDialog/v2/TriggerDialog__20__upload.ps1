@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 
 #-----------------------------------------------
@@ -22,10 +22,19 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "D:\Scripts\TriggerDialog\v2"
-	    abc= "def"
-	    Username= "abc"
+        TransactionType = "Replace"
+        Password = "b"
+        scriptPath = "D:\Scripts\TriggerDialog\v2"
+        MessageName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
+        EmailFieldName = "email"
+        SmsFieldName = ""
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt"
+        ReplyToEmail = "" 
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Kunden ID"
+        ListName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
+        CommunicationKeyFieldName = "Communication Key"
     }
 }
 
@@ -99,7 +108,7 @@ if ( $debug ) {
 
 ################################################
 #
-# FUNCTIONS AND ASSEMBLIES
+# FUNCTIONS & LIBRARIES
 #
 ################################################
 
@@ -110,8 +119,23 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     "... $( $_.FullName )"
 }
 
-Add-Type -AssemblyName System.Security
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
 
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
+
+Add-Type -AssemblyName System.Security
 
 ################################################
 #
@@ -135,8 +159,14 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
     }
+}
+
+# Add note in log file, that the file is a converted file
+# TODO [ ] Add these notes to other scripts, too
+if ( $params.path -match "\.converted$") {
+    Write-Log -message "Be aware, that the exports are generated in Codepage 1252 and not UTF8. Please change this in the Channel Editor." -severity ( [LogSeverity]::WARNING )
 }
 
 
@@ -148,18 +178,10 @@ if ( $paramsExisting ) {
 
 
 #-----------------------------------------------
-# LOAD DATA
+# PARSE MESSAGE NAME
 #-----------------------------------------------
 
-# TODO [ ] implement loading bigger files later
-
-# Get file item
-$file = Get-Item -Path $params.Path
-$filename = $file.Name -replace $file.Extension
-
-# Load data from file
-$dataCsv = @()
-$dataCsv += import-csv -Path $file.FullName -Delimiter "`t" -Encoding UTF8
+$message = [TriggerDialogMailing]::new($params.MessageName)
 
 
 #-----------------------------------------------
@@ -194,11 +216,17 @@ $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:s
 $customerId = $settings.customerId
 
 
+
 #-----------------------------------------------
-# PARSE MESSAGE NAME
+# LOAD AND CHECK STATUS OF CAMPAIGN
 #-----------------------------------------------
 
-$message = [TriggerDialogMailing]::new($params.MessageName)
+#$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
+$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType
+if ( $campaignDetails.elements | where { $_.id -eq $message.campaignId } ).campaignState.id -ne 120 ) {
+    Write-Log -message "Campaign is not active yet" -severity ( [LogSeverity]::ERROR )
+    throw [System.IO.InvalidDataException] "Campaign is not active yet"
+}
 
 
 #-----------------------------------------------
@@ -207,72 +235,140 @@ $message = [TriggerDialogMailing]::new($params.MessageName)
 
 $variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
 
+
+#-----------------------------------------------
+# LOAD DATA
+#-----------------------------------------------
+
+# TODO [ ] implement loading bigger files later
+
+# Get file item
+$file = Get-Item -Path $params.Path
+$filename = $file.Name -replace $file.Extension
+
+# Load data from file
+#$dataCsv = @()
+#$dataCsv += import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8
+
+$dataCsv = [System.Collections.ArrayList]@( import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
+Write-Log -message "Loaded $( $dataCsv.Count ) records"
+
+
+#-----------------------------------------------
+# FIELD MAPPING
+#-----------------------------------------------
+
+# Check csv fields
+$csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
+Write-Log -message "Loaded csv attributes '$( $csvAttributesNames.Name -join ", " )'"
+
+# Create mapping for source and target
+$colMap = [System.Collections.ArrayList]@()
+
+# Add URN column
+<#
+$colMap.Add(
+    [PSCustomObject]@{
+        "source" = $params.UrnFieldName
+        "target" = $settings.upload.urnColumn
+    }
+)
+#>
+
+# Check corresponding field NAMES
+$compareNames = Compare-Object -ReferenceObject $variableDefinitions.elements.label -DifferenceObject $csvAttributesNames.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
+$compareNames | ForEach {
+    $fieldname = $_
+    [void]$colMap.Add(
+        [PSCustomObject]@{
+            "source" = $fieldname
+            "target" = $fieldname
+        }
+    )
+}
+
+# Which columns are still remaining in csv?
+$remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
+
+# Log
+Write-Log -message "Current field mapping is:"
+$colMap | ForEach {
+    Write-Log -message "    $( $_.source ) -> '$( $_.target )'"
+}
+
+# TODO [ ] should this 
+If ( $remainingColumns.count -gt 0 ) {
+    Write-Log -message "Following columns are missing: $( $remainingColumns.Name -join ", " )" -severity ( [LogSeverity]::WARNING )
+}
+
+
 #-----------------------------------------------
 # TRANSFORM UPLOAD DATA
 #-----------------------------------------------
 
+$urnFieldName = $params.UrnFieldName
+$recipients = [System.Collections.ArrayList]@()
+$dataCsv | ForEach {
 
+    # Use current row
+    $row = $_
+
+    # Special Fields
+    #$row.$commkeyFieldName
+
+    # Generate the receiver meta data
+    
+    $entry = [PSCustomObject]@{
+        "recipientIdExt" = $row.$urnFieldName
+        "recipientData" = [System.Collections.ArrayList]@()  #[PSCustomObject]@{}
+    }
+    
+    # Generate the custom receiver columns data
+    $colMap | ForEach {
+        $source = $_.source.ToString()
+        $target = $_.target.ToString()
+        [void]$entry.recipientData.Add([PSCustomObject]@{
+            label = $target
+            value = $row.$source
+        })
+    }
+
+    # Changing the urn colum to the correct value
+    #If ( $settings.upload.urnContainsEmail ) {
+    #    $entry.data.($settings.upload.urnColumn) = $urn
+    #}
+
+    # Add recipient to array
+    [void]$recipients.Add($entry)
+
+}
+
+Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
 
 #-----------------------------------------------
 # UPLOAD DATA
 #-----------------------------------------------
 
 $body = @{
-    "campaignId" = $campaign.id
+    "campaignId" = $message.campaignId #$campaign.id
     "customerId" = $customerId
-    "recipients" = @(
-        
-        # This is the data of 1 recipient
-        @{
-            "recipientData" = @(                    
-                @{
-                    "label" = "zip"
-                    "value" = "48309"
-                }
-                @{
-                    "label" = "city"
-                    "value" = "Dover"
-                }
-            )
-            "recipientIdExt" = "null"
-        },
-
-        # This is the data of 1 recipient
-        @{
-            "recipientData" = @(                    
-                @{
-                    "label" = "zip"
-                    "value" = "52080"
-                }
-                @{
-                    "label" = "city"
-                    "value" = "Aachen"
-                }
-            )
-            "recipientIdExt" = "null"
-        }
-        
-
-
-    )
+    "recipients" = $recipients
 }
 
 $bodyJson = $body | ConvertTo-Json -Depth 8
-$newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
-$newCustomers.elements | Out-GridView
+try {
 
-<#
+    $newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
 
-If uploaded failed, you get an http422
+} catch {
+    $errorMessage = ParseErrorForResponseBody -err $_
+    $errorMessage.errors | ForEach {
+        Write-Log -severity ( [LogSeverity]::ERROR ) -message "$( $_.errorCode ) : $( $_.errorMessage )"
+    }
+    Throw [System.IO.InvalidDataException]
+}
 
-If succeeded, you a correlationId back
-
-id on a upload at 2020-10-14: d7513861-894b-4b8b-b88e-34e992f0c1ba
-
-#>
-
-# Send back id
-$newCustomers.correlationId
+Write-Log -message "Uploaded successfully with id $( $newCustomers.correlationId )"
 
 
 ################################################
@@ -280,6 +376,8 @@ $newCustomers.correlationId
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
+
+$queued = $dataCsv.Count
 
 If ( $queued -eq 0 ) {
     Write-Host "Throwing Exception because of 0 records"
@@ -291,7 +389,7 @@ $return = [Hashtable]@{
 
     # Mandatory return values
     "Recipients"=$queued 
-    "TransactionId"=$processId
+    "TransactionId"=$newCustomers.correlationId
 
     # General return value to identify this custom channel in the broadcasts detail tables
     "CustomProvider"=$moduleName
@@ -300,6 +398,7 @@ $return = [Hashtable]@{
     # Some more information for the broadcasts script
     "Path"= $params.Path
     "UrnFieldName"= $params.UrnFieldName
+    "CorrelationId"=$newCustomers.correlationId
 
     # More information about the different status of the import
     #"RecipientsIgnored" = $ignored

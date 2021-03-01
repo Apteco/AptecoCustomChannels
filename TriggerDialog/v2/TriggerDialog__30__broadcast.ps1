@@ -22,10 +22,16 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "D:\Scripts\TriggerDialog\v2"
-	    abc= "def"
-	    Username= "abc"
+        ProcessId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
+        MessageName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
+        Username = "a"
+        TransactionId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
+        CustomProvider = "TRUPLOAD"
+        UrnFieldName = "Kunden ID"
+        Password = "b"
+        ListName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt.converted"
+        scriptPath = "D:\Scripts\TriggerDialog\v2"
     }
 }
 
@@ -96,10 +102,9 @@ if ( $debug ) {
 }
 
 
-
 ################################################
 #
-# FUNCTIONS AND ASSEMBLIES
+# FUNCTIONS & LIBRARIES
 #
 ################################################
 
@@ -110,8 +115,23 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     "... $( $_.FullName )"
 }
 
-Add-Type -AssemblyName System.Security
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
 
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
+
+Add-Type -AssemblyName System.Security
 
 ################################################
 #
@@ -135,7 +155,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
     }
 }
 
@@ -167,7 +187,7 @@ $transactionId = $processId
 # return object
 $return = [Hashtable]@{
     "Recipients"=$recipients
-    "TransactionId"=$transactionId
+    "TransactionId"=$params.CorrelationId #$transactionId
     "CustomProvider"=$moduleName
     "ProcessId" = $processId
 }

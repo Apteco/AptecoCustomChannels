@@ -435,7 +435,8 @@ $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
 # https://dm.deutschepost.de?partnersystem={YOUR-SIGNED-JWT}.
 #$authUri = "https://dm-uat.deutschepost.de?partnersystem=$( $jwt )"
-$authUri = "$( $hostUri )/campaign/editLongTermCampaign/34364?partnersystem=$( $jwt )"
+$editUri = "$( $hostUri )/campaign/editLongTermCampaign/34364" #?partnersystem=$( $jwt )"
+$authUri = "https://dm-uat.deutschepost.de?partnersystem=$( $jwt )"
 $authUri
 
 
@@ -478,9 +479,11 @@ Write-Log -message "Email was sent: $( $emailSuccess )"
 # https://dm-uat.deutschepost.de/campaign/editLongTermCampaign/34362
 
 $redirectHTML = @"
+<!-- saved from url=(0014)http://about:internet -->
 <!DOCTYPE html>
 <html>
    <head>
+      <meta http-equiv="X-UA-Compatible" content="IE=edge" /> 
       <title>HTML Meta Tag</title>
         
    </head>
@@ -489,6 +492,8 @@ $redirectHTML = @"
         $( $mailing.campaignOperation )<p>&nbsp;</p>
         $( $htmlTxt )<p>&nbsp;</p>
         Sie erhalten eine E-Mail zum Login, hier ist die URL direkt: <a href="$( $authUri )" target="_new">$( $authUri )</a> 
+        Sie erhalten eine E-Mail zum Login, hier ist die URL direkt: <a href="$( $authUri )" target="_blank">$( $authUri )</a> <p>&nbsp;</p>
+        <a href="$( $editUri )" target="_blank">$( $editUri )</a> 
    </body>
 </html>
 "@
