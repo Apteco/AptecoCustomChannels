@@ -22,12 +22,12 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        scriptPath = "D:\Scripts\TriggerDialog\v2"
-        TestRecipient = '{"Email":"name@example.com","Sms":null,"Personalisation":{"Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Strasse":"Strasse","PLZ":"PLZ","Ort":"Ort","Communication Key":"02b4bddc-c115-48f1-b624-69f6f8318ad5"}}'
-        MessageName = "41126 / 36146 / 2020-12-22_14:23:46 / Entwurf / EDIT"
-        ListName = ""
-        Password = "b"
-        Username = "a"
+        scriptPath = 'D:\Scripts\TriggerDialog\v2'
+        TestRecipient = '{"Email":"florian.von.bracht@apteco.de","Sms":null,"Personalisation":{"Test":"Contentobjekt","Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Strasse":"Strasse","PLZ":"PLZ","Ort":"Ort","TTT":"GGG","Geburtsdatum":"Geburtsdatum","Communication Key":"ab0ba429-4be7-45b7-bcc5-de9eaa72e23b"}}'
+        MessageName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
+        ListName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
+        Password = 'b'
+        Username = 'a'
     }
 }
 
@@ -193,6 +193,15 @@ $testData = @{
 
 $message = [TriggerDialogMailing]::new($params.MessageName)
 
+$changeCampaignName = $false
+# If ListName is something other than messagename, use this for the campaign name
+if ( $params.ListName -ne $params.MessageName ) {
+    $changeCampaignName = $true
+    $campaignName = $params.ListName
+} else {
+    $campaignName = [datetime]::Now.ToString("yyyy-MM-dd_HH:mm:ss")
+}
+
 
 #-----------------------------------------------
 # CREATE HEADERS
@@ -227,6 +236,13 @@ $customerId = $settings.customerId
 
 
 #-----------------------------------------------
+# DEFAULT TEXT
+#-----------------------------------------------
+
+$htmlTxt = "Keine Hinweise verfügbar."
+
+
+#-----------------------------------------------
 # WHAT TO DO?
 #-----------------------------------------------
 
@@ -248,7 +264,7 @@ switch ( $message.campaignOperation ) {
 
         $body = @{
             "campaignIdExt"= $processId #$campaignIdExt
-            "campaignName"= [datetime]::Now.ToString("yyyy-MM-dd_HH:mm:ss")  #$campaignName
+            "campaignName"= $campaignName
             "customerId"= $customerId
         }
         $bodyJson = $body | ConvertTo-Json
@@ -291,7 +307,7 @@ switch ( $message.campaignOperation ) {
         # OUTPUT RESULT TO HTML
         #-----------------------------------------------
         
-        $htmlTxt = "Created a new campaign with $( $newCampaign.id ) and mailing id $( $newMailing.id ) and $( $newVariables.elements.count ) variables"
+        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $newCampaign.id )' und der Mailing-ID '$( $newMailing.id )' erstellt.<br/>Dabei wurden $( $newVariables.elements.count ) Variablen erstellt: $( ($newVariables.elements.label -join ", ") )"
 
 
     }
@@ -299,6 +315,24 @@ switch ( $message.campaignOperation ) {
 
     "EDIT" {
         
+        #-----------------------------------------------
+        # UPDATE CAMPAIGN VIA REST
+        #-----------------------------------------------
+
+        if ( $changeCampaignName ) {
+
+            $body = @{
+                "campaignName"= $campaignName
+                "customerId"= $customerId
+            }
+            $bodyJson = $body | ConvertTo-Json
+            $newCampaign = Invoke-RestMethod -Method PUT -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+    
+            Write-Log "Renamed an existing campaign with id $( $message.campaignId ) and name $( $campaignName )"
+
+        }
+
+
         #-----------------------------------------------
         # CREATE FIELD DEFINITION OBJECT
         #-----------------------------------------------
@@ -331,6 +365,9 @@ switch ( $message.campaignOperation ) {
                 $var | Add-Member -MemberType NoteProperty -Name "id" -Value $oldVariableDefinitions.elements.Where({$_.label -eq $var.label}).id
             }
         }
+
+        # Remove columns
+        # TODO [ ] not needed at the moment
 
 
         #-----------------------------------------------
@@ -399,12 +436,15 @@ switch ( $message.campaignOperation ) {
         $newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
         $newCustomers.elements | Out-GridView
         #>
-        $htmlTxt = "Click the link here to edit the campaign"
-
+        #$htmlTxt = "Click the link here to edit the campaign: <a href=""https://www.google.de"" target=""_blank"">Testlink</a>"
+        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $message.campaignId )' und der Mailing-ID '$( $message.mailingId )' angepasst.<br/>Dabei wurden $( $addCols.label.count ) neue Variablen erstellt: $( ($addCols.label -join ", ") )"
+        if ( $changeCampaignName ) {
+            $htmlTxt += "<br/>Die Kampagnen wurde von $( $message.campaignName ) in '$( $campaignName )' umbenannt."
+        }
     }
 
     "UPLOAD" {
-        $htmlTxt = "All fine, publish and start the campaign in PeopleStage"
+        $htmlTxt = "Alles ok. Kampagne bereit zum Starten."
     }
 
     "DELETE" {
@@ -415,7 +455,8 @@ switch ( $message.campaignOperation ) {
         
         # Delete campaign
         Invoke-RestMethod -Method Delete -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )?customerId=$( $customerId  )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
-        $htmlTxt = "The campaign with $( $message.campaignId ) was just deleted"
+        Write-Log -message "The campaign with id '$( $message.campaignId )' was deleted" -severity ( [LogSeverity]::WARNING ) 
+        $htmlTxt = "Die Kampagne mit ID '$( $message.campaignId )' wurde gelöscht."
 
     }
 
@@ -478,6 +519,14 @@ Write-Log -message "Email was sent: $( $emailSuccess )"
 # To jump directly to a campaign
 # https://dm-uat.deutschepost.de/campaign/editLongTermCampaign/34362
 
+$redirectHTML = Get-Content -Path ".\preview_template.html" -Encoding UTF8 -Raw
+
+$redirectHTML = $redirectHTML -replace "#JWTLINK#",$authUri
+$redirectHTML = $redirectHTML -replace "#NOTES#" ,$htmlTxt
+
+
+<#
+
 $redirectHTML = @"
 <!-- saved from url=(0014)http://about:internet -->
 <!DOCTYPE html>
@@ -491,12 +540,12 @@ $redirectHTML = @"
         $( $mailing.ToString() )<br/>
         $( $mailing.campaignOperation )<p>&nbsp;</p>
         $( $htmlTxt )<p>&nbsp;</p>
-        Sie erhalten eine E-Mail zum Login, hier ist die URL direkt: <a href="$( $authUri )" target="_new">$( $authUri )</a> 
         Sie erhalten eine E-Mail zum Login, hier ist die URL direkt: <a href="$( $authUri )" target="_blank">$( $authUri )</a> <p>&nbsp;</p>
         <a href="$( $editUri )" target="_blank">$( $editUri )</a> 
    </body>
 </html>
 "@
+#>
 #     <a href="$( $authUri )" target="_blank">$( $authUri )</a> 
 
 <#

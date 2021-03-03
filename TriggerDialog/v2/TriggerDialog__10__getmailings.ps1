@@ -192,19 +192,20 @@ $customerId = $settings.customerId
 #-----------------------------------------------
 
 <#
-    id            : 34362
-    createdOn     : 2020-09-30T22:26:48.000Z
-    changedOn     : 2020-10-14T16:14:22.000Z
-    version       : 6
-    campaignType  : LONG_TERM
-    campaignName  : Kampagne A
-    actions       : {}
-    campaignState : @{id=120; label=Aktiv}
+
+   id createdOn                changedOn                version campaignType campaignName        actions        campaignState
+   -- ---------                ---------                ------- ------------ ------------        -------        -------------
+41126 2020-12-22T13:23:47.000Z 2021-03-03T12:33:50.000Z       6 LONG_TERM    2020-12-22_14:23:46 {}             @{id=120; label=Aktiv}
+41125 2020-12-21T23:36:53.000Z                                1 LONG_TERM    2020-12-22_00:36:52 {EDIT, DELETE} @{id=110; label=Entwurf}
+47959 2021-03-01T17:30:26.000Z 2021-03-01T17:33:16.000Z       6 LONG_TERM    2021-03-01_18:30:26 {}             @{id=120; label=Aktiv}
+34362 2020-09-30T22:26:48.000Z 2021-03-01T13:20:26.000Z       8 LONG_TERM    Kampagne A          {}             @{id=120; label=Aktiv}
+
 #>
 
 # TODO [ ] implement paging for campaigns
 $campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
 <#
+
 # ready to be edited
 $campaignDetails.elements | where {$_.actions -contains "EDIT"}
 $campaignDetails.elements | where {$_.campaignState.id -eq 110} # State "Entwurf"
@@ -223,18 +224,17 @@ $campaignDetails.elements | where {$_.actions -contains "DELETE"}
 #-----------------------------------------------
 
 <#
-    id                       : 30449
-    createdOn                : 2020-10-09T15:57:26.000Z
-    changedOn                : 2020-10-12T22:17:55.000Z
-    version                  : 5
-    campaignId               : 34362
-    variableDefVersion       : 2
-    senderAddress            :
-    mailingTemplateType      : @{mailingTemplateTypeId=230; editorType=ADVANCED}
-    addressMappingsConfirmed : True
-    hasIndividualVariables   : False
-    hasSelectedVariables     : False
-    addressPageDefined       : False
+
+   id createdOn                changedOn                version campaignId variableDefVersion senderAddress mailingTemplateType                               addressMappingsConfirmed hasIndividualVariables
+   -- ---------                ---------                ------- ---------- ------------------ ------------- -------------------                               ------------------------ ----------------------
+29591 2020-10-01T13:32:02.000Z                                1      34363                  0                                                                                     True                  False
+30449 2020-10-09T15:57:26.000Z 2021-03-01T12:57:36.000Z       8      34362                  4               @{mailingTemplateTypeId=230; editorType=ADVANCED}                     True                   True
+36028 2020-12-21T21:53:45.000Z                                1      34372                  0                                                                                     True                  False
+36064 2020-12-21T22:34:15.000Z                                1      41043                  0                                                                                     True                  False
+36145 2020-12-21T23:36:53.000Z                                1      41125                  0                                                                                     True                  False
+36146 2020-12-22T13:23:47.000Z 2021-03-03T12:33:17.000Z      18      41126                  8               @{mailingTemplateTypeId=110; editorType=BASIC}                        True                   True
+42855 2021-03-01T17:30:27.000Z 2021-03-01T17:32:57.000Z       7      47959                  3               @{mailingTemplateTypeId=120; editorType=BASIC}                        True                   True
+
 #>
 
 # TODO [ ] implement paging for mailings
