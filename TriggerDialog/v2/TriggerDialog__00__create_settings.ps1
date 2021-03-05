@@ -1,11 +1,14 @@
 ﻿
 ################################################
 #
-# SCRIPT ROOT
+# START
 #
 ################################################
 
-# Load scriptpath
+#-----------------------------------------------
+# LOAD SCRIPTPATH
+#-----------------------------------------------
+
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
     $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 } else {
@@ -15,27 +18,93 @@ if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
 Set-Location -Path $scriptPath
 
 
-################################################
-#
-# SETTINGS
-#
-################################################
+#-----------------------------------------------
+# LOAD MORE FUNCTIONS
+#-----------------------------------------------
 
-# General settings
-$functionsSubfolder = "functions"
-$settingsFilename = "settings.json"
-$timestamp = [datetime]::Now
+$functionsSubfolder = ".\functions"
 
-
-################################################
-#
-# FUNCTIONS
-#
-################################################
-
-Get-ChildItem ".\$( $functionsSubfolder )" -Filter "*.ps1" -Recurse | ForEach {
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+
+
+#-----------------------------------------------
+# ASK FOR SETTINGSFILE
+#-----------------------------------------------
+
+# Default file
+$settingsFileDefault = "$( $scriptPath )\settings.json"
+
+# Ask for another path
+$settingsFile = Read-Host -Prompt "Where do you want the settings file to be saved? Just press Enter for this default [$( $settingsFileDefault )]"
+
+# ALTERNATIVE: The file dialog is not working from Visual Studio Code, but is working from PowerShell ISE or "normal" PowerShell Console
+#$settingsFile = Set-FileName -initialDirectory "$( $scriptPath )" -filter "JSON files (*.json)|*.json"
+
+# If prompt is empty, just use default path
+if ( $settingsFile -eq "" -or $null -eq $settingsFile) {
+    $settingsFile = $settingsFileDefault
+}
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $settingsFile -IsValid ) {
+    Write-Host "SettingsFile '$( $settingsFile )' is valid"
+} else {
+    Write-Host "SettingsFile '$( $settingsFile )' contains invalid characters"
+}
+
+
+#-----------------------------------------------
+# ASK FOR LOGFILE
+#-----------------------------------------------
+
+# Default file
+$logfileDefault = "$( $scriptPath )\triggerdialog.log"
+
+# Ask for another path
+$logfile = Read-Host -Prompt "Where do you want the log file to be saved? Just press Enter for this default [$( $logfileDefault )]"
+
+# ALTERNATIVE: The file dialog is not working from Visual Studio Code, but is working from PowerShell ISE or "normal" PowerShell Console
+#$settingsFile = Set-FileName -initialDirectory "$( $scriptPath )" -filter "JSON files (*.json)|*.json"
+
+# If prompt is empty, just use default path
+if ( $logfile -eq "" -or $null -eq $logfile) {
+    $logfile = $logfileDefault
+}
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $logfile -IsValid ) {
+    Write-Host "Logfile '$( $logfile )' is valid"
+} else {
+    Write-Host "Logfile '$( $logfile )' contains invalid characters"
+}
+
+
+#-----------------------------------------------
+# ASK FOR UPLOAD FOLDER
+#-----------------------------------------------
+
+# Default file
+$uploadDefault = "$( $scriptPath )\uploads"
+
+# Ask for another path
+$upload = Read-Host -Prompt "Where do you want the files to be uploaded? Just press Enter for this default [$( $uploadDefault )]"
+
+# If prompt is empty, just use default path
+if ( $upload -eq "" -or $null -eq $upload) {
+    $upload = $uploadDefault
+}
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $upload -IsValid ) {
+    Write-Host "Upload folder '$( $upload )' is valid"
+} else {
+    Write-Host "Upload folder '$( $upload )' contains invalid characters"
+}
+
 
 
 ################################################
@@ -57,10 +126,10 @@ $ssoTokenKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",
 
 $auth = @{
 
-    "partnerSystemIdExt" = "<partnersystemidext>"                    # The numeric id of your partnersystem in our system.
-    "partnerSystemCustomerIdExt" = "<partnersystemcustomeridext>"    # The alphanumeric id identifying your customer, you want to act for.
-    "authenticationSecret" = $authSecretEncrypted                    # A shared secret for authentication.
-    "ssoTokenKey" = $ssoTokenKeyEncrypted                            # A shared secret used for signing the JWT you generated.    
+    "partnerSystemIdExt" = "3008"                           # The numeric id of your partnersystem in our system.
+    "partnerSystemCustomerIdExt" = "Apteco"                 # The alphanumeric id identifying your customer, you want to act for.
+    "authenticationSecret" = $authSecretEncrypted           # A shared secret for authentication.
+    "ssoTokenKey" = $ssoTokenKeyEncrypted                   # A shared secret used for signing the JWT you generated.    
 
 }
 
@@ -75,7 +144,6 @@ $previewSettings = @{
     "FromName"="Apteco"
     "ReplyTo"="info@apteco.de"
     "Subject"="Test-Subject"
-    
 }
 
 
@@ -84,8 +152,8 @@ $previewSettings = @{
 #-----------------------------------------------
 
 $uploadSettings = @{
-    #"rowsPerUpload" = 800
-    "uploadsFolder" = "$( $scriptPath )\uploads\"
+    "rowsPerUpload" = 80 # should be max 100 per upload
+    "uploadsFolder" = $upload #"$( $scriptPath )\uploads\"
     "delimiter" = "`t" # "`t"|","|";" usw.
     "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
     #"excludedAttributes" = @()
@@ -93,13 +161,22 @@ $uploadSettings = @{
 
 
 #-----------------------------------------------
-# BROADCAST SETTINGS
+# REPORT SETTINGS
 #-----------------------------------------------
 
+$reportSettings = @{
+    "delimiter" = ";"   # The delimiter used by TriggerDialog for report data
+}
+
+
+#-----------------------------------------------
+# BROADCAST SETTINGS
+#-----------------------------------------------
+<#
 $broadcastSettings = @{
     
 }
-
+#>
 
 #-----------------------------------------------
 # MAIL NOTIFICATION SETTINGS
@@ -170,8 +247,9 @@ $settings = @{
     "authentication" = $auth
     "preview" = $previewSettings
     "upload" = $uploadSettings
-    "broadcast" = $broadcastSettings
+    #"broadcast" = $broadcastSettings
     "mail" = $mail
+    "report" = $reportSettings
     
 }
 
@@ -254,3 +332,22 @@ $json
 
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+
+################################################
+#
+# CREATE FOLDERS IF NEEDED
+#
+################################################
+
+if ( !(Test-Path -Path $settings.upload.uploadsFolder) ) {
+    Write-Log -message "Upload $( $settings.upload.uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $settings.upload.uploadsFolder )" -ItemType Directory
+}
+
+<#
+if ( !(Test-Path -Path $settings.download.folder) ) {
+    Write-Log -message "Download $( $settings.download.folder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $settings.download.folder )" -ItemType Directory
+}
+#>
