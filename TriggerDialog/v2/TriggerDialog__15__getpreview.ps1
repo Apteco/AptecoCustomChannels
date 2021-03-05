@@ -215,16 +215,15 @@ $headers = @{
     "accept" = $settings.contentType
 }
 
-
 #-----------------------------------------------
 # CREATE SESSION
 #-----------------------------------------------
 
-Get-TriggerDialogSession
-#$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
-$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
-
+$newSessionCreated = Get-TriggerDialogSession
 $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
+
+# Create JWT token for UI login
+$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
 
 
 #-----------------------------------------------
@@ -267,10 +266,33 @@ switch ( $message.campaignOperation ) {
             "campaignName"= $campaignName
             "customerId"= $customerId
         }
-        $bodyJson = $body | ConvertTo-Json
-        $newCampaign = Invoke-RestMethod -Method POST -Uri "$( $settings.base )/longtermcampaigns" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        #$bodyJson = $body | ConvertTo-Json
+        #$newCampaign = Invoke-RestMethod -Method POST -Uri "$( $settings.base )/longtermcampaigns" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        $newCampaign = Invoke-TriggerDialog -method Post -customerId $customerId -path "longtermcampaigns" -headers $headers -body $body -returnRawObject
 
-        Write-Log "Created a new campaign with id $( $newCampaign.id ) and name $( $newCampaign.name )"
+        Write-Log "Created a new campaign with id $( $newCampaign.id ) and name $( $newCampaign.campaignName )"
+
+        <#
+        id                    : 49029
+        createdOn             : 2021-03-04T16:45:34.978Z
+        changedOn             :
+        version               : 1
+        campaignType          : LONG_TERM
+        campaignName          : 2021-03-04_17:45:34
+        stateId               : 110
+        product               :
+        sendingReasonId       : 10
+        actions               : {EDIT}
+        requiredActions       : {DEFINE_PRODUCT, DEFINE_SENDING_REASON, ESTIMATE_CAMPAIGN, DEFINE_MAILING_TEMPLATE...}
+        workflowType          : TRIGGER_COMPLETE
+        hasDummyName          : False
+        campaignIdExt         : 29e0a178-ea6b-47c7-aa72-6b8b5f806c4e
+        variableDefVersion    :
+        individualizationId   :
+        printingProcessId     :
+        deliveryProductId     :
+        deliveryCheckSelected :
+        #>
 
         #-----------------------------------------------
         # CREATE MAILING VIA REST
@@ -280,11 +302,26 @@ switch ( $message.campaignOperation ) {
             "campaignId"= $newCampaign.id
             "customerId"= $customerId
         }
-        $bodyJson = $body | ConvertTo-Json
-        $newMailing = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/mailings" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
-        
+        #$bodyJson = $body | ConvertTo-Json
+        #$newMailing = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/mailings" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        $newMailing = Invoke-TriggerDialog -method Post -customerId $customerId -path "mailings" -headers $headers -body $body -returnRawObject
+
         Write-Log "Created a new mailing with id $( $newMailing.id )"
 
+        <#
+        id                       : 43838
+        createdOn                : 2021-03-04T16:45:35.558Z
+        changedOn                :
+        version                  : 1
+        campaignId               : 49029
+        variableDefVersion       : 0
+        senderAddress            :
+        mailingTemplateType      :
+        addressMappingsConfirmed : True
+        hasIndividualVariables   : False
+        hasSelectedVariables     : False
+        addressPageDefined       : False
+        #>
 
         #-----------------------------------------------
         # CREATE FIELDS VIA REST
@@ -297,17 +334,31 @@ switch ( $message.campaignOperation ) {
             "customerId" = $customerId
             "createVariableDefRequestRepList" = $variableDefinitions
         }
-        $bodyJson = $body | ConvertTo-Json -Depth 10
-        $newVariables = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/mailings/$( $newMailing.id )/variabledefinitions" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        #$bodyJson = $body | ConvertTo-Json -Depth 10
+        #$newVariables = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/mailings/$( $newMailing.id )/variabledefinitions" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        $newVariables = Invoke-TriggerDialog -method Post -customerId $customerId -path  "mailings/$( $newMailing.id )/variabledefinitions" -Headers $headers -Body $body
         #$newVariables.elements | Out-GridView
-        Write-Log "Generated $( $newVariables.elements.count ) fields in TriggerDialog"
+        Write-Log "Generated $( $newVariables.count ) fields in TriggerDialog"
         
+        <#
+        id createdOn                changedOn                version label             sortOrder dataType                     addressVariableId addressVariableMappingConfirmed selected
+        -- ---------                ---------                ------- -----             --------- --------                     ----------------- ------------------------------- --------
+        49872 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.409Z       2 Anrede                   10 @{id=10; label=Text}                         2                           False    False
+        49867 2021-03-04T16:49:32.078Z                                1 Communication Key        20 @{id=10; label=Text}                                                     False    False
+        49871 2021-03-04T16:49:32.078Z                                1 Geburtsdatum             30 @{id=10; label=Text}                                                     False    False
+        49869 2021-03-04T16:49:32.078Z                                1 Kunden ID                40 @{id=10; label=Text}                                                     False    False
+        49874 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.432Z       2 Nachname                 50 @{id=10; label=Text}                         5                           False    False
+        49870 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.398Z       2 Ort                      60 @{id=10; label=Text}                         9                           False    False
+        49868 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.385Z       2 PLZ                      70 @{id=80; label=Postleitzahl}                 8                           False    False
+        49873 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.421Z       2 Strasse                  80 @{id=10; label=Text}                         6                           False    False
+        49866 2021-03-04T16:49:32.078Z 2021-03-04T16:49:32.372Z       2 Vorname                  90 @{id=10; label=Text}                         4                           False    False
+        #>
 
         #-----------------------------------------------
         # OUTPUT RESULT TO HTML
         #-----------------------------------------------
         
-        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $newCampaign.id )' und der Mailing-ID '$( $newMailing.id )' erstellt.<br/>Dabei wurden $( $newVariables.elements.count ) Variablen erstellt: $( ($newVariables.elements.label -join ", ") )"
+        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $newCampaign.id )' und der Mailing-ID '$( $newMailing.id )' erstellt.<br/>Dabei wurden $( $newVariables.count ) Variablen erstellt: $( ($newVariables.label -join ", ") )"
 
 
     }
@@ -325,9 +376,10 @@ switch ( $message.campaignOperation ) {
                 "campaignName"= $campaignName
                 "customerId"= $customerId
             }
-            $bodyJson = $body | ConvertTo-Json
-            $newCampaign = Invoke-RestMethod -Method PUT -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
-    
+            #$bodyJson = $body | ConvertTo-Json
+            #$newCampaign = Invoke-RestMethod -Method PUT -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+            $newCampaign = Invoke-TriggerDialog -method Put -customerId $customerId -path "longtermcampaigns/$( $message.campaignId )" -headers $headers -body $body -returnRawObject
+
             Write-Log "Renamed an existing campaign with id $( $message.campaignId ) and name $( $campaignName )"
 
         }
@@ -344,8 +396,8 @@ switch ( $message.campaignOperation ) {
         # LOAD EXISTING FIELDS
         #-----------------------------------------------
 
-        $oldVariableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
-
+        #$oldVariableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
+        $oldVariableDefinitions = Invoke-TriggerDialog -customerId $customerId -path "mailings/$( $message.mailingId )/variabledefinitions" -headers $headers
         
         #-----------------------------------------------
         # MATCH FIELDS TOGETHER
@@ -378,10 +430,12 @@ switch ( $message.campaignOperation ) {
             "customerId" = $customerId
             "updateVariableDefRequestRepList" = $newVariableDefinitions
         }
-        $bodyJson = $body | ConvertTo-Json -Depth 10
-        $updatedVariables = Invoke-RestMethod -Method Put -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
-        #$updatedVariables.elements | Out-GridView
-        Write-Log "Updated $( $updatedVariables.elements.count ) fields in TriggerDialog"
+        #$bodyJson = $body | ConvertTo-Json -Depth 10
+        #$updatedVariables = Invoke-RestMethod -Method Put -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+        $updatedVariables = Invoke-TriggerDialog -method Put -customerId $customerId -path  "mailings/$( $message.mailingId )/variabledefinitions" -Headers $headers -Body $body
+
+        #$updatedVariables | Out-GridView
+        Write-Log "Updated $( $updatedVariables.count ) fields in TriggerDialog"
         
 
 
@@ -454,7 +508,8 @@ switch ( $message.campaignOperation ) {
         #Invoke-RestMethod -Method Delete -Uri "$( $settings.base )/mailings/36064?customerId=$( $customerId  )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
         
         # Delete campaign
-        Invoke-RestMethod -Method Delete -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )?customerId=$( $customerId  )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
+        #Invoke-RestMethod -Method Delete -Uri "$( $settings.base )/longtermcampaigns/$( $message.campaignId )?customerId=$( $customerId  )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
+        Invoke-TriggerDialog -method Delete -customerId $customerId -path  "longtermcampaigns/$( $message.campaignId )" -Headers $headers
         Write-Log -message "The campaign with id '$( $message.campaignId )' was deleted" -severity ( [LogSeverity]::WARNING ) 
         $htmlTxt = "Die Kampagne mit ID '$( $message.campaignId )' wurde gelöscht."
 

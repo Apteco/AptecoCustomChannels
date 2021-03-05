@@ -216,14 +216,14 @@ $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:s
 $customerId = $settings.customerId
 
 
-
 #-----------------------------------------------
 # LOAD AND CHECK STATUS OF CAMPAIGN
 #-----------------------------------------------
 
 #$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
-$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType
-if ( $campaignDetails.elements | where { $_.id -eq $message.campaignId } ).campaignState.id -ne 120 ) {
+#$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType
+$campaignDetails = Invoke-TriggerDialog -customerId $customerId -headers $headers -path "longtermcampaigns"
+if ( ( $campaignDetails | where { $_.id -eq $message.campaignId } ).campaignState.id -ne 120 ) {
     Write-Log -message "Campaign is not active yet" -severity ( [LogSeverity]::ERROR )
     throw [System.IO.InvalidDataException] "Campaign is not active yet"
 }
@@ -233,7 +233,8 @@ if ( $campaignDetails.elements | where { $_.id -eq $message.campaignId } ).campa
 # LOAD EXISTING FIELDS
 #-----------------------------------------------
 
-$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
+#$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
+$variableDefinitions = Invoke-TriggerDialog -customerId $customerId -path "mailings/$( $message.mailingId )/variabledefinitions" -headers $headers
 
 
 #-----------------------------------------------
@@ -276,7 +277,7 @@ $colMap.Add(
 #>
 
 # Check corresponding field NAMES
-$compareNames = Compare-Object -ReferenceObject $variableDefinitions.elements.label -DifferenceObject $csvAttributesNames.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
+$compareNames = Compare-Object -ReferenceObject $variableDefinitions.label -DifferenceObject $csvAttributesNames.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
 $compareNames | ForEach {
     $fieldname = $_
     [void]$colMap.Add(
@@ -345,20 +346,75 @@ $dataCsv | ForEach {
 
 Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
 
+
+
+
 #-----------------------------------------------
 # UPLOAD DATA
 #-----------------------------------------------
 
+
+# Should be max 100 recipients per batch
+# TODO [ ] change this back to variable 
+$batchsize = 2 #$settings.upload.rowsPerUpload
+
+$results = [System.Collections.ArrayList]@()
+if ( $recipients.Count -gt 0 ) {
+    
+    $chunks = [Math]::Ceiling( $recipients.count / $batchsize )
+
+    $t = Measure-Command {
+        for ( $i = 0 ; $i -lt $chunks ; $i++  ) {
+            
+            $start = $i*$batchsize
+            $end = ($i + 1)*$batchsize - 1
+
+            # Create body for API call
+            $body = @{
+                "campaignId" = $message.campaignId #$campaign.id
+                "customerId" = $customerId
+                "recipients" = $recipients[$start..$end]
+            }
+
+            # Check size of recipients object
+            Write-Host "start $($start) - end $($end) - $( $body.recipients.Count ) objects"
+
+            # Do API call
+            $result = Invoke-TriggerDialog -customerId $customerId -path "recipients" -method Post -headers $headers -body $body -returnRawObject
+            
+            # Log results of this chunk
+            Write-Host "Got back correlation id '$( $result.correlationId )'"
+
+            # Add correlation id
+            [void]$results.add($result) #$result.correlationId
+
+        }
+    }
+}
+
+# Log the results
+Write-Log -message "Queued $( $recipients.Count ) records in $( $chunks ) chunks and $( $t.TotalSeconds ) seconds"
+
+# Exporting the correlation IDs for later
+$results | Export-Csv -Path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).csv" -Delimiter "`t" -NoTypeInformation -Encoding UTF8
+
+
+
+#-----------------------------------------------
+# UPLOAD DATA
+#-----------------------------------------------
+<#
 $body = @{
     "campaignId" = $message.campaignId #$campaign.id
     "customerId" = $customerId
     "recipients" = $recipients
 }
 
-$bodyJson = $body | ConvertTo-Json -Depth 8
+#$bodyJson = $body | ConvertTo-Json -Depth 8
 try {
 
-    $newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+    #$newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
+    $newCustomers = Invoke-TriggerDialog -customerId $customerId -path "recipients" -method Post -headers $headers -body $body -returnRawObject
 
 } catch {
     $errorMessage = ParseErrorForResponseBody -err $_
@@ -369,7 +425,7 @@ try {
 }
 
 Write-Log -message "Uploaded successfully with id $( $newCustomers.correlationId )"
-
+#>
 
 ################################################
 #

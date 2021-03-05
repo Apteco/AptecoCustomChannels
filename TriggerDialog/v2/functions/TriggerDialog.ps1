@@ -1,47 +1,104 @@
-# This function fills the variable $Script:sessionId with the current session id
+
+
+################################################
+#
+# GENERIC CLASSES AND ENUMS
+#
+################################################
+
+# TODO [ ] implement using these enums
+
+enum TriggerDialogCampaignState {
+    Entwurf = 110          # Entwurf
+    Aktiv = 120           # Aktiv
+    Pausiert = 125          # Pausiert/Paused
+}
+
+enum TriggerDialogTemplateType {
+    Basic = 110     # "Basic" in UI
+    Plus = 120      # Also entitled as Basic, but in UI as "Plus"
+    Advanced = 230  # "Unique in UI" 
+}
+
+
+################################################
+#
+# FUNCTIONS
+#
+################################################
+
+
+# This function fills the variable $Script:sessionId with the current session id and the default parameters
 Function Get-TriggerDialogSession {
+    [CmdletBinding()]
+    param ()
+    
+    begin {
 
-    $sessionPath = "$( $settings.sessionFile )"
+        $sessionPath = "$( $settings.sessionFile )"
+        $return = $false
 
-    # if file exists -> read it and check ttl
-    $createNewSession = $true
-    if ( (Test-Path -Path $sessionPath) -eq $true ) {
-
-        $sessionContent = Get-Content -Encoding UTF8 -Path $sessionPath -Raw | ConvertFrom-Json
+    }
+    
+    process {
         
-        $expire = [datetime]::ParseExact($sessionContent.expire,"yyyyMMddHHmmss",[CultureInfo]::InvariantCulture)
 
-        if ( $expire -gt [datetime]::Now ) {
+        #-----------------------------------------------
+        # IF FILE EXISTS -> READ IT AND CHECK TTL
+        #-----------------------------------------------
 
-            $createNewSession = $false
-            $Script:sessionId = $sessionContent.sessionId
+        $createNewSession = $true
+        if ( (Test-Path -Path $sessionPath) -eq $true ) {
+
+            $sessionContent = Get-Content -Encoding UTF8 -Path $sessionPath -Raw | ConvertFrom-Json
             
+            $expire = [datetime]::ParseExact($sessionContent.expire,"yyyyMMddHHmmss",[CultureInfo]::InvariantCulture)
+
+            if ( $expire -gt [datetime]::Now ) {
+
+                $createNewSession = $false
+                $Script:sessionId = $sessionContent.sessionId
+                
+            }
+
+        }
+        
+        #-----------------------------------------------
+        # FILE DOES NOT EXIST OR DATE IS NOT VALID -> CREATE SESSION
+        #-----------------------------------------------
+
+        if ( $createNewSession -eq $true ) {
+            
+            $expire = [datetime]::now.AddMinutes( $settings.ttl ).ToString("yyyyMMddHHmmss")
+
+            #$pass = Get-SecureToPlaintext $settings.login.pass
+            #$login = Get-LoginViaCredentials
+            $sessionId = Get-LoginViaCredentials
+            
+            if ( $settings.encryptToken ) {
+                $Script:sessionId = Get-PlaintextToSecure -String $sessionId
+            } else {
+                $Script:sessionId = $sessionId
+            }
+
+            $session = @{
+                sessionId=$Script:sessionId
+                expire=$expire
+            }
+            $session | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $sessionPath
+            
+            $return = $true
         }
 
     }
     
-    # file does not exist or date is not valid -> create session
-    if ( $createNewSession -eq $true ) {
-        
-        $expire = [datetime]::now.AddMinutes( $settings.ttl ).ToString("yyyyMMddHHmmss")
-
-        #$pass = Get-SecureToPlaintext $settings.login.pass
-        #$login = Get-LoginViaCredentials
-        $sessionId = Get-LoginViaCredentials
-        
-        if ( $settings.encryptToken ) {
-            $Script:sessionId = Get-PlaintextToSecure -String $sessionId
-        } else {
-            $Script:sessionId = $sessionId
-        }
-
-        $session = @{
-            sessionId=$Script:sessionId
-            expire=$expire
-        }
-        $session | ConvertTo-Json | Set-Content -Encoding UTF8 -Path $sessionPath
-    
+    end {
+        # return $true, if a new session was created
+        $return
     }
+
+
+
 
 }
 
@@ -243,6 +300,191 @@ Function Create-VariableDefinitions {
 
         # return object
         $variableDefinitions
+
+    }
+
+}
+
+
+Function Invoke-TriggerDialog {
+
+    [CmdletBinding()]
+    param (
+         [Parameter(Mandatory=$true)][String] $customerId
+        ,[Parameter(Mandatory=$true)][String] $path
+        ,[Parameter(Mandatory=$false)][String] $contentType = "application/json; charset=utf-8"
+        ,[Parameter(Mandatory=$false)][Microsoft.PowerShell.Commands.WebRequestMethod] $method = "Get"
+        ,[Parameter(Mandatory=$false)][Hashtable] $headers = @{}
+        ,[Parameter(Mandatory=$false)][Hashtable] $body = @{}
+        #,[Parameter(Mandatory=$false)][System.Collections.ArrayList] $parameters = $null
+        ,[Parameter(Mandatory=$false)][int] $pagingSize = 2 # TODO [ ] change this to a max of 2k
+        ,[Parameter(Mandatory=$false)][switch] $deactivatePaging = $false
+        ,[Parameter(Mandatory=$false)][switch] $returnRawObject = $false
+    )
+    
+    begin {
+
+        #-----------------------------------------------
+        # CHECK THE VALID SESSION OR CREATE A NEW ONE
+        #-----------------------------------------------
+<#
+        #$headers = @{}
+        $newSessionCreated = Get-TriggerDialogSession
+        if ( $newSessionCreated ) {
+            # Choose if we replace or add the auth
+            if ( $headers.Authorization ) {
+                $headers.Authorization = "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )"
+            } else {
+                $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
+            }
+        }
+#>
+        #-----------------------------------------------
+        # HEADER + CONTENTTYPE + BASICS
+        #-----------------------------------------------
+
+        $uri = $settings.base
+
+        $defaultParams = @{
+            Headers = $headers
+            Verbose = $true
+            ContentType = $contentType
+        }
+
+        <#
+        if ( $parameters -ne $null ) {
+            $param = "json=$( Format-ELAINE-Parameter $parameters )"
+        } else {
+            $param = ""
+        }
+        #>
+
+        #-----------------------------------------------
+        # CALL PARAMETERS
+        #-----------------------------------------------
+
+        Switch ( $method.toString() ) {
+
+            "Get" {
+                
+                $params = $defaultParams + @{
+                    Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
+                    Method = $method.toString()
+                }
+
+            }
+
+            "Post" {
+
+                $deactivatePaging = $true
+
+                $bodyJson = $body | ConvertTo-Json -Depth 8
+
+                $params = $defaultParams + @{
+                    Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
+                    Method = $method.toString()
+                    Body = $bodyJson
+                }         
+
+            }
+
+            "Put" {
+
+                $deactivatePaging = $true
+
+                $bodyJson = $body | ConvertTo-Json -Depth 8
+
+                $params = $defaultParams + @{
+                    Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
+                    Method = $method.toString()
+                    Body = $bodyJson
+                }
+
+            }
+
+            "Delete" {
+
+                $deactivatePaging = $true
+                $returnRawObject = $true
+
+                $params = $defaultParams + @{
+                    Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
+                    Method = $method.toString()
+                }
+
+            }
+
+            Default {
+                throw [System.IO.InvalidDataException] "Method not implemented yet"  
+            }
+
+        }
+
+
+    }
+    
+    process {
+                
+        #-----------------------------------------------
+        # PAGE THROUGH RESULTS
+        #-----------------------------------------------
+
+        $size = $pagingSize
+        $page = 0
+        <#
+        $params = @{
+            Method = $method
+            Uri = "$( $settings.base )/$( $path )?customerId=$( $customerId )"
+            Verbose = $true
+            Headers = $headers
+            ContentType = $contentType
+            # Body = $bodyJson
+        }
+        #>
+        
+        # Only if it is a get request, build an array
+        if ( -not $returnRawObject ) {
+            $totalResult = [System.Collections.ArrayList]@()
+        }
+
+        $initUrl = $params.Uri
+        Do {
+            
+            # Setup paging, if not deactivated
+            if ( -not $deactivatePaging ) {
+                $params.Uri = "$( $initUrl )&size=$( $size )&page=$( $page )" # &sort=id,desc
+            }
+
+            # Try the call
+            try {
+                $pageResult = Invoke-RestMethod @params
+            } catch {
+                $errorMessage = ParseErrorForResponseBody -err $_
+                $errorMessage.errors | ForEach {
+                    Write-Log -severity ( [LogSeverity]::ERROR ) -message "$( $_.errorCode ) : $( $_.errorMessage )"
+                }
+                Throw [System.IO.InvalidDataException]
+            }
+
+            # Add the results to array or give the plain response back
+            if ( $returnRawObject ) {
+                $totalResult = $pageResult
+            } else {
+                $totalResult.AddRange( $pageResult.elements )
+            }
+            
+            # Increase the page
+            $page += 1
+        
+        # Check if we are on the last page
+        } while ( ($pageResult.page.number + 1) -lt $pageResult.page.totalPages )        
+
+    }
+    
+    end {
+        
+        # return
+        $totalResult
 
     }
 

@@ -135,7 +135,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
     }
 }
 
@@ -154,7 +154,7 @@ if ( $paramsExisting ) {
 [uint64]$currentTimestamp = Get-Unixtime -timestamp $timestamp
 
 # It is important to use the charset=utf-8 to get the correct encoding back
-$contentType = $settings.contentType
+#$contentType = $settings.contentType
 $headers = @{
     "accept" = $settings.contentType
 }
@@ -164,9 +164,9 @@ $headers = @{
 # CREATE SESSION
 #-----------------------------------------------
 
-Get-TriggerDialogSession
+$newSessionCreated = Get-TriggerDialogSession
 #$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
-$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
+#$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
 
 $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
 
@@ -203,7 +203,9 @@ $customerId = $settings.customerId
 #>
 
 # TODO [ ] implement paging for campaigns
-$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
+#$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
+$campaignDetails = Invoke-TriggerDialog -customerId $customerId -path "longtermcampaigns" -headers $headers
+
 <#
 
 # ready to be edited
@@ -238,19 +240,19 @@ $campaignDetails.elements | where {$_.actions -contains "DELETE"}
 #>
 
 # TODO [ ] implement paging for mailings
-$mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
-
+#$mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
+$mailingDetails = Invoke-TriggerDialog -customerId $customerId -path "mailings" -headers $headers
 
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
 #-----------------------------------------------
 
 $mailings = @()
-$mailingDetails.elements | foreach {
+$mailingDetails | foreach {
 
     # Load data
     $mailing = $_
-    $campaign = $campaignDetails.elements.where({ $_.id -eq $mailing.campaignId })
+    $campaign = $campaignDetails.where({ $_.id -eq $mailing.campaignId })
 
     # Show only if mailing has a corresponding campaign
 
