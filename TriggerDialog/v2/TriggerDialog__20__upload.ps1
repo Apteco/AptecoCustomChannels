@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -203,7 +203,7 @@ $headers = @{
 
 Get-TriggerDialogSession
 #$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
-$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
+#$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
 
 $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
 
@@ -227,6 +227,7 @@ if ( ( $campaignDetails | where { $_.id -eq $message.campaignId } ).campaignStat
     Write-Log -message "Campaign is not active yet" -severity ( [LogSeverity]::ERROR )
     throw [System.IO.InvalidDataException] "Campaign is not active yet"
 }
+#exit 0
 
 
 #-----------------------------------------------
@@ -464,3 +465,30 @@ $return = [Hashtable]@{
 
 # return the results
 $return
+
+exit 0
+
+
+#$body = $dataCsv | select $colMap.source | ConvertTo-Csv -Delimiter ";" -NoTypeInformation
+#$body | Set-Content -Encoding UTF8 -Path ".\exp.csv"
+# get file, load and encode it
+#$fileBytes = [System.IO.File]::ReadAllBytes("D:\Scripts\TriggerDialog\v2\swagger\Unbenannt 1.xlsx")
+#$fileEncoded = [System.Text.Encoding]::GetEncoding($uploadEncoding).GetString($fileBytes)
+
+<#
+$b = @{
+    file = $fileEncoded
+}
+#>
+
+#try {
+
+#} catch {
+#    $errorMessage = ParseErrorForResponseBody -err $_
+#    $errorMessage.errors | ForEach {
+#        Write-Log -severity ( [LogSeverity]::ERROR ) -message "$( $_.errorCode ) : $( $_.errorMessage )"
+#    }
+    #Throw [System.IO.InvalidDataException]
+#}
+
+

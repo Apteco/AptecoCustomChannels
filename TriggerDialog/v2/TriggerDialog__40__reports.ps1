@@ -213,7 +213,7 @@ $campaigns | ForEach {
     $campaign = $_
 
     $reportCsv = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/recipientreport/detail?campaignId=$( $campaign.id )&customerId=$( $customerId )&reportDate=2021-03-03" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
-    $csvData = $reportCsv | ConvertFrom-Csv -Delimiter ";"
+    $csvData = $reportCsv | ConvertFrom-Csv -Delimiter $settings.report.delimiter
     if ( $csvData.count -gt 0 ) {
         [void]$reportDetail.AddRange(( $csvData ))
     }
