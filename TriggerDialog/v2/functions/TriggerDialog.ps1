@@ -316,6 +316,8 @@ Function Invoke-TriggerDialog {
         ,[Parameter(Mandatory=$false)][Microsoft.PowerShell.Commands.WebRequestMethod] $method = "Get"
         ,[Parameter(Mandatory=$false)][Hashtable] $headers = @{}
         ,[Parameter(Mandatory=$false)][Hashtable] $body = @{}
+        ,[Parameter(Mandatory=$false)][String] $rawBody = ""
+        ,[Parameter(Mandatory=$false)][Hashtable] $additionalQuery = @{}
         #,[Parameter(Mandatory=$false)][System.Collections.ArrayList] $parameters = $null
         ,[Parameter(Mandatory=$false)][int] $pagingSize = 2 # TODO [ ] change this to a max of 2k
         ,[Parameter(Mandatory=$false)][switch] $deactivatePaging = $false
@@ -377,8 +379,12 @@ Function Invoke-TriggerDialog {
             "Post" {
 
                 $deactivatePaging = $true
-
-                $bodyJson = $body | ConvertTo-Json -Depth 8
+                
+                if ( $rawBody -ne "" ) {
+                    $bodyJson = $rawBody
+                } else {
+                    $bodyJson = $body | ConvertTo-Json -Depth 8
+                }
 
                 $params = $defaultParams + @{
                     Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
@@ -419,6 +425,13 @@ Function Invoke-TriggerDialog {
             }
 
         }
+        
+        foreach($key in $additionalQuery.Keys) {
+            $value = $t.$key
+            $params.Uri = "$( $params.Uri )&$( $key )=$( $value )"
+            #Write-Output "$key : $value"
+        }
+        
 
 
     }
