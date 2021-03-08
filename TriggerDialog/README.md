@@ -1,5 +1,7 @@
 
 * Replace the tags in `TriggerDialog__00__create_settings.ps1`
+  * `<partnerSystemIdExt>`
+  * `<partnerSystemCustomerIdExt>`
 
 # Process
 
@@ -26,7 +28,7 @@ id|label
 20|Ganzzahl
 30|Boolscher Wert
 40|Datum
-50|Bild
+50|Bild (deprecated)
 60|Bild-URL
 70|Fließkommazahl
 80|Postleitzahl

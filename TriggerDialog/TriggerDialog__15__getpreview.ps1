@@ -23,7 +23,7 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
         scriptPath = 'D:\Scripts\TriggerDialog\v2'
-        TestRecipient = '{"Email":"florian.von.bracht@apteco.de","Sms":null,"Personalisation":{"Test":"Contentobjekt","Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Strasse":"Strasse","PLZ":"PLZ","Ort":"Ort","TTT":"GGG","Geburtsdatum":"Geburtsdatum","Communication Key":"ab0ba429-4be7-45b7-bcc5-de9eaa72e23b"}}'
+        TestRecipient = '{"Email":"testrecipient@example.com","Sms":null,"Personalisation":{"Test":"Contentobjekt","Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Strasse":"Strasse","PLZ":"PLZ","Ort":"Ort","TTT":"GGG","Geburtsdatum":"Geburtsdatum","Communication Key":"ab0ba429-4be7-45b7-bcc5-de9eaa72e23b"}}'
         MessageName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
         ListName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
         Password = 'b'

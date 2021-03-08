@@ -126,8 +126,8 @@ $ssoTokenKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",
 
 $auth = @{
 
-    "partnerSystemIdExt" = "3008"                           # The numeric id of your partnersystem in our system.
-    "partnerSystemCustomerIdExt" = "Apteco"                 # The alphanumeric id identifying your customer, you want to act for.
+    "partnerSystemIdExt" = "<partnerSystemIdExt>"                           # The numeric id of your partnersystem in our system.
+    "partnerSystemCustomerIdExt" = "<partnerSystemCustomerIdExt>"                 # The alphanumeric id identifying your customer, you want to act for.
     "authenticationSecret" = $authSecretEncrypted           # A shared secret for authentication.
     "ssoTokenKey" = $ssoTokenKeyEncrypted                   # A shared secret used for signing the JWT you generated.    
 
