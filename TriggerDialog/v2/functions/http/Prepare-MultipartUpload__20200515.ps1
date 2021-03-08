@@ -47,11 +47,3 @@ Function Prepare-MultipartUpload {
 
 }
 
-
-#$headers.accept = "application/json, text/plain, */*"
-$part = Prepare-MultipartUpload -path "D:\Scripts\TriggerDialog\v2\swagger\Unbenannt1.xlsx"
-
-Invoke-TriggerDialog -method Post -customerId $customerId -path "/recipients/testdata" -headers $headers -contentType $part.contentType -rawBody $part.body -returnRawObject -additionalQuery ( [Hashtable]@{"campaignId"=47959} )
-exit 0
-
-Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients/testdata?customerId=$( $customerId )&campaignId=47959" -Headers $headers -ContentType $part.contentType -Verbose -Body $part.body #-TransferEncoding "Deflate"
