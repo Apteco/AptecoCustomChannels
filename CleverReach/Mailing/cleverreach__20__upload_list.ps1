@@ -492,6 +492,7 @@ if ( !$createNewGroup -and $params.deactivate -eq "true") {
     Write-Log -message "Done with deactivating $( $upload.count ) 'contacts' in group '$( $groupId )'"
 }
 
+
 #-----------------------------------------------
 # TRANSFORM UPLOAD DATA
 #-----------------------------------------------
@@ -514,10 +515,13 @@ $object = "groups"
 $endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
 $globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
 $uploadObject = @()
+# TODO [ ] implement the upload in chunks rather than mod like for ELAINE transactional implementation
 For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
+    
+    $currentRecord = $dataCsv[$i]
 
     $uploadEntry = [PSCustomObject]@{
-        email = $dataCsv[$i].email
+        email = $currentRecord.email
         deactivated = 0
         global_attributes = [PSCustomObject]@{}
         attributes = [PSCustomObject]@{}
@@ -527,19 +531,18 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     # Global attributes
     $globalAtts | ForEach {
         $attrName = $_.name
-        $uploadEntry.global_attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
+        $uploadEntry.global_attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $currentRecord.$attrName
     }
 
-    # New local attributes
-    $newAttributes | ForEach {
+    # Existing local attributes, try technical name first, otherwise description of field
+    @( $newAttributes + $localAttributes ) | ForEach {
         $attrName = $_.name
-        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
-    }
-
-    # Existing local attributes
-    $localAttributes | ForEach {
-        $attrName = $_.name
-        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $dataCsv[$i].$attrName
+        $attrDesc = $_.description
+        if ( $currentRecord.$attrName -ne $null ) {
+            $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $currentRecord.$attrName
+        } else {
+            $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $attrName -Value $currentRecord.$attrDesc
+        }
     }
 
     # Tags
@@ -547,16 +550,9 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
     In the array of tags, prepend a "-" to the tag you want to be removed.
     To remove all tags with a specific origin, simply specify "*" instead of any tag name.
     #>
-    if ( $dataCsv[$i].tags.length -gt 0 ) {
-        $uploadEntry.tags += ( $dataCsv[$i].tags -split "," )
+    if ( $currentRecord.tags.length -gt 0 ) {
+        $uploadEntry.tags += ( $currentRecord.tags -split "," )
     }
-    <#
-        #$props = Get-Member -InputObject $dataCsv[$i] -MemberType NoteProperty | where { $_.Name -ne "email" }
-    ForEach($prop in $props) {
-        $propName = $prop.Name
-        $uploadEntry.attributes | Add-Member -MemberType NoteProperty -Name $prop.Name -Value $dataCsv[$i].$propName
-    }
-    #>
 
     $uploadObject += $uploadEntry
 
