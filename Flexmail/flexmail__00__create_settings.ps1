@@ -204,7 +204,7 @@ $importSettings = @{
         "synchronise"=0 #1|0
         "allowDuplicates"=0 #1|0
         "allowBouncedOut"=0 #1|0
-        "defaultLanguage"="de" #nl, fr, en, de, it, es, ru, da, se, zh, pt, pl
+        #"defaultLanguage"="de" #nl, fr, en, de, it, es, ru, da, se, zh, pt, pl
         "referenceField"="email" # one of those: https://flexmail.be/nl/api/manual/type/80-referencefieldtype
 }
 

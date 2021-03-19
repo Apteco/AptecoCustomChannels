@@ -199,15 +199,31 @@ Create-Flexmail-Parameters
 
 
 #-----------------------------------------------
+# LOAD GLOBAL FLEXMAIL SETTINGS
+#-----------------------------------------------
+
+$globalList = Invoke-Flexmail -method "GetMailingLists"
+
+
+#-----------------------------------------------
 # CHECK SOURCES
 #-----------------------------------------------
 
 # TODO [ ] make sources available in lists dropdown in PeopleStage?
 
 # Load sources from Flexmail
-$url = "$( $apiRoot )/sources"
-$sources = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
-#$sources = Invoke-Flexmail -method "GetSources" -param @{} -responseNode "sources" # load via SOAP
+$limit = 500
+$offset = 0
+$sourcesReturn = [System.Collections.ArrayList]@()
+Do {
+    $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
+    $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
+    $offset += $limit
+    $sourcesReturn.AddRange( $sourcesResponse )
+} while ( $sourcesResponse.count -eq $limit )
+
+# Mapping for existing variables
+$sources = $sourcesReturn
 
 # Extract the source id
 $listId = [FlxWorkflow]::new($params.MessageName).workflowSource
@@ -469,47 +485,21 @@ Write-Log -message "Done with export id $( $exportId ) in $( $t.Seconds ) second
 
 
 #-----------------------------------------------
-# RECIPIENT LIST ID
-#-----------------------------------------------
-<#
-$campaignId = [FlxWorkflow]::new($params.ListName).workflowId
-$recipientListID = $settings.masterListId
-
-Write-Log -message "Using the recipient list $( $recipientListID )"
-#>
-
-#-----------------------------------------------
-# DEBUG - CHOOSE MAILINGLISTS
-#-----------------------------------------------
-<#
-$categories = Invoke-Flexmail -method "GetCategories"
-$firstCategory = $categories | Out-GridView -PassThru
-$mailingsParams = @{
-    "categoryId"=@{
-        "value"=$firstCategory.categoryId
-        "type"="int"
-     }
-}
-
-$mailingLists = Invoke-Flexmail -method "GetMailingLists" -param $mailingsParams
-$mailingList = $mailingLists | Out-GridView -PassThru
-#>
-#-----------------------------------------------
-# DEBUG - SHOW MAILINGLIST
-#-----------------------------------------------
-<#
-if ( $debug ) {
-    $emailsParams = @{
-        "mailingListIds"=[array]@($recipientListID)  #$mailingList.mailingListId
-    }
-    $emails = Invoke-Flexmail -method "GetEmailAddresses" -param $emailsParams
-    $emails | Out-GridView
-}
-#>
-
-#-----------------------------------------------
 # IMPORT RECIPIENTS VIA REST
 #-----------------------------------------------
+
+# Wait for the upload slot to be free
+Write-Log -message "Polling for lockfile, if present"
+$outArgs = @{
+    Path = $settings.lockfile
+    fireExceptionIfUsed = $true
+}
+Retry-Command -Command 'Is-PathFree' -Args $outArgs -retries $settings.lockfileRetries -MillisecondsDelay $settings.lockfileDelayWhileWaiting
+Write-Log -message "Upload slot is free now, no lockfile present anymore"
+
+# Write lock file
+$processId.Guid | Set-Content -Path $settings.lockfile -Verbose -Force -Encoding UTF8
+Write-Log -message "Creating own lockfile now at '$( $settings.lockfile )'"
 
 # Create an import id
 $url = "$( $settings.baseREST )/contacts/imports"
@@ -560,7 +550,7 @@ $partFiles | ForEach {
             email = $row.$emailFieldName
             first_name = $row.$firstNameFieldname
             name = $row.$lastNameFieldname
-            language = "de" #$row.$languageFieldname # TODO [ ] change this back
+            language = $globalList.mailingListLanguage.ToLower() 
             custom_fields = [PSCustomObject]@{}
             sources = @( $listId )
             interest_labels = @()
@@ -632,19 +622,9 @@ $partFiles | ForEach {
 
 } 
 
-# Wait for the upload slot to be free
-$outArgs = @{
-    Path = $settings.lockfile
-    fireExceptionIfUsed = $true
-}
-Retry-Command -Command 'Is-PathFree' -Args $outArgs -retries $settings.lockfileRetries -MillisecondsDelay $settings.lockfileDelayWhileWaiting
-
 # Queue the import and set the lock file
 $t = Measure-Command {
     try {
-
-        # Write lock file
-        $processId.Guid | Set-Content -Path $settings.lockfile -Verbose -Force -Encoding UTF8
 
         # Queue the import for processing
         $url = "$( $settings.baseREST )/contacts/imports/$( $exportId )"
@@ -693,69 +673,6 @@ Write-Log -message "    Ignored: $( $status.report.total_ignored )"
 }
 #>
 
-#$importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
-#Write-Log -message "Uploaded the data with $($importResults.Count) import results"
-
-
-
-#-----------------------------------------------
-# IMPORT RECIPIENTS VIA SOAP
-#-----------------------------------------------
-<#
-# upload in batches of x
-$exportPath = "$( $uploadsFolder )\$( $exportId )"
-$partFiles = Get-ChildItem -Path "$( $exportPath )"
-
-Write-Log -message "Uploading the data in $( $partFiles.count ) files"
-
-$importResults = @()
-$partFiles | ForEach {
-
-    $f = $_
-
-    $importRecipients = [array]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
-
-    # if the source name does not exist, Flexmail create a new one automatically
-    $importSourcesName = $sources.where( { $_.id -eq $listId } ).name
-    $importSources = [array]@( [PSCustomObject]@{"name"=$importSourcesName } )
-    
-    # pack everything together
-    $importParams = @{
-        "mailingListId"=$recipientListID
-        "emailAddressTypeItems"=@{value=$importRecipients;type="EmailAddressType"}
-        "overwrite"=$settings.importSettings.overwrite
-        "synchronise"=$settings.importSettings.synchronise
-        "allowDuplicates"=$settings.importSettings.allowDuplicates
-        "allowBouncedOut"=$settings.importSettings.allowBouncedOut
-        "defaultLanguage"=$settings.importSettings.defaultLanguage
-        "referenceField"=$settings.importSettings.referenceField
-        "sources"=@{value=$importSources;type="SourcesType"}
-    }
- 
-    $importResult = Invoke-Flexmail -method "ImportEmailAddresses" -param $importParams -customFields $customFields #-verboseCall
-    
-    # TODO [ ] Check if arraylist is maybe more performant
-    $importResults += $importResult
-
-} 
-
-$importResults | Export-Csv -Path "$( $exportPath )\00_importresults.csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
-
-Write-Log -message "Uploaded the data with $($importResults.Count) import results"
-#>
-<#
-#-----------------------------------------------
-# DEBUG - SHOW MAILINGLIST AFTER CHANGE
-#-----------------------------------------------
-
-if ( $debug ) {
-    $emailsParams = @{
-        "mailingListIds"=[array]@($recipientListID)  #$mailingList.mailingListId
-    }
-    $emails = Invoke-Flexmail -method "GetEmailAddresses" -param $emailsParams
-    $emails | Out-GridView
-}
-#>
 
 #-----------------------------------------------
 # RETURN VALUES TO PEOPLESTAGE

@@ -180,13 +180,25 @@ $sourcesReturn = Invoke-Flexmail -method "GetSources" -responseNode "sources" #|
 
 
 #-----------------------------------------------
-# LOAD WITH REST
+# PREPARE FLEXMAIL REST API
 #-----------------------------------------------
 
 Create-Flexmail-Parameters
 
-$url = "$( $apiRoot )/sources"
-$sourcesReturn = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
+
+#-----------------------------------------------
+# LOAD WITH REST
+#-----------------------------------------------
+
+$limit = 500
+$offset = 0
+$sourcesReturn = [System.Collections.ArrayList]@()
+Do {
+    $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
+    $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
+    $offset += $limit
+    $sourcesReturn.AddRange( $sourcesResponse )
+} while ( $sourcesResponse.count -eq $limit )
 
 
 #-----------------------------------------------
