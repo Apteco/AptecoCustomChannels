@@ -156,7 +156,7 @@ $uploadSettings = @{
     "uploadsFolder" = $upload #"$( $scriptPath )\uploads\"
     "delimiter" = "`t" # "`t"|","|";" usw.
     "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
-    #"excludedAttributes" = @()
+    "excludedAttributes" = @()
 }
 
 
@@ -170,17 +170,9 @@ $reportSettings = @{
 
 
 #-----------------------------------------------
-# BROADCAST SETTINGS
-#-----------------------------------------------
-<#
-$broadcastSettings = @{
-    
-}
-#>
-
-#-----------------------------------------------
 # MAIL NOTIFICATION SETTINGS
 #-----------------------------------------------
+
 $smtpPass = Read-Host -AsSecureString "Please enter the SMTP password"
 $smtpPassEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$smtpPass).GetNetworkCredential().Password)
 
@@ -197,8 +189,6 @@ $mail = @{
 #-----------------------------------------------
 # ALL SETTINGS
 #-----------------------------------------------
-
-# TODO [ ] use url from PeopleStage Channel Editor Settings instead?
 
 $settings = @{
 
@@ -224,16 +214,16 @@ $settings = @{
     "customerId" = ""
     "createCampaignsWithDate" = $true
 
-    # payloads    
+    # default payload - will be filled with other values when in preview window    
     "defaultPayload" = @{
         "firstname" = "<firstname>"                              # The systemuser’s firstname (max. 50 characters).
         "lastname" = "<lastname>"                                # The systemuser’s lastname (max. 50 characters).
         "email" = "<email>"                   # The systemuser’s email address (max. 150 characters).
         "username" = "<username>"                         # The systemuser’s username (max. 80 characters). Must be unique for the same partnersystem customer.
-        "masClientId" = "<partnersystemcustomeridext>"                    # same as partnerSystemCustomerIdExt
-        "masId" = "<partnersystemidext>"                            # same as partnerSystemIdExt
         "iss" = "<issuer>" 
         "exp" = 0                                  # Should expire in around 2 minutes
+        "partnerSystemCustomerIdExt" = $auth.partnerSystemCustomerIdExt   # same as partnerSystemCustomerIdExt; „masClientId“ has been renamed to „partnerSystemCustomerIdExt“
+        "masId" = $auth.partnerSystemIdExt                 # same as partnerSystemIdExt
         "iat" = 0
     }
 
@@ -247,7 +237,6 @@ $settings = @{
     "authentication" = $auth
     "preview" = $previewSettings
     "upload" = $uploadSettings
-    #"broadcast" = $broadcastSettings
     "mail" = $mail
     "report" = $reportSettings
     
@@ -269,7 +258,7 @@ $json = $settings | ConvertTo-Json -Depth 8 # -compress
 $json
 
 # save settings to file
-$json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+$json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 
 
 
@@ -278,6 +267,13 @@ $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UT
 # DO SOME MORE SETTINGS DIRECTLY
 #
 ################################################
+
+
+#-----------------------------------------------
+# PREPARATION
+#-----------------------------------------------
+
+$timestamp = [datetime]::Now
 
 
 #-----------------------------------------------
@@ -292,11 +288,12 @@ $headers = @{
     "accept" = $settings.contentType
 }
 
+
 #-----------------------------------------------
 # CREATE SESSION
 #-----------------------------------------------
 
-Get-TriggerDialogSession
+$newSessionCreated = Get-TriggerDialogSession
 #$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
 $jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
 
@@ -331,7 +328,7 @@ $json = $settings | ConvertTo-Json -Depth 8 # -compress
 $json
 
 # save settings to file
-$json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+$json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 
 
 ################################################
