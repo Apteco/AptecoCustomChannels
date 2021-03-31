@@ -37,6 +37,7 @@ if ( $debug ) {
     }
 }
 
+
 ################################################
 #
 # NOTES
@@ -45,10 +46,15 @@ if ( $debug ) {
 
 <#
 
-TODO [ ] How to work with multilingual variants?
+# TODO [ ] Test required fields object in settings
+# TODO [ ] Test with and without variant field defined in settings
+# TODO [ ] SQLServer: hold connection open to test better performance
+# TODO [ ] Add BULK and Single send mode to the the settings creation or make id dependent on the version
+# TODO [ ] Check the usage of the notification url with webhooks
 
 
 #>
+
 
 ################################################
 #
@@ -198,76 +204,17 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
     # or like this to get it back as number
     #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
 
     Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
 
-}
-
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
-
-
-#-----------------------------------------------
-# GROUP HANDLING
-#-----------------------------------------------
-
-# TODO [ ] Check the need of groups for transactional mailings
-<#
-# If lists contains a concat character (id+name), use the list id
-# if no concat character is present, take the whole string as name for a new list and search for it... if not present -> new list!
-# if no list is present, just take the current date and time
-$listItems = $params.ListName -split $settings.nameConcatChar
-$createNewGroup = $true
-if ( $listItems[1].count -gt 0 ) {
-
-    $listName = $listItems[0]
-    $groupId = $listName
-    $createNewGroup = $false
-
-} elseif ( $listItems[0].count -gt 0 ) {
-    
-    $listNameTxt = $listItems[0]
-
-    # Try to search for that group
-    $object = "groups"    
-    $endpoint = "$( $apiRoot )$( $object )"
-    $groups = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType "application/json; charset=utf-8"
-    
-    $matchGroups = ( $groups | where { $_.name -eq $listNameTxt } | sort stamp -Descending | Select -first 1 ).id
-
-    if ( $matchGroups.count -ne "" ) {
-        $listName = $matchGroups
-        $groupId = $listName
-        $createNewGroup = $false
-    } else {
-        $listName = $listNameTxt
-    }
-
-
-} else {
-
-    $listName = [datetime]::Now.ToString("yyyyMMdd HHmmss")
+    # Use this function to check if a mininum version is needed to call the function
+    #Check-ELAINE-Version -minVersion "6.2.2"
 
 }
 
-
-#>
-
-
-#-----------------------------------------------
-# PARSE GROUP AND LOAD DETAILS
-#-----------------------------------------------
-<#
-# TODO [ ] Activate group dependent features
-$group = [Group]::New($params.ListName)
-
-# Load details from ELAINE to check if it still exists
-$groupDetails = Invoke-ELAINE -function "api_getDetails" -parameters @("Group",[int]$group.groupId)
-#>
 
 #-----------------------------------------------
 # PARSE MAILING AND LOAD DETAILS
@@ -306,7 +253,6 @@ Write-Log -message "Loaded '$( $dataCsv.count )' records"
 
 # TODO [ ] Loading only C fields or think of group dependent fields, too?
 $fields = Invoke-ELAINE -function "api_getDatafields"
-#$fields | Out-GridView
 
 <#
 # Load group fields
@@ -321,7 +267,6 @@ Write-Log -message "Loaded fields $( $fields.f_name -join ", " )"
 # FIELD MAPPING
 #-----------------------------------------------
 
-
 # Check csv fields
 $csvAttributesNames = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
 Write-Log -message "Loaded csv attributes '$( $csvAttributesNames.Name -join ", " )'"
@@ -330,7 +275,7 @@ Write-Log -message "Loaded csv attributes '$( $csvAttributesNames.Name -join ", 
 $colMap = [System.Collections.ArrayList]@()
 
 # Add URN column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $params.UrnFieldName
         "target" = $settings.upload.urnColumn
@@ -338,7 +283,7 @@ $colMap.Add(
 )
 
 # Add email column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $params.EmailFieldName
         "target" = $settings.upload.emailColumn
@@ -360,7 +305,7 @@ $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source 
 $compareNames = Compare-Object -ReferenceObject $fields.f_name -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
 $compareNames | ForEach {
     $fieldname = $_
-    $colMap.Add(
+    [void]$colMap.Add(
         [PSCustomObject]@{
             "source" = $fieldname
             "target" = $fieldname
@@ -375,7 +320,7 @@ $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source 
 $compareLabels = Compare-Object -ReferenceObject $fields.f_label -DifferenceObject $remainingColumns.Name  -IncludeEqual -PassThru  | where { $_.SideIndicator -eq "==" }
 $compareLabels | ForEach {
     $fieldlabel = $_
-    $colMap.Add(
+    [void]$colMap.Add(
         [PSCustomObject]@{
             "source" = $fieldlabel
             "target" = $fields.where({ $_.f_label -eq $fieldlabel }).f_name
@@ -389,7 +334,7 @@ $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source 
 # Add remaining columns as t_ columns
 $remainingColumns | ForEach {
     $columnName = $_
-    $colMap.Add(
+    [void]$colMap.Add(
         [PSCustomObject]@{
             "source" = $columnName.Name
             "target" = "t_$( $columnName.Name.ToLower().replace(" ","_") )" # TODO [ ] check if maybe more is needed
@@ -401,9 +346,6 @@ Write-Log -message "Current field mapping is:"
 $colMap | ForEach {
     Write-Log -message "    $( $_.source ) -> '$( $_.target )'"
 }
-
-# TODO [ ] Test required fields object in settings
-# TODO [ ] Test with and without variant field defined in settings
 
 # Add variant name if present
 if ( $settings.upload.variantColumn -ne $null ) {
@@ -475,7 +417,7 @@ $dataCsv | ForEach {
     }
 
     # Add recipient to array
-    $recipients.Add($entry)
+    [void]$recipients.Add($entry)
 
 }
 
@@ -529,7 +471,6 @@ $t1 = Measure-Command {
             $variant = $recipient.variant
         }
 
-        # TODO [ ] Check the usage of the notification url with webhooks
         # Create the upload data object
         $dataArr = [ordered]@{
             "content" = $recipient.data
@@ -551,7 +492,7 @@ $t1 = Measure-Command {
         $send = Invoke-ELAINE -function "api_sendSingleTransaction" -method Post -parameters $jsonInput
         
         # Add the results
-        $sends.Add(
+        [void]$sends.Add(
             [PSCustomObject]@{
                 "urn" = $recipient.urn
                 "email" = $recipient.email
@@ -566,8 +507,6 @@ $t1 = Measure-Command {
 }
 Write-Log -message "Send out '$( $sends.Count )' messages in '$( $t1.TotalSeconds )' seconds"
 
-# TODO [ ] Add BULK and Single send to the the settings creation or make id dependent on the version
-
 
 #-----------------------------------------------
 # GET TRANSACTIONAL MAILING STATUS
@@ -580,7 +519,7 @@ $sendsStatus = [System.Collections.ArrayList]@()
 if ( $settings.upload.waitForSuccess ) {
 
     # Initial wait of 5 seconds, so there is a good chance the messages are already send
-    Start-Sleep -Seconds 5 # TODO [ ] put this into settings
+    Start-Sleep -Seconds 5
 
     $stopWatch = [System.Diagnostics.Stopwatch]::new()
     $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
@@ -596,11 +535,11 @@ if ( $settings.upload.waitForSuccess ) {
             $status = Invoke-ELAINE -function "api_getTransactionMailStatus" -method Post -parameters $jsonInput
             if ( $status.status -eq "sent" ) {
                 $sendOut | Add-Member -MemberType NoteProperty -Name "lastStatus" -Value $status.status                    
-                $sendsStatus.Add($sendOut)
+                [void]$sendsStatus.Add($sendOut)
             }
         }
         # wait another n seconds
-        Start-Sleep -Seconds 10 # TODO [ ] put this into settings
+        Start-Sleep -Seconds $settings.upload.checkEveryNSeconds
     }
     until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
     
@@ -611,7 +550,7 @@ if ( $settings.upload.waitForSuccess ) {
 # Put queued, but not sent uploads into object, too
 $queue = @( $sends | where { $_.sendId -notin $sendsStatus.sendId } | select *, @{name="lastStatus";expression={ "queued" }} )
 if ( $queue ) {
-    $sendsStatus.AddRange( $queue )
+    [void]$sendsStatus.AddRange( $queue )
 }
 
 
@@ -630,12 +569,8 @@ Write-Log -message "Written results into $( $resultsFile )"
 # OUTPUT RESULTS TO DATABASE
 #-----------------------------------------------
 
-# TODO [x] implement database insert
-# TODO [x] implement insertion via datatable if needed
-# TODO [x] put creation statement for another persistent table into the readme file
-# TODO [x] put database and instance into settings 
-
 <#
+outputs the records to a table like this one, if wished
 [dbo].[ELAINETransactional](
 	[Urn] [nvarchar](255) NULL,
 	[Email] [nvarchar](255) NULL,
@@ -649,7 +584,6 @@ Write-Log -message "Written results into $( $resultsFile )"
 
 if ( $settings.upload.writeToDatabase ) {
 
-    # TODO [ ] put parameters in @calls, so there is only one call
     $writtenRecords = 0
     switch ( $settings.upload.writeMethod ) {
 
@@ -662,13 +596,7 @@ if ( $settings.upload.writeToDatabase ) {
                 $row = $_
 
                 $insertStatement = $insertStatementTemplate
-<#
-                # TODO [ ] Read sqlstatement from file and replace tokens
-                $insertStatement = @"
-INSERT INTO [$( $settings.upload.databaseSchema )].[$( $settings.upload.databaseTable )] (Urn,Email,SendId,CommunicationKey,BroadcastTransactionId,MailingId,LastStatus)
-VALUES ('$( $row.urn )','$( $row.email )',$( $row.sendId ),'$( $row.communicationKey )','$( $row.broadcastTransactionId )',$( $row.mailingId ),'$( $row.lastStatus )')
-"@
-#>
+
                 # Replace fields/tokens
                 $row.psobject.properties.name | foreach {
                     $prop = $_
@@ -706,15 +634,13 @@ VALUES ('$( $row.urn )','$( $row.email )',$( $row.sendId ),'$( $row.communicatio
 
                 }
 
-                # Invoke sqlserver
-                # TODO [ ] hold connection open to ensure better performance
                 $writtenRecords += Invoke-SqlServer @statementParams
         
             }
 
         }
         <#
-        # TODO [ ] Implement this one if wished
+        # TODO [ ] Implement this one if wished -> alternate way for inserting data instead of single inserts, but needs additional ssms installation on the machine
         "SqlServer" {
             if ( $settings.upload.trustedConnection ) {
                 $sendsStatus | Write-SqlTableData -ServerInstance $settings.upload.databaseInstance -DatabaseName $settings.upload.databaseName -SchemaName $settings.upload.databaseSchema -TableName $settings.upload.databaseTable -Force
@@ -731,8 +657,6 @@ VALUES ('$( $row.urn )','$( $row.email )',$( $row.sendId ),'$( $row.communicatio
     Write-Log -message "INSERT $( $writtenRecords ) records into database"
 
 }
-
-
 
 
 #-----------------------------------------------

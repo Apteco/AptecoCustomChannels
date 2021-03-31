@@ -177,7 +177,6 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
     # or like this to get it back as number
     #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
@@ -190,6 +189,9 @@ if ( $settings.checkVersion ) {
 }
 
 
+#-----------------------------------------------
+# LOAD THE TRANSACTIONAL MAILINGS
+#-----------------------------------------------
 
 switch ( $settings.mailings.loadMailingsMethod ) {
 
@@ -204,12 +206,11 @@ switch ( $settings.mailings.loadMailingsMethod ) {
         #>
 
         $jsonInput = @(
-            ""      # message_name : string
-            "actionmail" # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
+            ""              # message_name : string
+            "actionmail"    # message_status : on_hold|actionmail|ready|clearing|not_started|finished|processing|paused|aborted|failed|queued|scheduled|pending|sampling|deleted -> an empty string means all status
         ) 
         $templates = Invoke-ELAINE -function "api_getMessageInfo" -parameters $jsonInput
         
-
     }
 
     2 {
@@ -259,11 +260,11 @@ switch ( $settings.mailings.loadMailingsMethod ) {
 
             $nl = $_
             $jsonInput = @(
-                "Mailing"       # objectType : Datafield|Mailing|Group|Segment
-                "$( $nl.nl_id )"      # objectID
+                "Mailing"               # objectType : Datafield|Mailing|Group|Segment
+                "$( $nl.nl_id )"        # objectID
             ) 
             $res = Invoke-ELAINE -function "api_getDetails" -parameters $jsonInput
-            $templates.Add(@($res))
+            [void]$templates.Add(@($res))
             
         }
 
@@ -271,22 +272,22 @@ switch ( $settings.mailings.loadMailingsMethod ) {
 
 }
 
+
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
 #-----------------------------------------------
 
-$mailings = @()
+$mailings = [System.Collections.ArrayList]@()
 $templates | foreach {
 
     # Load data
     $template = $_
-    #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
 
     # Create mailing objects
-    $mailings += [Mailing]@{
+    [void]$mailings.Add([Mailing]@{
         mailingId=$template.nl_id
         mailingName=$template.nl_name
-    }
+    })
 
 }
 

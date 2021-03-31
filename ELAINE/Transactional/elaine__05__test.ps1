@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -170,7 +170,6 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
     # or like this to get it back as number
     #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
@@ -185,4 +184,3 @@ exit 0
 # RETURN
 #-----------------------------------------------
 
-# TODO [ ] Is there something expected to return? Something like true or false?

@@ -10,8 +10,9 @@
 
 # Prepare the database
 
-* If you want to save the results into the response database (useful for the response laterhand), then it is useful to write the transactional messages direclty in there
-* This is an example statement to create it, replace the database name at the top:
+If you want to save the results into the response database (useful for the response laterhand), then it is useful to write the transactional messages direclty in there
+
+This is an example statement to create it, replace the database name at the top:
 
 ```SQL
 USE [RS_Handel]
@@ -37,7 +38,6 @@ GO
 
 ALTER TABLE [dbo].[ELAINETransactional] ADD  CONSTRAINT [DF_ELAINETransactional_Timestamp]  DEFAULT (getdate()) FOR [Timestamp]
 GO
-
 ```
 
 # Upload

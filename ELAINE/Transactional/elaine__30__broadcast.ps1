@@ -24,21 +24,10 @@ if ( $debug ) {
     $params = [hashtable]@{
         
         # Coming from PeopleStage
-        Password = "b"
-        scriptPath = "D:\Scripts\Optilyz"
-        MessageName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
-        EmailFieldName = "E-Mail"
-        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_5fc6ca6a89b5e200e0de42e0  Test Automation Apteco_aada3235-9bb8-44ad-9aee-63ef1ab74d0f.txt"
-        TransactionId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
-        Username = "a"
-        UrnFieldName = "Kunden ID"
-        ListName = "5fc6ca6a89b5e200e0de42e0 / Test Automation Apteco"
+
         
         # Coming from Upload
-        ProcessId = "f38ed50c-7c23-4c77-8db0-81b6c468068e"
-        CustomProvider = "OPTLZUPLOAD"
-        RecipientsIgnored = "2000"
-        RecipientsQueued = "3000"
+
 
     }
 }
@@ -191,17 +180,16 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
     # or like this to get it back as number
     #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
 
     Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
 
-}
+    # Use this function to check if a mininum version is needed to call the function
+    #Check-ELAINE-Version -minVersion "6.2.2"
 
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
+}
 
 
 #-----------------------------------------------
@@ -230,8 +218,6 @@ if ( $mailingDetails.status_data.is_transactionmail ) {
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
-
-# TODO [x] Forward the right numbers here
 
 # count the number of successful upload rows
 $recipients = $params.RecipientsQueued #$upload.count

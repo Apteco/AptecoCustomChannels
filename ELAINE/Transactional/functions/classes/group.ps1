@@ -4,14 +4,14 @@
 #-----------------------------------------------
 
 <#
-$m = [Mailing]@{mailingId=123;mailingName="MailingName"}
+$m = [Group]@{groupId=123;groupName="GroupName"}
 $m.toString()
 
 Good hints here: https://xainey.github.io/2016/powershell-classes-and-concepts/
 
 # Play around with different constructors
-([Mailing]@{mailingId=123;mailingName="abc"}).toString()
-([Mailing]::new("123 / abc")).toString()
+([Group]@{groupId=123;groupName="abc"}).toString()
+([Group]::new("123 / abc")).toString()
 
 
 #>

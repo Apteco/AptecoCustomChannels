@@ -70,7 +70,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "ELNMAILINGS"
+$moduleName = "ELNLISTS"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -177,26 +177,23 @@ This call should be made at the beginning of every script to be sure the version
 
 if ( $settings.checkVersion ) { 
 
-    #$res = Invoke-RestMethod -Uri $url -Method get -Verbose -Headers $headers -ContentType $contentType
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
     # or like this to get it back as number
     #$elaineVersion = Invoke-ELAINE -function "api_getElaineVersion" -method "Post" -parameters @($true)
 
     Write-Log -message "Using ELAINE version '$( $elaineVersion )'"
 
+    # Use this function to check if a mininum version is needed to call the function
+    #Check-ELAINE-Version -minVersion "6.2.2"
+
 }
-
-# Use this function to check if a mininum version is needed to call the function
-#Check-ELAINE-Version -minVersion "6.2.2"
-
 
 
 #-----------------------------------------------
 # GET GROUPS
 #-----------------------------------------------
 <#
-This one returns the nl_id, nl_name and nl_status
-Transactional Mailings and Automation Mails (subscribe, unsubscribe, etc.) have the status "actionmail", the normal mailings have "ready"
+This one returns all groups and details
 #>
 
 $jsonInput = @(
@@ -210,15 +207,15 @@ $groups = Invoke-ELAINE -function "api_getGroups" -parameters $jsonInput -method
 # GET ALL GROUPS DETAILS METHOD 1 - VIA SINGLE CALLS
 #-----------------------------------------------
 
-# TODO [ ] add bulk support for this
+# TODO [ ] add bulk support in future for this
 
 $groupsDetails = [System.Collections.ArrayList]@()
 $groups | ForEach-Object {
 
     $groupId = $_
     $jsonInput = @(
-        "Group"       # objectType : Datafield|Mailing|Group|Segment
-        [int]$groupId      # objectID
+        "Group"             # objectType : Datafield|Mailing|Group|Segment
+        [int]$groupId       # objectID
     ) 
 
     $group = Invoke-ELAINE -function "api_getDetails" -parameters $jsonInput
@@ -228,11 +225,10 @@ $groups | ForEach-Object {
 }
 
 $groupDetailsFiltered = $groupsDetails | where { $_.ev_id -ne $null }
-#$groupDetailsFiltered.Count
 
 
 #-----------------------------------------------
-# BUILD MAILING OBJECTS
+# BUILD GROUPS OBJECTS
 #-----------------------------------------------
 
 $groups = [System.Collections.ArrayList]@()
@@ -240,10 +236,9 @@ $groupDetailsFiltered | foreach {
 
     # Load data
     $group = $_
-    #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
 
     # Create group objects
-    $groups.add([Group]@{
+    [void]$groups.add([Group]@{
         groupId=$group.ev_id
         groupName=$group.ev_name
     })

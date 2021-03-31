@@ -10,7 +10,7 @@ Function Format-ELAINE-Parameter {
     }
     
     process {
-        $json = ConvertTo-Json $arr -Compress # `$json | convertto-json` does not work properly with single elements
+        $json = ConvertTo-Json -InputObject $arr -Compress -Depth 99
         $jsonEscaped = [uri]::EscapeDataString($json)
     }
     
@@ -42,7 +42,10 @@ Function Check-ELAINE-Version {
         # Check if currentVersion is present as script variable
         if ( $currentVersion -eq "" ) {
             if ( $script:elaineVersion -eq $null ) {
-                throw [System.IO.InvalidDataException] "No ELAINE version loaded into cache through environment. Please define in script '`$elaineVersion' or use parameter -currentVersion"
+                $msg = "No ELAINE version loaded into cache through environment. Please define in script '`$elaineVersion' or use parameter -currentVersion"
+                Write-Log $msg
+                throw [System.IO.InvalidDataException] $msg
+
             } else {
                 $currentVersion = $script:elaineVersion
             }
@@ -289,6 +292,8 @@ Function Create-ELAINE-Parameters {
 
 }
 
+<#
+- [ ] TODO Future Function to implement
 
 function Match-ELAINE-Columns {
 
@@ -313,3 +318,4 @@ function Match-ELAINE-Columns {
     }
 
 }
+#>

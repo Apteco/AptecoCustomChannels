@@ -56,6 +56,7 @@ $token = Read-Host -AsSecureString "Please enter the password for artegic ELAINE
 $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password) #-keyFile $keyFile
 
 $loginSettings = @{
+    username = "<username>"
     token = $tokenEncrypted 
 }
 
@@ -95,13 +96,14 @@ $uploadSettings = @{
 
     "rowsPerUpload"     = 80                            # rows per upload, if BULK is used (available since 6.2.2)
     "uploadsFolder"     = "$( $scriptPath )\uploads\"   # upload folder where the message status is stored
+    "checkEveryNSeconds"= 10                            # seconds to wait if all messages have been sent out
     "timeout"           = 60                            # max seconds to wait until the message status check will fail
     "priority"          = 99                            # 99 is default value, 100 is for emergency mails           
     "override"          = $false                        # overwrite array data with profile data
     "updateProfile"     = $false                        # update existing contacts with array data
     "notifyUrl"         = ""                            # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
     "blacklist"         = $true                         # false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
-    "waitForSuccess"    = $true                         # 
+    "waitForSuccess"    = $true                         # wait until transactional mailings are sent out
 
     # Those will be filled later in the script
     "requiredFields"    = @()                           # additional fields that are required
@@ -111,7 +113,7 @@ $uploadSettings = @{
     "urnContainsEmail"  = $false                         # If this is set, the email will be concatenated with the URN like "123|user@example.tld"
 
     # Database settings
-    "writeToDatabase"   = $true                         # If the results should be written to a separate database like the reponse database
+    "writeToDatabase"   = $false                         # If the results should be written to a separate database like the reponse database
     "writeMethod"       = "SqlClient"                   # SqlClient|SqlServer -> SqlClient is generally available and inserts data with single records where SqlServer (SqlServer Management) can insert a whole table object at once,
                                                         # but only available if installed on that machine with 'Install-Module -Name SqlServer -AllowClobber'
                                                         # SqlServer is not implemented yet
@@ -119,11 +121,12 @@ $uploadSettings = @{
     "databaseName"      = "RS_Handel"                   # The database to write into
     "databaseSchema"    = "dbo"                         # The schema of the insert table
     "databaseTable"     = "ELAINETransactional"         # The table to write into
-    "trustedConnection" = $false
+    "trustedConnection" = $false                        # Use trusted connection for SQL Server authentication, if not you will need to enter the details in the next step
 
 }
 
-If ( $uploadSettings.trustedConnection -eq $false) {
+# Enter the details if no trusted connection is used
+If ( $uploadSettings.trustedConnection -eq $false -and $uploadSettings.writeToDatabase) {
     
     # Ask for credentials and encrypt the password
     $sqlCred = Get-Credential -Message "Enter your SQL Auth credentials"
@@ -141,14 +144,11 @@ If ( $uploadSettings.trustedConnection -eq $false) {
 # ALL SETTINGS
 #-----------------------------------------------
 
-# TODO [ ] use url from PeopleStage Channel Editor Settings instead?
-# TODO [ ] Documentation of all these parameters and the ones above
-
 $settings = @{
 
     # General
-    base="https://ed92.elaine-asp.de/http/api/"   # Default url
-    defaultResponseFormat = "json" # json|text|serialize|xml
+    base="https://ed92.elaine-asp.de/http/api/"         # Default url
+    defaultResponseFormat = "json"                      # json|text|serialize|xml
     changeTLS = $true                                   # should tls be changed on the system?
     nameConcatChar = " / "                              # character to concat mailing/campaign id with mailing/campaign name
     logfile="$( $scriptPath )\elaine.log"               # path and name of log file
@@ -156,7 +156,7 @@ $settings = @{
     checkVersion = $true                                # check elaine version for some specific calls
     
     # Session 
-    aesFile = $keyFile
+    aesFile = $keyFile                                  # encryption key for saving credentials
     encryptToken = $true                                # $true|$false if the session token should be encrypted
     
     # Detail settings
@@ -211,6 +211,7 @@ $fields = Invoke-ELAINE -function "api_getDatafields"
 <#
 Choose the email field
 #>
+"Choose the email field"
 $emailField = $fields | Out-GridView -PassThru
 $settings.upload.emailColumn = $emailField.f_name
 
@@ -222,6 +223,7 @@ $settings.upload.emailColumn = $emailField.f_name
 <#
 Choose the urn field for the primary key
 #>
+"Choose the URN field"
 $urnField = $fields | Out-GridView -PassThru
 $settings.upload.urnColumn = $urnField.f_name
 
@@ -235,6 +237,7 @@ $settings.upload.urnColumn = $urnField.f_name
 Choose the variant field, e.g. for language dependent accounts/templates
 If there is no variant field, just cancel
 #>
+"Choose the variant field if needed or just cancel it"
 $variantField = $fields | Out-GridView -PassThru
 $settings.upload.variantColumn = $variantField.f_name
 
@@ -248,6 +251,7 @@ Choose some fields
 c_email and c_urn are not needed as required
 If there are not more fields, just cancel
 #>
+"Choose other required fields or just cancel it"
 $fields = Invoke-ELAINE -function "api_getDatafields"
 $requiredFields = $fields | Out-GridView -PassThru
 $settings.upload.requiredFields = $requiredFields.f_name
@@ -265,3 +269,21 @@ $json
 
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
+
+
+
+################################################
+#
+# CHECK SOME FOLDERS
+#
+################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.upload.uploadsFolder
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
+}
