@@ -20,6 +20,7 @@ Legend:
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
 Bertelsmann eLettershop||REST/SFTP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:heavy_check_mark:Trigger FERGE|Code is private
+ELAINE|Transactional|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:o:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:heavy_check_mark:/:o:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:o:Trigger FERGE|[ELAINE Transactional Mailing Integration Guideline](ELAINE/Transactional)
 Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Flexmail Integration Guideline](Flexmail)
 Mailingwork|Standard|REST
 Mailingwork|Campaign|REST
