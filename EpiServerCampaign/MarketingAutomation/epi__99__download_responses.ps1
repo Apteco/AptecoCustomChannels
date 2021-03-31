@@ -131,7 +131,7 @@ $maxRows = 1000
 $currentTimestamp = Get-Unixtime -inMilliseconds
 
 # create directory
-New-Item -ItemType Directory -Path ".\$( $guid )"
+New-Item -ItemType Directory -Path ".\$( $processId  )"
 
 # log after loop
 #Write-Log -message "Updatet $( $result ) rows in Broadcasts for Mailings $( $mailingsToTransform -join ',' )"
@@ -142,21 +142,35 @@ New-Item -ItemType Directory -Path ".\$( $guid )"
 #-----------------------------------------------
 
 # export data
-#$recipients = Get-EpiResponses -responseType Recipients -maxDays $maxDays
-#$recipients | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $guid )\recipients.csv" -Delimiter "`t"
+$recipients = [System.Collections.ArrayList]@()
+$recipients.addRange( @(Get-EpiResponses -responseType Recipients -maxDays $maxDays) )
+if ( $recipients.Count -gt 0 ) {
+    $recipients | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $processId )\recipients.csv" -Delimiter "`t"
+}
 
-$opens = Get-EpiResponses -responseType Opens -maxDays $maxDays
-$opens | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $guid )\opens.csv" -Delimiter "`t"
+$opens = [System.Collections.ArrayList]@()
+$opens.addRange( @(Get-EpiResponses -responseType Opens -maxDays $maxDays) )
+if ( $opens.Count -gt 0 ) {
+    $opens | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $processId )\opens.csv" -Delimiter "`t"
+}
 
-#$clicks = Get-EpiResponses -responseType Clicks -maxDays $maxDays
-#$clicks | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $guid )\clicks.csv" -Delimiter "`t"
+$clicks = [System.Collections.ArrayList]@()
+$clicks.addRange( @(Get-EpiResponses -responseType Clicks -maxDays $maxDays) )
+if ( $clicks.Count -gt 0 ) {
+    $clicks | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $processId )\clicks.csv" -Delimiter "`t"
+}
 
-#$unsubscribes = Get-EpiResponses -responseType Unsubscribes -maxDays $maxDays
-#$unsubscribes | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $guid )\unsubscribes.csv" -Delimiter "`t"
+$unsubscribes = [System.Collections.ArrayList]@()
+$unsubscribes.addRange( @(Get-EpiResponses -responseType Unsubscribes -maxDays $maxDays) )
+if ( $unsubscribes.Count -gt 0 ) {
+    $unsubscribes | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $processId )\unsubscribes.csv" -Delimiter "`t"
+}
 
-#$responses = Get-EpiResponses -responseType Responses -maxDays $maxDays
-#$responses | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $guid )\responses.csv" -Delimiter "`t"
-
+$responses = [System.Collections.ArrayList]@()
+$responses.addRange( @(Get-EpiResponses -responseType Responses -maxDays $maxDays) )
+if ( $responses.Count -gt 0 ) {
+    $responses | Export-Csv -Encoding UTF8 -NoTypeInformation -Path ".\$( $processId )\responses.csv" -Delimiter "`t"
+}
 
 
 
