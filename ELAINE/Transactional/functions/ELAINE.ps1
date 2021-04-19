@@ -175,6 +175,7 @@ Function Invoke-ELAINE {
     begin {
         if ( $parameters -ne $null ) {
             $param = "json=$( Format-ELAINE-Parameter $parameters )"
+            Set-Content -Value $param -Path "$( $scriptPath )\$( ([guid]::NewGuid()).guid ).txt"
         } else {
             $param = ""
         }
