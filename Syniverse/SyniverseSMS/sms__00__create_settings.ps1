@@ -139,6 +139,9 @@ $settings = @{
     # Authentication
     authentication = $authentication
     
+    # Upload settings
+    uploadsFolder = "$( $scriptPath )\uploads"
+
     # Detail settings
     countryMap = $countryMap
     channels = $channelIds
@@ -168,3 +171,19 @@ $json
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
 
+
+################################################
+#
+# CHECK SOME FOLDERS
+#
+################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.uploadsFolder
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
+}
