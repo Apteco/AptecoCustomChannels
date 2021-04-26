@@ -100,7 +100,11 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$maxWriteCount = $settings.rowsPerUpload
+if ( $settings.rowsPerUpload ) {
+    $maxWriteCount = $settings.rowsPerUpload
+} else {
+    $maxWriteCount = 100
+}
 $uploadsFolder = $settings.uploadsFolder
 $mssqlConnectionString = $settings.responseDB
 
@@ -163,7 +167,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message " $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param )= ""$( $params[$param] )"""
     }
 }
 
@@ -337,11 +341,12 @@ $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeIn
 
 $url = "$( $settings.base )scg-external-api/api/v1/messaging/message_requests"
 
-$results = @()
+$results = [System.Collections.ArrayList]@()
 $parsedData | ForEach {
     
+    $parsedRow = $_
     $text = $_.message
-    $mobile = $_.mdn
+    $mobile = $parsedRow.mdn
     
     switch ($settings.sendMethod) {
         "sender_id" {
@@ -370,17 +375,44 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
-    $res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType # -UseDefaultCredentials -ProxyUseDefaultCredentials -Proxy $settings.proxyUrl
+    try {
+
+        $paramsPost = [Hashtable]@{
+            Uri = $url
+            Method = "Post"
+            Headers = $headers
+            Body = $body
+            Verbose = $true
+            ContentType = $contentType
+        }
+
+        if ( $settings.useDefaultCredentials ) {
+            $paramsPost.Add("UseDefaultCredentials", $true)
+        }
+        if ( $settings.ProxyUseDefaultCredentials ) {
+            $paramsPost.Add("ProxyUseDefaultCredentials", $true)
+        }
+        if ( $settings.proxyUrl ) {
+            $paramsPost.Add("Proxy", $settings.proxyUrl)
+        }
+
+        $res = Invoke-RestMethod @paramsPost
+        #$res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType # -UseDefaultCredentials -ProxyUseDefaultCredentials -Proxy $settings.proxyUrl
+
+    } catch {
+        $e = ParseErrorForResponseBody -err $_
+        Write-Log -message $e
+    }
 
     Write-Log -message "SMS result: $( $res.id )"
 
     # create new object with data
     $newResult = New-Object PSCustomObject
     $newResult | Add-Member -MemberType NoteProperty -Name "messageid" -Value $res.id
-    $newResult | Add-Member -MemberType NoteProperty -Name "Urn" -Value $parsedData.Urn
-    $newResult | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $parsedData.CommunicationKey
+    $newResult | Add-Member -MemberType NoteProperty -Name "Urn" -Value $parsedRow.Urn
+    $newResult | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $parsedRow.CommunicationKey
 
-    $results += $newResult
+    [void]$results.Add( $newResult )
 
 }
 
@@ -396,52 +428,151 @@ Write-Log -message "Putting results in response database"
 # open connection again
 $mssqlConnection.Open()
 
-$states = @()
-$results | ForEach {
-    
-    $result = $_
+# Initial wait of 15 seconds, so there is a good chance the messages are already "DELIVERED" OR "FAILED" instead of "SENT" (the state before...)
+$secondsToWait = 15  # TODO [ ] put this into settings if wished
+$maxWaitTime = 45 # TODO [ ] put this into settings if wished
+Start-Sleep -Seconds $secondsToWait
 
-    # Get message requests result
-    $messageStatus = Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/$( $result.messageid )" -Method Get -Headers $headers -Verbose -ContentType "application/json" #-UseDefaultCredentials -Proxy $ProxyURL -ProxyUseDefaultCredentials
-    $states += $messageStatus
-    #$messageStatus
+# Loop for requesting the results
+$stopWatch = [System.Diagnostics.Stopwatch]::new()
+$timeSpan = New-TimeSpan -Seconds $maxWaitTime 
+$stopWatch.Start()
+$states = [System.Collections.ArrayList]@()
+
+do {
+
+    $results | where { $_.messageid -notin $states.id } | ForEach {
+        
+        $result = $_
+
+        # Get message requests result and save it into SQL, if possible
+        try {
+
+            <#
+            
+            Getting a response like, where the state can be SENT, DELIVERED, FAILED, CLICKTHROUGH
+            
+            application_id                    : 1234
+            company_id                        : 9999
+            created_date                      : 1619433193844
+            last_updated_date                 : 1619433201381
+            version_number                    : 3
+            id                                : J8Y6XuvoGGf3xxxxxxxxxx
+            from                              : channel:JXxaP5zxxxxxxxxxxxxxx
+            to                                : {+4917664787187}
+            consent_requirement               : NONE
+            body                              : Florian, thanks for adding your mobile number to your profile. Get your 10% discount now: https://2.lnkme.net/H5eoSp
+            state                             : DELIVERED
+            channel_id                        : JXxaP5zxxxxxxxxxxxxxx
+            sender_id_sort_criteria           : {}
+            contact_delivery_address_priority : {}
+            verify_number                     : False
+            message_type                      : SMS
+
+            OR 
+
+            application_id                    : 1234
+            company_id                        : 9999
+            created_date                      : 1619458867858
+            last_updated_date                 : 1619458869321
+            version_number                    : 2
+            id                                : L8P0wENVG31Fxxxxxxxxxx
+            from                              : channel:JXxaP5zxxxxxxxxxxxxxx
+            to                                : {+4927664787187}
+            consent_requirement               : NONE
+            body                              : Florian, thanks for adding your mobile number to your profile. Get your 10% discount now: https://2.lnkme.net/bbfs8u
+            state                             : FAILED
+            failure_code                      : 1002
+            failure_details                   : Invalid recipient +4927664787187 for message L8P0wENVG31Fxxxxxxxxxx
+            channel_id                        : JXxaP5zxxxxxxxxxxxxxx
+            sender_id_sort_criteria           : {}
+            contact_delivery_address_priority : {}
+            verify_number                     : True
+            message_type                      : SMS
+
+            #>
+
+            $paramsGet = [Hashtable]@{
+                Uri = "$( $settings.base )scg-external-api/api/v1/messaging/message_requests/$( $result.messageid )"
+                Method = "Get"
+                Headers = $headers
+                Verbose = $true
+                ContentType = $contentType
+            }
     
-    $insert = @"
-        INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey],[failurecode],[state],[created_date],[to])
-          VALUES (
-               'SYNSMS'
-              ,'$( $result.Urn )'
-              ,'$( $processId.Guid )'
-              ,'$( $result.messageid )'
-              ,'$( $result.CommunicationKey )'
-              ,'$( $messageStatus.failure_code )'
-              ,'$( $messageStatus.state )'
-              ,'$( $messageStatus.created_date )'
-              ,'$( $messageStatus.to )'
-              )
+            if ( $settings.useDefaultCredentials ) {
+                $paramsGet.Add("UseDefaultCredentials", $true)
+            }
+            if ( $settings.ProxyUseDefaultCredentials ) {
+                $paramsGet.Add("ProxyUseDefaultCredentials", $true)
+            }
+            if ( $settings.proxyUrl ) {
+                $paramsGet.Add("Proxy", $settings.proxyUrl)
+            }
+    
+            $messageStatus = Invoke-RestMethod @paramsGet
+            #$messageStatus = Invoke-RestMethod -Uri "https://api.syniverse.com/scg-external-api/api/v1/messaging/message_requests/$( $result.messageid )" -Method Get -Headers $headers -Verbose -ContentType $contentType #-UseDefaultCredentials -Proxy $ProxyURL -ProxyUseDefaultCredentials
+            
+            #$messageStatus
+            [void]$states.Add( $messageStatus )
+
+            # Prepare insert statement
+            $insert = @"
+            INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey],[failurecode],[state],[to])
+            VALUES (
+                'SYNSMS'
+                ,'$( $result.Urn )'
+                ,'$( $processId.Guid )'
+                ,'$( $result.messageid )'
+                ,'$( $result.CommunicationKey )'
+                ,'$( $messageStatus.failure_code )'
+                ,'$( $messageStatus.state )'
+                ,'$( $messageStatus.to )'
+                )
 "@
+            # Add it to sqlserver table
+            try {
 
-    try {
+                # execute command
+                $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+                $messageUpdateMssqlCommand.CommandText = $insert
+                $updateResult = $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+            
+            } catch [System.Exception] {
 
-        # execute command
-        $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
-        $messageUpdateMssqlCommand.CommandText = $insert
-        $updateResult = $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
-    
-    } catch [System.Exception] {
+                $errText = $_.Exception
+                $errText | Write-Output
+                Write-Log -message $errText
 
-        $errText = $_.Exception
-        $errText | Write-Output
-        Write-Log -message $errText
+            } finally {
+            
+            }
 
-    } finally {
-    
+        } catch {
+
+            <#
+            When getting a 404, the script will retry again until the timeout occurs
+            #>
+            $e = ParseErrorForResponseBody -err $_
+            Write-Log -message $e
+
+        }        # TODO [ ] Only add to array and to database, if it wasn't a 404 
+
     }
 
-}
+    Start-Sleep -Seconds $secondsToWait
+
+} until (( $stopWatch.Elapsed -ge $timeSpan -or $results.count -eq $states.Count)) # until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
 
 # close connection
 $mssqlConnection.Close()
+
+# Logging
+Write-Log -message "Sent out $( $results.Count ) SMS"
+Write-Log -message "Got message status back from $( $states.Count ) messages, in detail:"
+$states.state | group | foreach {
+    Write-Log -message "    $( $_.Name ): $( $_.Count )"
+}
 
 
 ################################################
@@ -449,6 +580,15 @@ $mssqlConnection.Close()
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
+
+<#
+
+JUST FORWARDING A FEW PARAMETERS TO THE BROADCAST TO DO EVERYTHING THERE
+
+#>
+
+Write-Log -message "Just forwarding parameters to broadcast"
+
 
 # TODO [ ] check return results
 

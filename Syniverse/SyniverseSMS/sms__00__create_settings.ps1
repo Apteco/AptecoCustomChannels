@@ -6,13 +6,6 @@
 
 <#
 
-[ ] possibly a user token could make sense
-
-To access these APIs , customers need to authenticate and authorize their access within the API call.
-This requires passing the access token, and potentially the user token, in the API call headers.
-User token requirement is dependent on how the company environment has been setup by the customer. 
-
-
 #>
 
 ################################################
@@ -48,8 +41,11 @@ $settingsFilename = "settings.json"
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
 
 
@@ -62,16 +58,11 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #-----------------------------------------------
 # AUTHENTICATION
 #-----------------------------------------------
-<#
-$consumerSecret = Read-Host -AsSecureString "Please enter the consumerSecret for syniverse"
-$consumerSecretEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$consumerSecret).GetNetworkCredential().Password)
-#>
+
 $accessToken = Read-Host -AsSecureString "Please enter the accessToken for syniverse"
 $accessTokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$accessToken).GetNetworkCredential().Password)
 
 $authentication = @{
-    #consumerKey = "<consumerkey>"
-    #consumerSecret = $consumerSecretEncrypted 
     accessToken = $accessTokenEncrypted
 }
 
@@ -117,7 +108,7 @@ $channelIds = @{
 #-----------------------------------------------
 
 # connection string of response database
-$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=abc123;"
+$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_LumaYoga;User Id=faststats_service;Password=abc123;"
 
 
 #-----------------------------------------------
@@ -139,12 +130,16 @@ $settings = @{
     # Authentication
     authentication = $authentication
     
+    # Upload settings
+    uploadsFolder = "$( $scriptPath )\uploads"
+    rowsPerUpload = 100
+    sendMethod = $sendMethod
+    senderId = $senderId
+
     # Detail settings
     countryMap = $countryMap
     channels = $channelIds
     responseDB = $mssqlConnectionString
-    sendMethod = $sendMethod
-    senderId = $senderId
 
 }
 
@@ -168,3 +163,19 @@ $json
 # save settings to file
 $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
 
+
+################################################
+#
+# CHECK SOME FOLDERS
+#
+################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.uploadsFolder
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
+}

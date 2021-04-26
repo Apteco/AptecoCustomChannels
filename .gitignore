@@ -22,9 +22,5 @@ recipientlists.json
 # archive folders
 _archive
 _dev
-
-# test files
-*.debug
-*.txt
+*.json
 *.csv
-*.html
