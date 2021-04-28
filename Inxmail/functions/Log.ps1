@@ -8,7 +8,7 @@ $logfile = "C:\logfile.txt"
 $processId = [guid]::NewGuid()
 * The process id is good for parallel calls so you know they belong together
 
-Current Version = 202002052330
+Current Version = 202002052330_1
 
 #>
 
