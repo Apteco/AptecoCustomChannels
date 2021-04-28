@@ -2,7 +2,7 @@ Function Format-ELAINE-Parameter {
 
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)][Array]$arr
+        [Parameter(Mandatory=$true)]$arr
     )
 
     begin {
@@ -175,6 +175,7 @@ Function Invoke-ELAINE {
     begin {
         if ( $parameters -ne $null ) {
             $param = "json=$( Format-ELAINE-Parameter $parameters )"
+            Set-Content -Value $param -Path "$( $scriptPath )\$( ([guid]::NewGuid()).guid ).txt"
         } else {
             $param = ""
         }
@@ -196,7 +197,8 @@ Function Invoke-ELAINE {
                 $restParams = $defaultRestParamsPost + @{
                     Uri = "$( $apiRoot )$( $function )?&response=$( $settings.defaultResponseFormat )"
                     Body = $param
-                }                
+                }
+                #$restParams.body | set-content -Path "$( $scriptPath )\$( [guid]::NewGuid().toString() ).json"
             }
 
             Default {
@@ -204,6 +206,7 @@ Function Invoke-ELAINE {
             }
 
         }
+
 
         $result = Invoke-RestMethod @restParams
 
