@@ -385,7 +385,7 @@ $dataCsv | ForEach {
     if ( $variantColumnName -ne $null ) {
         $variant = $row.$variantColumnName
     } else {
-        $variant = ""
+        $variant = $null
     }
 
     # Generate the correct URN, which could contain email and URN
@@ -466,7 +466,7 @@ $t1 = Measure-Command {
 
         # variant, if needed
         if ( $recipient.variant -eq $null -or $recipient.variant -eq "" ) {
-            $variant = ""
+            $variant = $null
         } else {
             $variant = $recipient.variant
         }
