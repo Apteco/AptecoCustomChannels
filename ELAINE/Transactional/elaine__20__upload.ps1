@@ -27,7 +27,7 @@ if ( $debug ) {
         "MessageName" = "1875 / Apteco PeopleStage Training Automation"
         "EmailFieldName" = "c_email"
         "SmsFieldName" = ""
-        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_1875  Apteco PeopleStage Training Automation_f29a31c9-7935-4bf6-b55c-e2794ea36dba.txt"
+        "Path" = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\ELAINE\Transactional\_archive\PowerShell_1875  Apteco PeopleStage Training Automation_f5e5fe83-1119-420d-ab46-4f7801c8b545.txt"
         "ReplyToEmail" = ""
         "Username" = "a"
         "ReplyToSMS" = ""
@@ -519,30 +519,48 @@ $sendsStatus = [System.Collections.ArrayList]@()
 if ( $settings.upload.waitForSuccess ) {
 
     # Initial wait of 5 seconds, so there is a good chance the messages are already send
-    Start-Sleep -Seconds 5
+    Start-Sleep -Seconds $settings.upload.initialWaitForStatus
 
     $stopWatch = [System.Diagnostics.Stopwatch]::new()
     $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
     $stopWatch.Start()
-    do
-    {
+    do {
+        $skipBatch = $false # Additional parameter to skip this batch, if we get a -18 as an error back, this means the status request is not ready yet
         $sends | where { $_.sendId -notin $sendsStatus.sendId } | ForEach {
-            $sendOut = $_
-            $jsonInput = @(
-                [int]$sendOut.sendId    # int $id
-                $false                  # bool $is_msgid -> true if the id is an external message id
-            ) 
-            $status = Invoke-ELAINE -function "api_getTransactionMailStatus" -method Post -parameters $jsonInput
-            if ( $status.status -eq "sent" ) {
-                $sendOut | Add-Member -MemberType NoteProperty -Name "lastStatus" -Value $status.status                    
-                [void]$sendsStatus.Add($sendOut)
+            if ( $skipBatch -eq $false ) {
+                $sendOut = $_
+                $jsonInput = @(
+                    [int]$sendOut.sendId    # int $id
+                    $false                  # bool $is_msgid -> true if the id is an external message id
+                ) 
+                try {
+                    $status = Invoke-ELAINE -function "api_getTransactionMailStatus" -method Post -parameters $jsonInput
+                } catch {
+                    # Parse error message, if it is -18, which means results are not ready yet
+                    $_.Exception.Message -match '\''(.*?) : (.*?)\''$'
+                    $errCode = $matches[1]
+                    $errDesc = $matches[2]
+
+                    if ( $errCode -eq "-18" ) {
+                        Write-Log -message "Skipping this batch because of an -18 error and wait for the next round"                    
+                        $skipBatch = $true
+                    } else {
+                        throw $_ # Throw the same exception, if it is not an -18
+                    }
+
+                }
+                if ( $status.status -eq "sent" ) {
+                    $sendOut | Add-Member -MemberType NoteProperty -Name "lastStatus" -Value $status.status                    
+                    [void]$sendsStatus.Add($sendOut)
+                }
             }
         }
         # wait another n seconds
+        Write-Log -message "Waiting $( $settings.upload.checkEveryNSeconds ) seconds for the next round of status, got already $( $sendsStatus.count ) send status back"
         Start-Sleep -Seconds $settings.upload.checkEveryNSeconds
-    }
-    until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
+    } until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
     
+
     Write-Log -message "Got back $( $sendsStatus.count ) successful sents"
 
 }
