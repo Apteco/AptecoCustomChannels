@@ -87,7 +87,7 @@ class MotifAlternative {
         return $this.motif.id, $this.id, $desc -join $this.nameConcatChar
     }
 
-    # TODO [ ] think about returning values, e.g. saving local or inline image
+    # TODO [x] think about returning values, e.g. saving local or inline image
     [String]createSinglePicture([array]$lines, [int]$width, [int]$height, [bool]$useWatermark, [String]$outputFile, [bool]$returnBase64) {
 
         # Get alphapictures object
@@ -101,7 +101,11 @@ class MotifAlternative {
         $this.raw.lines | Get-Member -MemberType NoteProperty | ForEach {
             $lineNumber = $_.Name
             $maxCharsLine = $this.raw.lines.$lineNumber.length
-            $lineText = $lines[$i++]
+            $currentLine = $lines[$i++]
+            $lineText = ""
+            if ( $currentLine.Length -gt 0 -and $null -ne $currentLine ) {
+                $lineText = $currentLine
+            }
             $textLines | Add-Member -MemberType NoteProperty -Name $lineNumber -Value $lineText
         }
 
@@ -130,7 +134,7 @@ class MotifAlternative {
             uri = "$( $alpha.baseUrl)Image"
             method = "Post"
             body = ConvertTo-Json -InputObject $body -Depth 8
-            outFile = $outputFile # TODO [ ] make this more parametrised and also load picture inline for preview window
+            outFile = $outputFile # TODO [x] make this more parametrised and also load picture inline for preview window
             returnBase64 = $returnBase64
         }
         $res = Invoke-AlphaPictures @params
@@ -140,55 +144,110 @@ class MotifAlternative {
     }
 
     [String]createSinglePicture([array]$lines, [int]$width, [int]$height, [bool]$returnBase64) {
-
         $useWatermark = $this.defaultUseWatermark
         $res = $this.createSinglePicture($lines, $width, $height, $useWatermark, "", $returnBase64)
         return $res
-
     }
 
     [String]createSinglePicture([array]$lines, [int]$width, [int]$height, [String]$outputFile) {
-
         $useWatermark = $this.defaultUseWatermark
         $res = $this.createSinglePicture($lines, $width, $height, $useWatermark, $outputFile, $false)
         return $res
-
     }
 
     [String]createSinglePicture([array]$lines, [int]$width, [int]$height) {
-
         $res = $this.createSinglePicture($lines, $width, $height, "")
         return $res
-
     }
 
     [String]createSinglePicture([array]$lines, [String]$outputFile) {
-
         $size = $this.raw.original_rect -split ", ",4
         $width = $size[2]
         $height = $size[3]
-
         $res = $this.createSinglePicture($lines, $width, $height, $outputFile)
         return $res
-
     }
 
     [String]createSinglePicture([array]$lines, [bool]$returnBase64) {
-
         $size = $this.raw.original_rect -split ", ",4
         $width = $size[2]
         $height = $size[3]
-
         $res = $this.createSinglePicture($lines, $width, $height, $returnBase64)
         return $res
-
     }
 
     [String]createSinglePicture([array]$lines) {
-
         $res = $this.createSinglePicture($lines, "")
         return $res
+    }
 
+    [AlphaJobs]createJob([pscustomobject]$data, [String]$urnFieldName, [array]$lines, [int]$width, [int]$height, [bool]$useWatermark) {
+
+        # Get alphapictures object
+        $alpha = $this.motif.alphaPictures
+
+        # Translate lines into object
+        # TODO  [ ] check if there are more lines or characters than available
+        $textLines = [PSCustomObject]@{}
+        $maxLines = ( $this.raw.lines | Get-Member -MemberType NoteProperty | select name -Last 1 ).Name
+        $i = 0
+        $this.raw.lines | Get-Member -MemberType NoteProperty | ForEach {
+            $lineNumber = $_.Name
+            $maxCharsLine = $this.raw.lines.$lineNumber.length
+            $currentLine = $lines[$i++]
+            $lineText = ""
+            if ( $currentLine.Length -gt 0 -and $null -ne $currentLine ) {
+                $lineText = $currentLine
+            }
+            $textLines | Add-Member -MemberType NoteProperty -Name $lineNumber -Value $lineText
+        }
+
+        # Create body for the picture job generation
+        $body = [PSCustomObject]@{
+            "Images" = @( # Array of motifs that need to be rendered
+                [Ordered]@{
+                    "MotifId" = $this.motif.id
+                    "AlternativeId" = $this.id
+                    "Template" = $textLines # TODO [ ] implement support for syntax "1+2+3": "combined line with automatic line break"                        
+                    "Filename" = "ap_%$( $urnFieldName )%" # Filename, without JPG extension # TODO [ ] add file prefix to settings
+                    "Dimensions" = @{ # Dimensions in pixels
+                        "w" = $width
+                        "h" = $height
+                    }
+                    "Watermark" = $useWatermark
+                }
+            )
+            #"Callback" = "http://some.callback.com/" # HTTP callback called when job done
+            "OutputOptions" = @{ # This are options related to the output of this job
+                "OutputMethod" = "HOTLINK" # HOTLINK|ZIP # TODO [ ] Add support for zip download
+            }
+            "Data" = $data.psobject.BaseObject
+        }
+
+        #$body | Add-Member -MemberType NoteProperty -Name "Data" -Value $data
+
+        # Call AlphaPictures
+        $params = $alpha.defaultParams + @{
+            uri = "$( $alpha.baseUrl)Job"
+            method = "Post"
+            body = ConvertTo-Json -InputObject $body -Depth 8
+        }
+        $res = Invoke-AlphaPictures @params
+
+        # Create job from this one
+        $alphaJob = ( [AlphaJobs]@{
+    
+            "alphaPictures" = $this.motif.alphaPictures
+            "raw" = $res
+            "jobId" = $res.JobId
+            "status" = $res.Status
+        
+        })
+
+        $alpha.addJob( $alphaJob )
+
+        return $alphaJob
+        
     }
 
 }
@@ -297,11 +356,213 @@ class Motif {
         return $this.id, $this.name -join $this.nameConcatChar
     }
 
-
-
 }
 
 
+#-----------------------------------------------
+# ALPHAPICTURES JOBS
+#-----------------------------------------------
+
+class AlphaJobs {
+
+
+    #-----------------------------------------------
+    # PROPERTIES (can be public by default, static or hidden)
+    #-----------------------------------------------
+
+    hidden [AlphaPictures]$alphaPictures    # parent class
+    [PSCustomObject]$raw        # the raw source object for this one 
+
+    #[String]$outputFolder
+
+    [String]$jobId
+
+    [String]$status
+    [DateTime]$startTime
+    [DateTime]$endTime
+    #[int]$offset = 0
+    #hidden [int]$limit = 10000000 #10 #10000000 # TODO [ ] test limit
+    [int]$totalSeconds = 0
+
+    #hidden [String]$filename
+    #hidden [String[]]$exportFiles
+    hidden [Timers.Timer]$timer
+    #[bool] $alreadyDownloaded = $false
+
+
+    #-----------------------------------------------
+    # PUBLIC CONSTRUCTORS
+    #-----------------------------------------------
+
+    # empty default constructor needed to support hashtable constructor
+    AlphaJobs () {
+        $this.init()
+    } 
+
+    #-----------------------------------------------
+    # METHODS
+    #-----------------------------------------------
+
+    hidden [void] init () {
+        $this.startTime = [DateTime]::Now
+    }
+
+    #[String[]] getFiles() {
+    #    return $this.exportFiles
+    #}
+
+    [void] updateStatus () {
+
+        $body = @{
+            "Id" = $this.jobId
+        }
+
+        $params = $this.alphaPictures.defaultParams + @{
+            uri = "$( $this.alphaPictures.baseUrl )JobInfo"
+            Method = "Post"
+            Body = ConvertTo-Json -InputObject $body -Depth 8
+        }
+
+        $jobStatus = Invoke-AlphaPictures @params
+
+        # An error happened
+        If ( $jobStatus.error ) {
+
+            # TODO [x] Maybe throw an exception here, the job errored, the message is in $jobsStatus.error and can be UNKNOWN_JOB or similar
+            # TODO [ ] Include maybe writing to log or in the calling script
+            throw [System.IO.InvalidDataException] "Error in Job: $( $jobStatus.error)"            
+
+        # All fine
+        } else {
+
+            <#
+            Getting back something like
+
+            JobId    : 29b00856-216c-4499-97b0-9f1de317081b
+            Error    :
+            Status   : DONE
+            Key      : 29b00856-216c-4499-97b0-9f1de317081b
+            Progress : @{Total=4; Done=4; Percentage=100}
+            CDN      : https://external.alphapicture.com/Result/29b00856-216c-4499-97b0-9f1de317081b
+            #>
+
+            #Write-Verbose ( $exportStatus | ConvertTo-Json )
+            $this.status = $jobStatus.Status
+            $this.raw = $jobStatus
+
+            # Status can be CREATED, IN_PROGRESS, DONE, ERROR
+            if ( $jobStatus.Status -in @("DONE","ERROR") ) {
+                #$this.filename = $exportStatus.file_name
+                $this.endTime =  [DateTime]::Now
+                $t = New-TimeSpan -Start $this.startTime -End $this.endTime
+                $this.totalSeconds = $t.TotalSeconds
+
+                if ( $jobStatus.Status -eq "ERROR" ) {
+                    throw [System.IO.InvalidDataException] "Error in Job: $( $jobStatus.Error )"
+                }
+
+            }
+
+        }
+
+
+    }
+
+    #[void] autoUpdate() {
+    #    $this.autoUpdate($false)
+    #}
+
+    [void] autoUpdate() {
+
+        # Create a timer object with a specific interval and a starttime
+        $this.timer = New-Object -Type Timers.Timer
+        $this.timer.Interval  = 20000 # milliseconds, the interval defines how often the event gets fired
+        $timerTimeout = 600 # seconds
+
+        # Register an event for every passed interval
+        Register-ObjectEvent -InputObject $this.timer  -EventName "Elapsed" -SourceIdentifier $this.jobId -MessageData @{ timeout=$timerTimeout; alphaJob = $this } -Action {
+            
+            # Input
+            $alphaJob = $Event.MessageData.alphaJob
+
+            # Calculate current timespan
+            $timeSpan = New-TimeSpan -Start $alphaJob.startTime -End ( Get-Date )
+
+            # Check current status
+            $alphaJob.updateStatus()
+
+            If ($alphaJob.status -in @("DONE","ERROR") ) { # -or ( $this.raw.type -eq "responses" -and $emarsysExport.status -eq "ready")
+
+                $Sender.stop()
+
+                #if ($Event.MessageData.downloadImmediatly) {
+                #    $emarsysExport.downloadResult()
+                #}
+
+            }
+
+            # Is timeout reached? Do something!            
+            if ( $timeSpan.TotalSeconds -gt $Event.MessageData.timeout ) {
+
+                # Stop timer now (it is important to do this before the next processes run)
+                $Sender.Stop()
+                Write-Host "Done! Timer stopped because timeout reached!"
+
+            }
+
+        } | Out-Null
+
+        # Start the timer
+        $this.timer.Start()
+
+    }
+    <#
+    [void] downloadResult() {
+
+        # TODO [ ] unregister timer event, if it exists
+
+        # Download file
+        # TODO [ ] implement offset and limit
+        # TODO [ ] export contains multiple files
+        # TODO [ ] calculate time when finishing export
+        if ( @("ready","done") -contains $this.status ) {
+            
+            if ($this.raw.type -eq "contactlist") {
+                $listCount = $this.list.count()
+                $rounds = [Math]::Ceiling($listCount/$this.limit)
+            } else {
+                $rounds = 1
+            }
+
+            for ( $i = 0 ; $i -lt $rounds ; $i++ ) {
+                # TODO [ ] it looks like there is a bug in offset and limit, so re-visit this later
+                $offset = $i * $rounds
+
+                # Sometimes the export does not come to the status "done" so we can download it with a fictitous filename
+                #if ( $this.status -eq "ready" ) {
+                #    $this.filename = "$( [DateTime]::Now.ToString("yyyyMMdd_HHmmss") ).csv"
+                #}
+
+                # Create the download job
+                $params = $this.emarsys.defaultParams + @{
+                    uri = "$( $this.emarsys.baseUrl )export/$( $this.exportId )/data" #?offset=$( $offset )&limit=$( $this.limit )"
+                    outFile = "$( $this.outputFolder )\$( $this.filename )"
+                }
+                Invoke-emarsys @params
+
+                # Add to the result
+                $this.exportFiles += $params.OutFile
+            }
+
+            # Flag this as already downloaded
+            $this.alreadyDownloaded = $true
+
+        }
+        
+    }
+    #>
+
+}
 
 
 
@@ -325,6 +586,7 @@ class AlphaPictures {
     [String]$providerName = "alphapictures"
 
     [PSCustomObject]$defaultParams
+    hidden [AlphaJobs[]]$jobs
 
 
     #-----------------------------------------------
@@ -426,6 +688,16 @@ class AlphaPictures {
   
     }
 
+    [void] addJob ([AlphaJobs]$job) {
+        #if ( -not ($this.jobs.Count -gt 0) ) {
+        #    $this.jobs = [System.Collections.ArrayList]@()
+        #}
+        $this.jobs += $job
+    }
+
+    [AlphaJobs[]] getJobs () {
+        return $this.jobs
+    }
 
 }
 

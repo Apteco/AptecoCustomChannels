@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -209,7 +209,7 @@ $alpha = [AlphaPictures]::new($cred,$settings.base)
 #-----------------------------------------------
 
 $motifs = $alpha.getMotifs()
-Read-Host -Prompt "Press Enter to exit"
+
 
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
@@ -230,5 +230,3 @@ $messages = $motifs.alternatives | Select @{name="id";expression={ "$( $_.motif.
 # real messages
 return $messages
 
-
-Read-Host -Prompt "Press Enter to exit"

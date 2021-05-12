@@ -1,4 +1,4 @@
-﻿################################################
+################################################
 #
 # INPUT
 #
@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 
 #-----------------------------------------------
@@ -21,15 +21,21 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        "scriptPath" = "D:\Scripts\alphapictures"
-        "TestRecipient" = '{"Email":"florian.von.bracht@apteco.de","Sms":null,"Personalisation":{"line#1":"Hello + %Vorname%","line#2":"Hello World","line#3":"Lorem Ipsum","Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Communication Key":"9377dd91-a9c2-4595-898a-0cda554bbe82"}}'
-        "MessageName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
-        "ListName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
+        "TransactionType" = "Replace"
         "Password" = "cd"
+        "scriptPath" = "D:\Scripts\alphapictures"
+        "MessageName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
+        "EmailFieldName" = "email"
+        "SmsFieldName" = ""
+        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_542  1  Passenger Boarding Bridge - 1 - _d6629a2c-4bac-4860-81e1-19493dfc2f81.txt"
+        "ReplyToEmail" = ""
         "Username" = "ab"
+        "ReplyToSMS" = ""
+        "UrnFieldName" = "Kunden ID"
+        "ListName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
+        "CommunicationKeyFieldName" = "Communication Key"
     }
 }
-
 
 ################################################
 #
@@ -38,7 +44,6 @@ if ( $debug ) {
 ################################################
 
 <#
-
 
 #>
 
@@ -71,7 +76,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "ALPICPREVIEW"
+$moduleName = "APUPLOAD"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -90,6 +95,9 @@ $settings = @{
 
     upload = @{
         defaultUseWatermark = $false
+        uploadsFolder = "$( $scriptPath )\results"
+        waitForSuccess = $true
+        timeout = 600
     }
 
     download = @{
@@ -105,19 +113,19 @@ $settings = @{
     }
 
 }
-
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
 # more settings
 $logfile = $settings.logfile
-#$guid = ([guid]::NewGuid()).Guid # TODO [ ] use this guid for a specific identifier of this job in the logfiles
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -127,9 +135,11 @@ if ( $debug ) {
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
+
+#Add-Type -AssemblyName System.Data
 
 # Load all PowerShell Code
 "Loading..."
@@ -153,7 +163,6 @@ $libExecutables | ForEach {
 }
 #>
 
-
 ################################################
 #
 # LOG INPUT PARAMETERS
@@ -175,7 +184,6 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 }
 
 # Log the params, if existing
-# TODO [ ] From PowerShell 7 upwards with Test-JSON we can check if a parameter is a json object and then escape it directly
 if ( $paramsExisting ) {
     Write-Log -message "Got these params object:"
     $params.Keys | ForEach-Object {
@@ -190,6 +198,16 @@ if ( $paramsExisting ) {
 # PROGRAM
 #
 ################################################
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.upload.uploadsFolder
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
+}
 
 
 #-----------------------------------------------
@@ -221,39 +239,31 @@ $motifAlternative = $motifs.alternatives | where { $_.motif.id -eq $chosenMotifA
 
 
 #-----------------------------------------------
-# RENDER THE PICTURE
+# IMPORT DATA
 #-----------------------------------------------
 
-$testRecipient = ConvertFrom-Json -InputObject $params.TestRecipient
+$dataCsv = Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose
+Write-Log -message "Loaded '$( $dataCsv.count )' records"
 
-# Render all lines
+
+#-----------------------------------------------
+# PREPARE THE LINES
+#-----------------------------------------------
+
+# Use the first row for creating the lines template
 $lines = [array]@()
-$testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $_.Name -like "line#*" } | sort { $_.Name } | ForEach {
+$firstRow = $dataCsv[0] 
+$firstRow | Get-Member -MemberType NoteProperty | where { $_.Name -like "line#*" } | sort { $_.Name } | ForEach {
     $prop = $_.Name
-    $line = $testRecipient.Personalisation.$prop
-    # Replace all lines with remaining variables
-    $testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $_.Name -notlike "line#*" } | ForEach {
-        $token = $_.Name
-        $value = $testRecipient.Personalisation.$token
-        $line = $line.Replace("%$( $token )%", $value)
-    }
-    #$testRecipient.Personalisation.$prop
-    $lines += $line
-} 
-
-$maxLines = ( $motifAlternative.raw.lines | Get-Member -MemberType NoteProperty | select name -Last 1 ).Name
-If ( $lines.Count -eq 0 ) {
-    $lines += "Max $( $maxLines ) lines. Use line#1, line#2, [...] in Content Step"
+    $lines += $firstRow.$prop
 }
-<#
-$line = [array]@(
-    "Hello"
-)
-$lines = [array]@(
-    "Hello"
-    "World"
-)
-#>
+
+
+#-----------------------------------------------
+# PREPARE THE SIZE
+#-----------------------------------------------
+
+# TODO [ ] make the size adjustable through property
 
 $size = $motifAlternative.raw.original_rect -split ", ",4
 $width = $size[2]
@@ -263,77 +273,134 @@ $inputwidth = 1000
 $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
 
 
-# Create the picture and load as base64 string
-$picBase64 = $motifAlternative.createSinglePicture($lines, $sizes.width, $sizes.height, $true)
+#-----------------------------------------------
+# CREATE THE JOB
+#-----------------------------------------------
 
-# Embed the base64 string into html tag
-$img = "<img alt=""$( $motifAlternative.motif.name )"" src=""data:image/jpeg;charset=utf-8;base64, $( $picBase64 )"" height=""$( $sizes.height )"" width=""$( $sizes.width )""/>"
-
-
-#$picString | set-content -Path ".\image.jpg"
-#$picBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($picString))
-
-
-#$response = Invoke-WebRequest -Uri "https://www.apteco.de/themes/custom/buildtheme/assets/images/logos/apteco-logo.png" -UseBasicParsing
-# From PS 6 onwards, use  bytestream instead: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-content?view=powershell-7.2
-#set-content -Value $response.content -Path ".\test.png" -Encoding Byte
+# Create the render job and get back the ids
+# TODO [ ] split the uploads in parts of n records
+$picJob = $motifAlternative.createJob($dataCsv, $params.UrnFieldName, $lines, $sizes.width, $sizes.height, $true)
 
 
 #-----------------------------------------------
-# EMBED HTML INTO BOILERPLATE
+# WAIT FOR THE JOB
 #-----------------------------------------------
 
-$htmlBoilerplate = @"
-<!DOCTYPE html>
-<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
-<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
-<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
-<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title></title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="">
-    </head>
-    <body>
-        <!--[if lt IE 7]>
-            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
-        <![endif]-->
-        #BODY#
-        <script src="" async defer></script>
-    </body>
-</html>
-"@
+#$picJob.updateStatus()
+$picJob.autoUpdate()
 
-$html = $htmlBoilerplate -replace "#BODY#",$img
-#$html | set-content -path ".\test.html"
+<#
+# Status can be CREATED, IN_PROGRESS, DONE, ERROR
+{
+    "JobId": "f5601144-a6d5-4008-b4be-1c3b3437f9e9",
+    "Error": false,
+    "Status": "IN_PROGRESS",
+    "Key": "f81d4fae-7dec-11d0-a765-00a0c91e6bf6",
+    "CDN": "http://cdn.alphapicture.com/f81d4fae-7dec-11d0-a765-00a0c91e6bf6/"
+}
+#>
 
+# TODO [ ] wait until the job is kind of done 
+if ( $settings.upload.waitForSuccess ) {
 
-################################################
-#
-# RETURN
-#
-################################################
+    # Initial wait of 5 seconds, so there is a good chance the messages are already send
+    Start-Sleep -Seconds 5 # TODO [ ] put this into settings
 
-# TODO [ ] implement subject and more of these things rather than using default values
+    $stopWatch = [System.Diagnostics.Stopwatch]::new()
+    $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
+    $stopWatch.Start()
+    do {
+        # wait another n seconds
+        Start-Sleep -Seconds 10 # TODO [ ] put this into settings
+    } until (( $picJob.status -eq "DONE" ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
+    
+    #Write-Log -message "Got back $( $sendsStatus.count ) successful sents"
 
-$return = [Hashtable]@{
-    "Type" = $settings.preview.Type
-    "FromAddress" = $render.headers.from
-    "FromName" = $render.headers.fromname
-    "Html" = $html #$htmlArr -join "<p>&nbsp;</p>"
-    "ReplyTo" = $render.headers.replyto
-    "Subject" = $render.headers.subject
-    "Text" = $render.bodies.text
 }
 
-return $return
 
 
+#-----------------------------------------------
+# CREATE LINKS FOR RECEIVERS
+#-----------------------------------------------
+
+$renderedPicLinks = [System.Collections.ArrayList]@()
+$dataCsv | ForEach {
+
+    $row = $_
+    $urnFieldName = $params.UrnFieldName
+    $commKeyFieldName = $params.CommunicationKeyFieldName
+    $urn = $row.$urnFieldName
+    
+    [void]$renderedPicLinks.Add(
+        [PSCustomObject]@{
+            "Urn" = $row.$urnFieldName
+            "Url" = "$( $picJob.raw.CDN )/ap_$( $urn ).jpg"
+            "Motif" = $motifAlternative.raw.motif_id
+            "Alternative" = $motifAlternative.raw.alternative_id
+            "CommunicationKey" = $row.$commKeyFieldName
+        }
+    )
+
+}
 
 
+#-----------------------------------------------
+# EXPORT DATA
+#-----------------------------------------------
+
+# TODO [ ] think about exporting this into database
+
+$renderedPicLinks | Export-Csv -Path "$( $uploadsFolder )\$( $picJob.JobId ).csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
 
 
+#-----------------------------------------------
+# FINAL RESULTS
+#-----------------------------------------------
+<#
+# Calculate results in total
+$queued = $dataCsv.count
+$sent = ( $sendsStatus | where { $_.lastStatus -eq "sent" } ).Count
+$ignored = $sent - $queued
+
+# Log the results
+Write-Log -message "Imported '$( $dataCsv.Count  )' -> Queued '$( $sends.Count )' -> Already sent '$( $sent )' records in $( $t1.TotalSeconds   ) seconds "
+#>
+
+################################################
+#
+# RETURN VALUES TO PEOPLESTAGE
+#
+################################################
+<#
+If ( $sent -eq 0 ) {
+    Write-Host "Throwing Exception because of 0 records"
+    throw [System.IO.InvalidDataException] "No records were successfully uploaded"  
+}
+#>
+
+# return object
+$return = [Hashtable]@{
+
+    # Mandatory return values
+    "Recipients"= $renderedPicLinks.Count
+    "TransactionId"=$processId
+
+    # General return value to identify this custom channel in the broadcasts detail tables
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
+
+    # Some more information for the broadcasts script
+    #"EmailFieldName"= $params.EmailFieldName
+    #"Path"= $params.Path
+    #"UrnFieldName"= $params.UrnFieldName
+
+    # More information about the different status of the import
+    #"RecipientsIgnored" = $ignored
+    #"RecipientsQueued" = $queued
+    #"RecipientsSent" = $sent
+
+}
+
+# return the results
+$return
