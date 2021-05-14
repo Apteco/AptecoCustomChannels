@@ -94,34 +94,35 @@ $previewSettings = @{
 
 $uploadSettings = @{
 
-    "rowsPerUpload"     = 80                            # rows per upload, if BULK is used (available since 6.2.2)
-    "uploadsFolder"     = "$( $scriptPath )\uploads\"   # upload folder where the message status is stored
-    "checkEveryNSeconds"= 10                            # seconds to wait if all messages have been sent out
-    "timeout"           = 60                            # max seconds to wait until the message status check will fail
-    "priority"          = 99                            # 99 is default value, 100 is for emergency mails           
-    "override"          = $false                        # overwrite array data with profile data
-    "updateProfile"     = $false                        # update existing contacts with array data
-    "notifyUrl"         = ""                            # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
-    "blacklist"         = $true                         # false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
-    "waitForSuccess"    = $true                         # wait until transactional mailings are sent out
+    "rowsPerUpload"         = 80                            # rows per upload, if BULK is used (available since 6.2.2)
+    "uploadsFolder"         = "$( $scriptPath )\uploads\"   # upload folder where the message status is stored
+    "initialWaitForStatus"  = 10                            # initial wait of seconds until the status will be firstly checked 
+    "checkEveryNSeconds"    = 10                            # seconds to wait if all messages have been sent out
+    "timeout"               = 300                            # max seconds to wait until the message status check will fail
+    "priority"              = 99                            # 99 is default value, 100 is for emergency mails           
+    "override"              = $false                        # overwrite array data with profile data
+    "updateProfile"         = $false                        # update existing contacts with array data
+    "notifyUrl"             = ""                            # notification url if bounced, e.g. like "http://notifiysystem.de?email=[c_email]"
+    "blacklist"             = $true                         # false means the blacklist will be ignored, a group id can also be passed and then used as an exclusion list
+    "waitForSuccess"        = $true                         # wait until transactional mailings are sent out
 
     # Those will be filled later in the script
-    "requiredFields"    = @()                           # additional fields that are required
-    "variantColumn"     = ""                            # column for variants
-    "emailColumn"       = ""                            # column for email
-    "urnColumn"         = ""                            # column for urn (primary key)
-    "urnContainsEmail"  = $false                         # If this is set, the email will be concatenated with the URN like "123|user@example.tld"
+    "requiredFields"        = @()                           # additional fields that are required
+    "variantColumn"         = ""                            # column for variants
+    "emailColumn"           = ""                            # column for email
+    "urnColumn"             = ""                            # column for urn (primary key)
+    "urnContainsEmail"      = $false                         # If this is set, the email will be concatenated with the URN like "123|user@example.tld"
 
     # Database settings
-    "writeToDatabase"   = $false                         # If the results should be written to a separate database like the reponse database
-    "writeMethod"       = "SqlClient"                   # SqlClient|SqlServer -> SqlClient is generally available and inserts data with single records where SqlServer (SqlServer Management) can insert a whole table object at once,
-                                                        # but only available if installed on that machine with 'Install-Module -Name SqlServer -AllowClobber'
-                                                        # SqlServer is not implemented yet
-    "databaseInstance"  = "localhost"                   # The database instance to write into    
-    "databaseName"      = "RS_Handel"                   # The database to write into
-    "databaseSchema"    = "dbo"                         # The schema of the insert table
-    "databaseTable"     = "ELAINETransactional"         # The table to write into
-    "trustedConnection" = $false                        # Use trusted connection for SQL Server authentication, if not you will need to enter the details in the next step
+    "writeToDatabase"       = $false                        # If the results should be written to a separate database like the reponse database
+    "writeMethod"           = "SqlClient"                   # SqlClient|SqlServer -> SqlClient is generally available and inserts data with single records where SqlServer (SqlServer Management) can insert a whole table object at once,
+                                                            # but only available if installed on that machine with 'Install-Module -Name SqlServer -AllowClobber'
+                                                            # SqlServer is not implemented yet
+    "databaseInstance"      = "localhost"                   # The database instance to write into    
+    "databaseName"          = "RS_Handel"                   # The database to write into
+    "databaseSchema"        = "dbo"                         # The schema of the insert table
+    "databaseTable"         = "ELAINETransactional"         # The table to write into
+    "trustedConnection"     = $false                        # Use trusted connection for SQL Server authentication, if not you will need to enter the details in the next step
 
 }
 

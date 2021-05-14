@@ -24,3 +24,7 @@ _archive
 _dev
 *.json
 *.csv
+
+# visual files
+*.html
+*.png
