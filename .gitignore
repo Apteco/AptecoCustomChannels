@@ -24,6 +24,5 @@ _archive
 _dev
 
 # visual files
-*.html
 *.csv
 *.png
