@@ -22,9 +22,8 @@ recipientlists.json
 # archive folders
 _archive
 _dev
-*.json
-*.csv
 
 # visual files
 *.html
+*.csv
 *.png

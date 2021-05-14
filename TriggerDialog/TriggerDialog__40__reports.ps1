@@ -1,4 +1,4 @@
-﻿################################################
+################################################
 #
 # INPUT
 #
@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 
 #-----------------------------------------------
@@ -22,16 +22,10 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        ProcessId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
-        MessageName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
-        Username = "a"
-        TransactionId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
-        CustomProvider = "TRUPLOAD"
-        UrnFieldName = "Kunden ID"
-        Password = "b"
-        ListName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
-        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt.converted"
-        scriptPath = "D:\Scripts\TriggerDialog\v2"
+	    Password= "def"
+	    scriptPath= "D:\Scripts\TriggerDialog\v2"
+	    abc= "def"
+	    Username= "abc"
     }
 }
 
@@ -44,9 +38,8 @@ if ( $debug ) {
 
 <#
 
-Good hints on PowerShell Classes and inheritance
-
 #>
+
 
 ################################################
 #
@@ -77,8 +70,8 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$processId = $params.ProcessId #[guid]::NewGuid()
-$modulename = "TRBROADCAST"
+$processId = [guid]::NewGuid()
+$modulename = "TRREPORT"
 $timestamp = [datetime]::Now
 
 # Load settings
@@ -133,6 +126,7 @@ $libExecutables | ForEach {
 
 Add-Type -AssemblyName System.Security
 
+
 ################################################
 #
 # LOG INPUT PARAMETERS
@@ -160,37 +154,68 @@ if ( $paramsExisting ) {
 }
 
 
-###############################################
+################################################
 #
-# PROGRAM
+# PROCESS
 #
 ################################################
 
+#-----------------------------------------------
+# CREATE HEADERS
+#-----------------------------------------------
 
-Write-Log -message "Nothing to do in the broadcast script"
+[uint64]$currentTimestamp = Get-Unixtime -timestamp $timestamp
 
-
-################################################
-#
-# RETURN VALUES TO PEOPLESTAGE
-#
-################################################
-
-# TODO [x] Forward the right numbers here
-
-# count the number of successful upload rows
-$recipients = $params.RecipientsQueued #$upload.count
-
-# put in the source id as the listname
-$transactionId = $processId
-
-# return object
-$return = [Hashtable]@{
-    "Recipients"=$recipients
-    "TransactionId"=$params.CorrelationId #$transactionId
-    "CustomProvider"=$moduleName
-    "ProcessId" = $processId
+# It is important to use the charset=utf-8 to get the correct encoding back
+$headers = @{
+    "accept" = $settings.contentType
 }
 
-# return the results
-$return
+
+#-----------------------------------------------
+# CREATE SESSION
+#-----------------------------------------------
+
+$newSessionCreated = Get-TriggerDialogSession
+$headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
+
+
+#-----------------------------------------------
+# CHOOSE CUSTOMER ACCOUNT
+#-----------------------------------------------
+
+# Choose first customer account first
+$customerId = $settings.customerId
+
+
+#-----------------------------------------------
+# LOAD REPORTS SUMMARY
+#-----------------------------------------------
+
+#$reportOverview = Invoke-TriggerDialog -customerId $customerId -path "recipientreport/overview" -headers $headers -deactivatePaging
+#exit 0
+
+#-----------------------------------------------
+# LOAD CAMPAIGNS
+#-----------------------------------------------
+
+$campaigns = Invoke-TriggerDialog -customerId $customerId -path "longtermcampaigns" -headers $headers #-deactivatePaging
+
+
+#-----------------------------------------------
+# LOAD CAMPAIGNS REPORT
+#-----------------------------------------------
+
+$headers.accept = "text/csv"
+$reportDetail = [System.Collections.ArrayList]@()
+$campaigns | ForEach {
+
+    $campaign = $_
+
+    $reportCsv = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/recipientreport/detail?campaignId=$( $campaign.id )&customerId=$( $customerId )&reportDate=2021-03-03" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
+    $csvData = $reportCsv | ConvertFrom-Csv -Delimiter $settings.report.delimiter
+    if ( $csvData.count -gt 0 ) {
+        [void]$reportDetail.AddRange(( $csvData ))
+    }
+
+}

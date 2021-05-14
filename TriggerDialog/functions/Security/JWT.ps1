@@ -26,7 +26,7 @@ $payload = [ordered]@{
   "iat" = 1516239022
 }
 
-$secret = "secret"
+$secret = "secret" #"GQDstcKsx0NHjPOuXOYg5MbeJ1XT0uFiwDVvVBrk"
 #>
 
 
@@ -66,6 +66,7 @@ Function Get-Unixtime {
 #>
 
 # inspired by https://gallery.technet.microsoft.com/scriptcenter/Get-StringHash-aa843f71
+# needs more methods to implement, if needed
 Function Get-HMACSHA512 {
     
     param(
@@ -106,6 +107,20 @@ Function Get-Base64UrlEncodeFromString {
     $base64 = [System.Convert]::ToBase64String($inputBytes,[Base64FormattingOptions]::None).Replace('+', '-').Replace('/', '_').Replace("=", "")
 
     return $base64
+
+}
+
+Function Get-StringFromBase64UrlEncode {
+    
+    param(
+         [Parameter(Mandatory=$true)][String]$inputString
+    )
+
+    $inputBytes = [System.Convert]::FromBase64String($inputString)
+
+    $string = [System.Text.Encoding]::UTF8.GetString($inputBytes)
+
+    return $string
 
 }
 
@@ -171,7 +186,7 @@ Function Check-Base64 {
 
 }
 
-Function Create-JWT {
+Function Encode-JWT {
 
     param(
           [Parameter(Mandatory=$true)][PSCustomObject]$headers
@@ -195,10 +210,56 @@ Function Create-JWT {
 
 }
 
+<# 
+
+https://jwt.io/
+
+#>
+Function Decode-JWT {
+
+    param(
+       [Parameter(Mandatory=$true)][string]$token
+       ,[Parameter(Mandatory=$false)][string]$secret = ""
+       #,[Parameter(Mandatory=$false)][switch]$secretBase64Encoded      # needs to be implemented
+    )
+
+    # Splitting the string
+    $splittedJwt = $token -split "\."
+
+    # Decoding all parts
+    $header = Get-StringFromBase64UrlEncode ( Check-Base64 -inputString $splittedJwt[0] ) | ConvertFrom-Json
+    $payload = Get-StringFromBase64UrlEncode ( Check-Base64 -inputString $splittedJwt[1] ) | ConvertFrom-Json
+    $signature = $splittedJwt[2]
+
+    # Checking the signature if secret is provided -> not fully tested yet!!!
+    $verified = $false
+    if ( $secret -ne "" ) {
+        $content = "$( Check-Base64 -inputString $splittedJwt[0] ).$( Check-Base64 -inputString $splittedJwt[1] )"
+        $signatureByte = Get-HMACSHA512 -data $content -key $secret
+        $signatureCheck = Get-Base64UrlEncodeFromByteArray -byteArray $signatureByte
+        if ($signature -eq $signatureCheck) {
+            $verified = $true
+        }
+    }
+
+    return @{
+        "header" = $header
+        "payload" = $payload
+        "verified" = $verified
+    }
+
+}
+
+<#
+$jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJBcHRlY28iLCJpc3MiOiJjb20uZHBkaGwuZGlhbG9nbWFya2V0aW5nIiwiZnVsbE5hbWUiOiItIC0iLCJjdXN0b21lcklkcyI6WyI4ODAiXSwiZXhwIjoxNjAxNTAyNjY2LCJsb2NhbGUiOiJkZSIsImlhdCI6MTYwMTUwMDg2NiwidXNlcklkIjoxMDg0LCJhdXRob3JpdGllcyI6WyJST0xFX1BNUF9BQ0NFU1MiLCJST0xFX1BNUF9MT05HX1RFUk1fQ0FNUEFJR05fUEFSVE5FUl9TWVNURU0iXX0.BkAfupFOrGymCcIV7h53Z2m2Br2YOgVZWkUHP2UV3U50gfp_qaCTalP6FSUFQe6QOGd5bsqdttTVbT23CEFcSQ"
+
+$res = Decode-JWT -token $jwt -secret 'b2RK1WplFNUOZ7X$1I9uq!tTko'
+$res
+#>
 
 ################################################
 #
-# TEST / DEBUG
+# TEST
 #
 ################################################
 

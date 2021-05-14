@@ -4,36 +4,15 @@
 #
 ################################################
 
-Param(
-    [hashtable] $params
-)
-
+#Param(
+#    [hashtable] $params
+#)
 
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
-
-
-#-----------------------------------------------
-# INPUT PARAMETERS, IF DEBUG IS TRUE
-#-----------------------------------------------
-
-if ( $debug ) {
-    $params = [hashtable]@{
-        ProcessId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
-        MessageName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
-        Username = "a"
-        TransactionId = "1088d463-c20b-43d5-9630-1cfd0501d01f"
-        CustomProvider = "TRUPLOAD"
-        UrnFieldName = "Kunden ID"
-        Password = "b"
-        ListName = "34362 / 30449 / Kampagne A / Aktiv / UPLOAD"
-        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt.converted"
-        scriptPath = "D:\Scripts\TriggerDialog\v2"
-    }
-}
+$debug = $true
 
 
 ################################################
@@ -44,9 +23,9 @@ if ( $debug ) {
 
 <#
 
-Good hints on PowerShell Classes and inheritance
-
 #>
+
+
 
 ################################################
 #
@@ -54,15 +33,11 @@ Good hints on PowerShell Classes and inheritance
 #
 ################################################
 
-if ( $debug ) {
-    # Load scriptpath
-    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    } else {
-        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    }
+# Load scriptpath
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 } else {
-    $scriptPath = "$( $params.scriptPath )" 
+    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
 }
 Set-Location -Path $scriptPath
 
@@ -77,8 +52,8 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$processId = $params.ProcessId #[guid]::NewGuid()
-$modulename = "TRBROADCAST"
+$processId = [guid]::NewGuid()
+$modulename = "authToUI"
 $timestamp = [datetime]::Now
 
 # Load settings
@@ -116,22 +91,24 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
 }
 
 <#
-# Load all exe files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+# Load all exe and dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe","*.dll") 
 $libExecutables | ForEach {
     "... $( $_.FullName )"
-    
-}
-
-# Load dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
-$libExecutables | ForEach {
-    "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
 }
 #>
 
 Add-Type -AssemblyName System.Security
+
+################################################
+#
+# MORE SETTINGS AFTER LOADING FUNCTIONS
+#
+################################################
+
+# ...
+[uint64]$currentTimestamp = Get-Unixtime -timestamp $timestamp
+
 
 ################################################
 #
@@ -155,42 +132,37 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
+        Write-Log -message "    $( $param ): $( $params[$param] )"
     }
 }
 
 
-###############################################
+################################################
 #
-# PROGRAM
+# PROCESS
 #
 ################################################
 
+#-----------------------------------------------
+# CREATE JWT AND AUTH URI
+#-----------------------------------------------
 
-Write-Log -message "Nothing to do in the broadcast script"
+Write-Log -message "Creating a login url"
 
+$jwt = Create-JwtToken -headers $settings.headers -payload $settings.defaultPayload -secret ( Get-SecureToPlaintext -String $settings.authentication.ssoTokenKey )
 
-################################################
-#
-# RETURN VALUES TO PEOPLESTAGE
-#
-################################################
+$uri = [uri]$settings.base 
+$hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
-# TODO [x] Forward the right numbers here
+# https://dm.deutschepost.de?partnersystem={YOUR-SIGNED-JWT}.
+$authUri = "https://dm-uat.deutschepost.de?partnersystem=$( $jwt )"
+#$authUri = "$( $hostUri )/campaign/editLongTermCampaign/34364?partnersystem=$( $jwt )"
+$authUri
 
-# count the number of successful upload rows
-$recipients = $params.RecipientsQueued #$upload.count
+#-----------------------------------------------
+# OPEN IN DEFAULT BROWSER
+#-----------------------------------------------
 
-# put in the source id as the listname
-$transactionId = $processId
+Start-Process "$( $authUri )"
 
-# return object
-$return = [Hashtable]@{
-    "Recipients"=$recipients
-    "TransactionId"=$params.CorrelationId #$transactionId
-    "CustomProvider"=$moduleName
-    "ProcessId" = $processId
-}
-
-# return the results
-$return
+[void](Read-Host 'Press Enter to continue…')
