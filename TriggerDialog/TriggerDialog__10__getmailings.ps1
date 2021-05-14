@@ -204,8 +204,10 @@ $customerId = $settings.customerId
 
 # TODO [ ] implement paging for campaigns
 #$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
-$campaignDetails = Invoke-TriggerDialog -customerId $customerId -path "longtermcampaigns" -headers $headers
-
+$campaignDetails = [System.Collections.ArrayList]@()
+$campaignDetails.AddRange(
+    @( Invoke-TriggerDialog -customerId $customerId -path "longtermcampaigns" -headers $headers )
+)
 <#
 
 # ready to be edited
