@@ -96,10 +96,11 @@ $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encodin
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
-        #[System.Net.SecurityProtocolType]::Tls13,
+        [System.Net.SecurityProtocolType]::Tls13
         #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    [System.Net.ServicePointManager]::Expect100Continue = $true
 }
 
 # more settings
