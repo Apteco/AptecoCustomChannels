@@ -725,5 +725,12 @@ $return = [Hashtable]@{
 
 }
 
+# Logging the values for PeopleStage
+Write-Log -message "Sending back these information bits to PeopleStage"
+$return.Keys | ForEach {
+    $key = $_
+    Write-Log -message "  $( $key ) = ""$( $return[$key] )"""
+}
+
 # return the results
 $return

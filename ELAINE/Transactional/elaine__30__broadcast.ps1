@@ -168,9 +168,9 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 # PREPARE CALLING ELAINE
 #-----------------------------------------------
-
+<#
 Create-ELAINE-Parameters
-
+#>
 
 #-----------------------------------------------
 # ELAINE VERSION
@@ -178,7 +178,7 @@ Create-ELAINE-Parameters
 <#
 This call should be made at the beginning of every script to be sure the version is filled (and the connection could be made)
 #>
-
+<#
 if ( $settings.checkVersion ) { 
 
     $elaineVersion = Invoke-ELAINE -function "api_getElaineVersion"
@@ -191,7 +191,7 @@ if ( $settings.checkVersion ) {
     #Check-ELAINE-Version -minVersion "6.2.2"
 
 }
-
+#>
 
 #-----------------------------------------------
 # PARSE MAILING AND LOAD DETAILS
@@ -202,8 +202,9 @@ mailingId mailingName
 --------- -----------
 1875      Apteco PeopleStage Training Automation
 #>
-$mailing = [Mailing]::New($params.MessageName)
 
+$mailing = [Mailing]::New($params.MessageName)
+<#
 # Load details from ELAINE to check if it still exists
 $mailingDetails = Invoke-ELAINE -function "api_getDetails" -parameters @("Mailing",[int]$mailing.mailingId)
 if ( $mailingDetails.status_data.is_transactionmail ) {
@@ -212,7 +213,7 @@ if ( $mailingDetails.status_data.is_transactionmail ) {
     Write-Log -message "Mailing is no transactional mailing"
     throw [System.IO.InvalidDataException] "Mailing is no transactional mailing"
 }
-
+#>
 
 ################################################
 #
@@ -232,6 +233,13 @@ $return = [Hashtable]@{
     "TransactionId"=$transactionId
     "CustomProvider"=$moduleName
     "ProcessId" = $processId
+}
+
+# Logging the values for PeopleStage
+Write-Log -message "Sending back these information bits to PeopleStage"
+$return.Keys | ForEach {
+    $key = $_
+    Write-Log -message "  $( $key ) = ""$( $return[$key] )"""
 }
 
 # return the results
