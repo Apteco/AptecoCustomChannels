@@ -176,6 +176,7 @@ Function Invoke-Flexmail {
         ,[Parameter(Mandatory=$false)][String]$responseType = "" # you should either define responseNode or responseType
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
         ,[Parameter(Mandatory=$false)][array]$customFields = @()
+        ,[Parameter(Mandatory=$false)][switch]$returnFlat = $false
     )
 
     # load url and header
@@ -261,7 +262,7 @@ Function Invoke-Flexmail {
     }
 
     
-    if ( $responseType -ne "" ) {
+    if ( $responseType -ne "" -or $returnFlat ) {
        
         return $responseItems
 
@@ -270,18 +271,25 @@ Function Invoke-Flexmail {
          # load xml result into array
         $items = @()
         if ( $responseItems.ChildNodes -ne $null ) {
+
             $responseItems.ChildNodes | ForEach {
 
                 $inputItem = $_
                 $item = New-Object PSCustomObject
-                $inputItem.ChildNodes.Name | ForEach {
-                    $name = $_       
-                    $item | Add-Member -MemberType NoteProperty -Name $name -Value $inputItem."$( $name )".'#text'
+                if ( $_.ChildNodes.Name -eq "#text" ) { # is it one-dimensional
+                    $item | Add-Member -MemberType NoteProperty -Name $inputItem.Name -Value $inputItem.'#text'
+                } else { # or two-dimensional with subnodes?
+                    $inputItem.ChildNodes.Name | ForEach { 
+                        $name = $_       
+                        $item | Add-Member -MemberType NoteProperty -Name $name -Value $inputItem."$( $name )".'#text'
+                    }
                 }
+                
                 $items += $item
                 #$id = $t.item.categoryId.'#text'
 
             }
+            
         }
         # return the results
         return $items
