@@ -34,6 +34,7 @@ if ( $debug ) {
 	    UrnFieldName= "Kunden ID"
 	    ListName= "123456 | 123456 | Regain"
 	    CommunicationKeyFieldName= "Communication Key"
+        "settingsFile" = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Flexmail\settings.json"
     }
 }
 
@@ -105,7 +106,9 @@ if ( $settings.changeTLS ) {
 }
 
 # more settings
-$logfile = $settings.logfile
+$logfile = $settings.logfile                    # Generic logfile variable
+$exp = { $_.Kunde_oder_Seed -ne "Kunde" }       # Expression to identify seeds, can be changed. In this case there is a virtual variable containing the string "Kunde", all records
+                                                # not equals Kunde are Seeds
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -246,7 +249,6 @@ if ( $listId -notin $sources.id ) {
 
 
 #$customFieldsSOAP = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNode "customFields"
-
 
 
 #-----------------------------------------------
@@ -534,6 +536,24 @@ $partFiles | ForEach {
     # Data
     $importRecipients = [System.Collections.ArrayList]@( import-csv -Path "$( $f.FullName )" -Delimiter "`t" -Encoding UTF8 )
 
+    # Check if the data contains seeds
+    $seeds = [System.Collections.ArrayList]@()
+    $seeds.AddRange( $importRecipients.where($exp) )
+    Write-Log -message "There are $( $seeds.Count ) seeds in this file. Deleting them online"
+
+    # Remove seeds in Flexmail before upload, if present
+    $seeds | ForEach {
+        $seed = $_
+        $emailAddress = $seed.$emailFieldName
+        $emailAddressEncoded = [uri]::EscapeDataString($emailAddress)
+        $seedRecords = Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts?email=$( $emailAddressEncoded )&limit=500&offset=0" -Method Get -Headers $headers -Verbose -ContentType $contentType
+        $seedRecords | ForEach {
+            $seedRecord = $_
+            Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts/$( $seedRecord.id )" -Method Delete -Headers $headers -Verbose -ContentType $contentType
+        }
+    }
+
+    # Create the recipients objects
     $recipients = [System.Collections.ArrayList]@()
     $importRecipients | ForEach {
 
@@ -612,8 +632,10 @@ $partFiles | ForEach {
 
     $uploadBodyJson = ConvertTo-Json -InputObject $recipients -Verbose -Depth 8 -Compress
     try {
+
         $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $uploadBodyJson
         [void]$importCalls.Add( $importRecords )
+
     } catch {
 
         $e = ParseErrorForResponseBody($_)
@@ -644,8 +666,7 @@ $t = Measure-Command {
         Do {
             Start-Sleep -Seconds $sleepTime
             $status = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -Verbose -ContentType $contentType
-        } while ( $status.status -eq "idle" -and (New-TimeSpan -Start $startTime).TotalSeconds -lt $maxWaitTimeTotal)
-
+        } while ( $status.status -ne "completed" -and (New-TimeSpan -Start $startTime).TotalSeconds -lt $maxWaitTimeTotal)
 
     } finally {
 
