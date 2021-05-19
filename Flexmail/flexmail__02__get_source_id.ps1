@@ -213,7 +213,7 @@ $sourcesReturn | foreach {
     #$id = Get-StringHash -inputString $template.url -hashName "MD5" #-uppercase
 
     # Create mailing objects
-    $sourcesList.Add(
+    [void]$sourcesList.Add(
         [Source]@{
             sourceId=$source.Id
             sourceName=$source.Name

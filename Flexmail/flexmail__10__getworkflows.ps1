@@ -187,7 +187,7 @@ $workflowsReturn | where { $_.campaignName -like "*$( $settings.nameConcatChar  
     $workflow = $_
 
     # Create mailing objects
-    $workflowsList.Add(
+    [void]$workflowsList.Add(
         [FlxWorkflow]::new($workflow.campaignId, $workflow.campaignName) 
     )
 

@@ -203,7 +203,9 @@ Create-Flexmail-Parameters
 #-----------------------------------------------
 
 $globalList = Invoke-Flexmail -method "GetMailingLists"
-
+# Read out current language
+# $t = Invoke-Flexmail -method "GetAccount" -param @{} -responseNode "account" -returnFlat
+# $t.language.'#text'
 
 #-----------------------------------------------
 # CHECK SOURCES
@@ -219,7 +221,7 @@ Do {
     $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
     $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
     $offset += $limit
-    $sourcesReturn.AddRange( $sourcesResponse )
+    [void]$sourcesReturn.AddRange( $sourcesResponse )
 } while ( $sourcesResponse.count -eq $limit )
 
 # Mapping for existing variables
@@ -243,6 +245,7 @@ if ( $listId -notin $sources.id ) {
 }
 
 
+#$customFieldsSOAP = Invoke-Flexmail -method "GetCustomFields" -param @{} -responseNode "customFields"
 
 
 
@@ -283,7 +286,7 @@ $colMap.Add(
 #>
 
 # Add email column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $params.EmailFieldName
         "target" = $params.EmailFieldName
@@ -291,7 +294,7 @@ $colMap.Add(
 )
 
 # Add first name column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $settings.uploadSettings.firstNameFieldname
         "target" = $settings.uploadSettings.firstNameFieldname
@@ -299,7 +302,7 @@ $colMap.Add(
 )
 
 # Add last name column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $settings.uploadSettings.lastNameFieldname
         "target" = $settings.uploadSettings.lastNameFieldname
@@ -307,7 +310,7 @@ $colMap.Add(
 )
 
 # Add language column
-$colMap.Add(
+[void]$colMap.Add(
     [PSCustomObject]@{
         "source" = $settings.uploadSettings.languageFieldname
         "target" = $settings.uploadSettings.languageFieldname
@@ -330,7 +333,7 @@ $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source 
 $compareNames = Compare-Object -ReferenceObject $customFields.placeholder -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
 $compareNames | ForEach {
     $fieldname = $_
-    $colMap.Add(
+    [void]$colMap.Add(
         [PSCustomObject]@{
             "source" = $fieldname
             "target" = $fieldname
@@ -345,7 +348,7 @@ $remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source 
 $compareLabels = Compare-Object -ReferenceObject $customFields.label -DifferenceObject $remainingColumns.Name  -IncludeEqual -PassThru  | where { $_.SideIndicator -eq "==" }
 $compareLabels | ForEach {
     $fieldlabel = $_
-    $colMap.Add(
+    [void]$colMap.Add(
         [PSCustomObject]@{
             "source" = $fieldlabel
             "target" = $customFields.where({ $_.label -eq $fieldlabel }).placeholder
@@ -614,7 +617,7 @@ $partFiles | ForEach {
     } catch {
 
         $e = ParseErrorForResponseBody($_)
-        Write-Log -message ( $e | ConvertTo-Json -Depth 20 )
+        Write-Log -message ( $e | ConvertTo-Json -Depth 20 -Compress )
         throw $_.exception
 
         #Write-Host $_ -fore green
