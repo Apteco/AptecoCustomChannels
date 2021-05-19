@@ -244,7 +244,8 @@ if ( $mailingDetails.status_data.is_transactionmail ) {
 # IMPORT DATA
 #-----------------------------------------------
 
-$dataCsv = Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose
+$dataCsv = @()
+$dataCsv += Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose
 Write-Log -message "Loaded '$( $dataCsv.count )' records"
 
 
@@ -300,7 +301,7 @@ if ( $settings.upload.requiredFields -ne $null ) {
 }
 
 # Which columns are remaining in csv?
-$remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
+$remainingColumns = $csvAttributesNames.where( { $_.name -notin $colMap.source  } )
 
 # Check corresponding field NAMES
 $compareNames = Compare-Object -ReferenceObject $fields.f_name -DifferenceObject $remainingColumns.Name -IncludeEqual -PassThru | where { $_.SideIndicator -eq "==" }
@@ -315,7 +316,7 @@ $compareNames | ForEach {
 }
 
 # Which columns are still remaining in csv?
-$remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
+$remainingColumns = $csvAttributesNames.where( { $_.name -notin $colMap.source } )
 
 # Check corresponding field LABELS
 $compareLabels = Compare-Object -ReferenceObject $fields.f_label -DifferenceObject $remainingColumns.Name  -IncludeEqual -PassThru  | where { $_.SideIndicator -eq "==" }
@@ -330,7 +331,7 @@ $compareLabels | ForEach {
 }
 
 # Which columns are still remaining in csv?
-$remainingColumns = $csvAttributesNames | where { $_.name -notin $colMap.source  }
+$remainingColumns = $csvAttributesNames.where( { $_.name -notin $colMap.source  } )
 
 # Add remaining columns as t_ columns
 $remainingColumns | ForEach {
@@ -356,14 +357,14 @@ Write-Log -message "Required fields '$( $requiredFields -join ", " )'"
 
 # Check if required fields are present
 $compareRequirements = Compare-Object -ReferenceObject $csvAttributesNames.Name -DifferenceObject $requiredFields -IncludeEqual -PassThru
-$equalWithRequirements = $compareRequirements | where { $_.SideIndicator -eq "==" }
+$equalWithRequirements = $compareRequirements.where( { $_.SideIndicator -eq "==" } )
 if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
     # Required fields are all included
     Write-Log -message "All required fields are present"
 } else {
     # Required fields not equal -> error!
-    Write-Log -message "Not all required fields are present, missing $( ( $compareRequirements | where { $_.SideIndicator -eq "=>" } ) -join ", " )!"  
-    throw [System.IO.InvalidDataException] "Not all required fields are present, missing $( ( $compareRequirements | where { $_.SideIndicator -eq "=>" } ) -join ", " )!"  
+    Write-Log -message "Not all required fields are present, missing $( ( $compareRequirements.where( { $_.SideIndicator -eq "=>" } )) -join ", " )!"  
+    throw [System.IO.InvalidDataException] "Not all required fields are present, missing $( ( $compareRequirements.where( { $_.SideIndicator -eq "=>" } )) -join ", " )!"  
 }
 
 
@@ -527,7 +528,7 @@ if ( $settings.upload.waitForSuccess ) {
     $stopWatch.Start()
     do {
         $skipBatch = $false # Additional parameter to skip this batch, if we get a -18 as an error back, this means the status request is not ready yet
-        $sends | where { $_.sendId -notin $sendsStatus.sendId } | ForEach {
+        $sends.where( { $_.sendId -notin $sendsStatus.sendId } ) | ForEach {
             if ( $skipBatch -eq $false ) {
                 $sendOut = $_
                 $jsonInput = @(
@@ -540,7 +541,7 @@ if ( $settings.upload.waitForSuccess ) {
                     # Parse error message, if it is -18, which means results are not ready yet
                     $_.Exception.Message -match '\''(.*?) : (.*?)\''$'
                     $errCode = $matches[1]
-                    $errDesc = $matches[2]
+                    #$errDesc = $matches[2]
 
                     if ( $errCode -eq "-18" ) {
                         Write-Log -message "Skipping this batch because of an -18 error and wait for the next round"                    
@@ -567,7 +568,7 @@ if ( $settings.upload.waitForSuccess ) {
 }
 
 # Put queued, but not sent uploads into object, too
-$queue = @( $sends | where { $_.sendId -notin $sendsStatus.sendId } | select *, @{name="lastStatus";expression={ "queued" }} )
+$queue = @( $sends.where( { $_.sendId -notin $sendsStatus.sendId } ) | select *, @{name="lastStatus";expression={ "queued" }} )
 if ( $queue ) {
     [void]$sendsStatus.AddRange( $queue )
 }
@@ -684,7 +685,7 @@ if ( $settings.upload.writeToDatabase ) {
 
 # Calculate results in total
 $queued = $dataCsv.count
-$sent = ( $sendsStatus | where { $_.lastStatus -eq "sent" } ).Count
+$sent = $sendsStatus.where({ $_.lastStatus -eq "sent" }).count
 $ignored = $sent - $queued
 
 # Log the results
