@@ -207,19 +207,46 @@ Function Invoke-ELAINE {
 
         }
 
+        # Try the call multiple times if it fails
+        $tries = 0
+        $success = $false
+        Do {
 
-        $result = Invoke-RestMethod @restParams
+            try {
 
-        # Check if the result is an integer
-        If ( Is-Int($result) ) {
-            # If negative, it is definitely an error
-            If ( $result -lt 0 ) {
-                # Get the error description
-                $errMsg = "Got error '$( $result ) : $( Get-ELAINE-ErrorDescription -errCode $result )'"
-                Write-Log -message $errMsg
-                throw [System.IO.InvalidDataException] $errMsg  
-                $errMsg = ""
+                #if ($tries -lt 2 ) {
+                #    throw [System.Net.WebException] "Not found"
+                #} 
+                $result = Invoke-RestMethod @restParams
+                $success = $true
+
+            # Problem with the connection, retry
+            } catch [System.Net.WebException] {
+
+                Write-Log -message "Got a [System.Net.WebException] with status '$( $_.Exception.Status )' and reason '$( $_.Exception.Message )'" -severity ([LogSeverity]::ERROR)
+
+                # If errored, wait a few seconds and increase tries
+                Start-Sleep -Seconds 3
+                $tries += 1
+
             }
+
+        } until ( $tries -ge 3 -or $success)
+
+        if ( $success ) {
+
+            # Check if the result is an integer
+            If ( Is-Int($result) ) {
+                # If negative, it is definitely an error
+                If ( $result -lt 0 ) {
+                    # Get the error description
+                    $errMsg = "Got error '$( $result ) : $( Get-ELAINE-ErrorDescription -errCode $result )'"
+                    Write-Log -message $errMsg
+                    throw [System.IO.InvalidDataException] $errMsg  
+                    $errMsg = ""
+                }
+            }
+            
         }
 
     }
