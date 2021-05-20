@@ -27,3 +27,6 @@ _dev
 *.html
 *.csv
 *.png
+
+# others
+*.part*
