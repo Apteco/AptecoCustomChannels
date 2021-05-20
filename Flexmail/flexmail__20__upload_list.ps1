@@ -206,9 +206,12 @@ Create-Flexmail-Parameters
 #-----------------------------------------------
 
 $globalList = Invoke-Flexmail -method "GetMailingLists"
+
 # Read out current language
-# $t = Invoke-Flexmail -method "GetAccount" -param @{} -responseNode "account" -returnFlat
-# $t.language.'#text'
+# TODO [ ] use this language as default
+$account = Invoke-Flexmail -method "GetAccount" -param @{} -responseNode "account" -returnFlat
+$lang = $account.language.'#text'
+
 
 #-----------------------------------------------
 # CHECK SOURCES
