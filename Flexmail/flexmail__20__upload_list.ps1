@@ -14,27 +14,27 @@ Param(
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    EmailFieldName= "emailAddress"
-	    TransactionType= "Replace"
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\flexmail"
-	    MessageName= "123456 | 123456 | Regain"
-	    abc= "def"
-	    SmsFieldName= ""
-	    Path= "c:\faststats\Publish\Handel\system\Deliveries\PowerShell_252060_e4ed1786-ce5d-4e51-af54-e97bb45d73a4.txt"
-	    ReplyToEmail= ""
-	    Username= "abc"
-	    ReplyToSMS= ""
-	    UrnFieldName= "Kunden ID"
-	    ListName= "123456 | 123456 | Regain"
-	    CommunicationKeyFieldName= "Communication Key"
-        "settingsFile" = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Flexmail\settings.json"
+        "ReplyToEmail" = ""
+        "settingsFile" = "D:\Scripts\Flexmail\settings.json"
+        "Password" = "b"
+        "scriptPath" = "D:\Scripts\Flexmail"
+        "MessageName" = "7505938 | 252922 | VGAT_PD_Regain_nach_erstem_Kauf_und_Attract"
+        "EmailFieldName" = "email"
+        "SmsFieldName" = ""
+        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_7505938  252922  VGAT_PD_Regain_nach_erstem_Kauf_und_Attract_4125193a-44a9-428a-be4b-675f2f31231e.txt"
+        "TransactionType" = "Replace"
+        "Username" = "a"
+        "ReplyToSMS" = ""
+        "UrnFieldName" = "Kunden ID"
+        "ListName" = "7505938 | 252922 | VGAT_PD_Regain_nach_erstem_Kauf_und_Attract"
+        "CommunicationKeyFieldName" = "Communication Key"
     }
 }
 
@@ -476,7 +476,7 @@ $t = Measure-Command {
         inputDelimiter = "`t"
         outputDelimiter = "`t"
         outputColumns = $fields
-        writeCount = 2 #$settings.rowsPerUpload
+        writeCount = $settings.rowsPerUpload
         outputDoubleQuotes = $true
     }
     $exportId = Split-File @splitParams
@@ -549,6 +549,7 @@ $partFiles | ForEach {
         $seedRecords = Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts?email=$( $emailAddressEncoded )&limit=500&offset=0" -Method Get -Headers $headers -Verbose -ContentType $contentType
         $seedRecords | ForEach {
             $seedRecord = $_
+            Write-Log -message "Removing the seed with Flexmail ID $( $seedRecord.id )"
             Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts/$( $seedRecord.id )" -Method Delete -Headers $headers -Verbose -ContentType $contentType
         }
     }
@@ -585,16 +586,20 @@ $partFiles | ForEach {
             $source = $_.source
             $target = $_.target
             $dataType = $customFields.where({ $_.placeholder -eq $target })[0].type
-            $value = switch ( $dataType ) {
-                "numeric" {
-                    [int]$row.$source
+            try {
+                $value = switch ( $dataType ) {
+                    "numeric" {
+                        [int]$row.$source
+                    }
+                    "free_text" {
+                        [String]$row.$source
+                    }
+                    Default {
+                        [String]$row.$source
+                    }
                 }
-                "free_text" {
-                    [String]$row.$source
-                }
-                Default {
-                    [String]$row.$source
-                }
+            } catch {
+                Write-Log -message "Data type mismatch defining with the value '$( $( $row.$source ) )' and datatype '$( $dataType )'" -severity ([LogSeverity]::WARNING)
             }
             $recipient.custom_fields | Add-Member -MemberType NoteProperty -Name $target -Value $value
         }
@@ -604,6 +609,7 @@ $partFiles | ForEach {
 
     }
 
+    Write-Log -message "Created $( $recipients.Count ) records to upload"
 
     
 <#
@@ -639,10 +645,18 @@ $partFiles | ForEach {
     } catch {
 
         $e = ParseErrorForResponseBody($_)
-        Write-Log -message ( $e | ConvertTo-Json -Depth 20 -Compress )
+        Write-Log -message $_.Exception.Message -severity ([LogSeverity]::ERROR)
+
+        $errFile = "$( $exportPath )\errors.json"
+        Set-content -Value ( $e | ConvertTo-Json -Depth 20 ) -Encoding UTF8 -Path $errFile 
+        Write-Log -message "Written error messages into '$( $errFile )'" -severity ([LogSeverity]::ERROR)
+
+        # Release the lock file
+        Write-log -message "Removing the lock file now"
+        Remove-Item -path $settings.lockfile -Force -Verbose
+
         throw $_.exception
 
-        #Write-Host $_ -fore green
     }
 
 } 
@@ -665,8 +679,13 @@ $t = Measure-Command {
         $startTime = Get-Date
         Do {
             Start-Sleep -Seconds $sleepTime
+            Write-Log -message "Looking for the status of job $( $exportId ) - last status: '$( $status.status )'"
             $status = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -Verbose -ContentType $contentType
-        } while ( $status.status -ne "completed" -and (New-TimeSpan -Start $startTime).TotalSeconds -lt $maxWaitTimeTotal)
+        } while ( $status.status -notin @("completed","failed") -and (New-TimeSpan -Start $startTime).TotalSeconds -lt $maxWaitTimeTotal)
+    
+    } catch {
+
+        Write-log -message "There has been an exception at status request" -severity ( [severity]::ERROR )  
 
     } finally {
 
