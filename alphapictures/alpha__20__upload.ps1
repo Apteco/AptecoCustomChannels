@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -21,19 +21,27 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
+
+        # Integration parameters
+        #"scriptPath" = "D:\Scripts\alphapictures"
+        #"importFile" = "D:\FastStats\Publish\Handel\public\alphapictures.csv"
+        
+        # PeopleStage
         "TransactionType" = "Replace"
         "Password" = "cd"
         "scriptPath" = "D:\Scripts\alphapictures"
-        "MessageName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
+        "MessageName" = "1087 | 1 | Greeting Card with Balloons - 1 - "
         "EmailFieldName" = "email"
         "SmsFieldName" = ""
-        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_542  1  Passenger Boarding Bridge - 1 - _d6629a2c-4bac-4860-81e1-19493dfc2f81.txt"
+        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_1087  1  Greeting Card with Balloons - 1 - _1f4cdf68-9854-4865-8499-0338b0c8ac34.txt"
         "ReplyToEmail" = ""
         "Username" = "ab"
         "ReplyToSMS" = ""
         "UrnFieldName" = "Kunden ID"
-        "ListName" = "542 | 1 | Passenger Boarding Bridge - 1 - "
+        "importFile" = "D:\FastStats\Publish\Handel\public\alphapictures.csv"
         "CommunicationKeyFieldName" = "Communication Key"
+        "ListName" = "1087 | 1 | Greeting Card with Balloons - 1 - "
+
     }
 }
 
@@ -341,7 +349,6 @@ $dataCsv | ForEach {
             "CommunicationKey" = $row.$commKeyFieldName
         }
     )
-
 }
 
 
@@ -349,9 +356,132 @@ $dataCsv | ForEach {
 # EXPORT DATA
 #-----------------------------------------------
 
-# TODO [ ] think about exporting this into database
-
 $renderedPicLinks | Export-Csv -Path "$( $uploadsFolder )\$( $picJob.JobId ).csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+
+
+
+#-----------------------------------------------
+# MERGE DATA IN SQLITE AND EXPORT
+#-----------------------------------------------
+
+<#
+Steps:
+Import existing csv
+Insert into sqlite in memory database
+Import data in this script into database
+join and take the newest record per customer
+read data and write as csv
+FastStats picks up changed text file
+#>
+
+if ( $params.importFile ) {
+
+    Write-Log -message "Trying to merge the current links with the existing links by URN"
+
+    # Simply create the file, if it does not exist
+    if (( Test-Path -Path $params.importFile ) -eq $false ) {
+        
+        Write-Log -message "File '$( $params.importFile )' does not exist. Creating it now!"
+        $renderedPicLinks | select Urn, Url | Export-Csv -Path $params.importFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+
+    # Merge the data and compare it
+    } else {
+
+        # Load existing file
+        $existingRecords = import-csv -path $params.importFile -Delimiter "`t" -Encoding UTF8
+
+        # Open up connection to new in-memory database
+        # TODO [ ] put the dll path into settings
+        sqlite-Load-Assemblies -dllFile "C:\Program Files\Apteco\FastStats Designer\SQLite\System.Data.SQLite.dll"
+        $sqliteConnection = sqlite-Open-Connection -sqliteFile ":memory:" # "D:\data.sqlite"
+        $sqliteCommand = $sqliteConnection.CreateCommand()
+        $sqliteCommand.CommandText = @"
+            CREATE TABLE IF NOT EXISTS "Data" (
+                "key"	TEXT,
+                "value"	TEXT
+            );
+"@
+        $sqliteCommand.ExecuteNonQuery()
+        Write-Log -message "Created temporary table"
+
+        # Prepare data insertion and create a transaction
+        # https://docs.microsoft.com/de-de/dotnet/standard/data/sqlite/bulk-insert
+        $sqliteTransaction = $sqliteConnection.BeginTransaction()
+        $sqliteCommand = $sqliteConnection.CreateCommand()
+        $sqliteCommand.CommandText = "INSERT INTO data (key, value) VALUES (:key, :value)"
+        Write-Log -message "Prepared the transaction for importing data"
+
+        # Prepare data parameters
+        $sqliteParameterKey = $sqliteCommand.CreateParameter()
+        $sqliteParameterKey.ParameterName = ":key"
+        $sqliteCommand.Parameters.Add($sqliteParameterKey)
+
+        $sqliteParameterValue = $sqliteCommand.CreateParameter()
+        $sqliteParameterValue.ParameterName = ":value"
+        $sqliteCommand.Parameters.Add($sqliteParameterValue)
+
+        Write-Log -message "Prepared parameters for the import"
+
+        # Inserting the data with 1m records and 2 columns took 77 seconds
+        $t = Measure-Command {
+
+            # Insert the existing data
+            $existingRecords | ForEach {
+                $row = $_
+                $sqliteParameterKey.Value = $row.Urn
+                $sqliteParameterValue.Value = $row.Url
+                [void]$sqliteCommand.ExecuteNonQuery()
+            }
+
+            # Insert the new data
+            $renderedPicLinks | select Urn, Url | ForEach {
+                $row = $_
+                $sqliteParameterKey.Value = $row.Urn
+                $sqliteParameterValue.Value = $row.Url
+                [void]$sqliteCommand.ExecuteNonQuery()
+            }
+
+        }
+        Write-Log -message "Inserted the data in $( $t.TotalSeconds ) seconds"
+
+        # Commit the transaction
+        $sqliteTransaction.Commit()
+        Write-Log -message "Committed the data import"
+
+        # Generate the query for merging data
+        $mergedQuery = @"
+            SELECT "key"
+            ,"value"
+        FROM (
+            SELECT "key"
+                ,"value"
+                ,ROWID
+                ,RANK() OVER (
+                    PARTITION BY "key" ORDER BY ROWID DESC
+                    ) rank
+            FROM Data
+            )
+        WHERE rank = 1 AND key is not null
+"@      
+
+        # Query the merged result
+        $t = Measure-Command {
+            $updatedRecords = sqlite-Load-Data -sqlCommand $mergedQuery -connection $sqliteConnection
+        }
+        Write-Log -message "Queried the data in $( $t.TotalSeconds ) seconds"
+
+        # Close the connection
+        $sqliteConnection.Dispose()
+        Write-Log -message "Closed the connection"
+
+    }
+
+    # Write the file
+    $updatedRecords | Select @{name="Urn";expression={ $_.key }}, @{name="Url";expression={ $_.value }} | Export-csv -Path $params.importFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+    Write-Log -message "Updated the file '$( $params.importFile )'"
+
+} 
+
 
 
 #-----------------------------------------------
