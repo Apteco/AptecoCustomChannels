@@ -392,7 +392,7 @@ if ( $params.importFile ) {
 
         # Open up connection to new in-memory database
         # TODO [ ] put the dll path into settings
-        sqlite-Load-Assemblies -dllFile "C:\Program Files\Apteco\FastStats Designer\SQLite\System.Data.SQLite.dll"
+        sqlite-Load-Assemblies -dllFile "C:\Program Files\Apteco\FastStats Designer\sqlite-netFx46-binary-x64-2015-1.0.113.0\System.Data.SQLite.dll"
         $sqliteConnection = sqlite-Open-Connection -sqliteFile ":memory:" # "D:\data.sqlite"
         $sqliteCommand = $sqliteConnection.CreateCommand()
         $sqliteCommand.CommandText = @"
@@ -474,11 +474,11 @@ if ( $params.importFile ) {
         $sqliteConnection.Dispose()
         Write-Log -message "Closed the connection"
 
-    }
+        # Write the file
+        $updatedRecords | Select @{name="Urn";expression={ $_.key }}, @{name="Url";expression={ $_.value }} | Export-csv -Path $params.importFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
+        Write-Log -message "Updated the file '$( $params.importFile )'"
 
-    # Write the file
-    $updatedRecords | Select @{name="Urn";expression={ $_.key }}, @{name="Url";expression={ $_.value }} | Export-csv -Path $params.importFile -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
-    Write-Log -message "Updated the file '$( $params.importFile )'"
+    }
 
 } 
 
