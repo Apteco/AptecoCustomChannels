@@ -210,6 +210,7 @@ $alpha = [AlphaPictures]::new($cred,$settings.base)
 #-----------------------------------------------
 
 $motifs = $alpha.getMotifs()
+Write-log -message "Loaded '$( $motifs.count )' motifs with '$( $motifs.alternatives.count )' alternatives in total"
 
 
 #-----------------------------------------------
@@ -218,6 +219,7 @@ $motifs = $alpha.getMotifs()
 
 $chosenMotifAlternative = [MotifAlternative]::new($params.MessageName)
 $motifAlternative = $motifs.alternatives | where { $_.motif.id -eq $chosenMotifAlternative.motif.id -and $_.id -eq $chosenMotifAlternative.id }
+Write-log -message "Using the motif '$( $chosenMotifAlternative.motif.id )' - '$( $chosenMotifAlternative.motif.name )' with alternative '$( $chosenMotifAlternative.id )'"
 
 
 #-----------------------------------------------
@@ -225,8 +227,10 @@ $motifAlternative = $motifs.alternatives | where { $_.motif.id -eq $chosenMotifA
 #-----------------------------------------------
 
 $testRecipient = ConvertFrom-Json -InputObject $params.TestRecipient
+Write-log -message "Using the testrecipient with the json data '$( ConvertTo-Json -InputObject $testRecipient -Compress -Depth 20 )'"
 
 # Render all lines
+Write-log -message "Rendering the lines:"
 $lines = [array]@()
 $testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $_.Name -like "line#*" } | sort { $_.Name } | ForEach {
     $prop = $_.Name
@@ -238,6 +242,7 @@ $testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $
         $line = $line.Replace("%$( $token )%", $value)
     }
     #$testRecipient.Personalisation.$prop
+    Write-log -message "    '$( $line )'"
     $lines += $line
 } 
 
@@ -245,26 +250,21 @@ $maxLines = ( $motifAlternative.raw.lines | Get-Member -MemberType NoteProperty 
 If ( $lines.Count -eq 0 ) {
     $lines += "Max $( $maxLines ) lines. Use line#1, line#2, [...] in Content Step"
 }
-<#
-$line = [array]@(
-    "Hello"
-)
-$lines = [array]@(
-    "Hello"
-    "World"
-)
-#>
+Write-log -message "There is a maximum of $( $maxLines ) lines in this motif"
+
 
 $size = $motifAlternative.raw.original_rect -split ", ",4
 $width = $size[2]
 $height = $size[3]
 
-$inputwidth = 1000
+$inputwidth = 1000 # TODO [ ] put this maybe into settings
+Write-log -message "Using $( $inputwidth ) width as reference for size calculation"
 $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
-
+Write-log -message "Calculated the the size of $( $sizes.width )x$( $sizes.height )"
 
 # Create the picture and load as base64 string
 $picBase64 = $motifAlternative.createSinglePicture($lines, $sizes.width, $sizes.height, $true)
+Write-log -message "Created the singe picture online"
 
 # Embed the base64 string into html tag
 $img = "<img alt=""$( $motifAlternative.motif.name )"" src=""data:image/jpeg;charset=utf-8;base64, $( $picBase64 )"" height=""$( $sizes.height )"" width=""$( $sizes.width )""/>"
@@ -283,6 +283,7 @@ $img = "<img alt=""$( $motifAlternative.motif.name )"" src=""data:image/jpeg;cha
 # EMBED HTML INTO BOILERPLATE
 #-----------------------------------------------
 
+Write-log -message "Embedding the picture in html code"
 $htmlBoilerplate = @"
 <!DOCTYPE html>
 <!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
@@ -319,6 +320,7 @@ $html = $htmlBoilerplate -replace "#BODY#",$img
 ################################################
 
 # TODO [ ] implement subject and more of these things rather than using default values
+Write-log -message "Returning the preview html now"
 
 $return = [Hashtable]@{
     "Type" = $settings.preview.Type

@@ -209,6 +209,7 @@ $alpha = [AlphaPictures]::new($cred,$settings.base)
 #-----------------------------------------------
 
 $motifs = $alpha.getMotifs()
+Write-log -message "Loaded '$( $motifs.count )' motifs with '$( $motifs.alternatives.count )' alternatives in total"
 
 
 #-----------------------------------------------
@@ -229,4 +230,7 @@ $messages = $motifs.alternatives | Select @{name="id";expression={ "$( $_.motif.
 
 # real messages
 return $messages
+
+
+
 

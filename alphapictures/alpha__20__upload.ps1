@@ -236,6 +236,7 @@ $alpha = [AlphaPictures]::new($cred,$settings.base)
 #-----------------------------------------------
 
 $motifs = $alpha.getMotifs()
+Write-log -message "Loaded '$( $motifs.count )' motifs with '$( $motifs.alternatives.count )' alternatives in total"
 
 
 #-----------------------------------------------
@@ -244,6 +245,7 @@ $motifs = $alpha.getMotifs()
 
 $chosenMotifAlternative = [MotifAlternative]::new($params.MessageName)
 $motifAlternative = $motifs.alternatives | where { $_.motif.id -eq $chosenMotifAlternative.motif.id -and $_.id -eq $chosenMotifAlternative.id }
+Write-log -message "Using the motif '$( $chosenMotifAlternative.motif.id )' - '$( $chosenMotifAlternative.motif.name )' with alternative '$( $chosenMotifAlternative.id )'"
 
 
 #-----------------------------------------------
@@ -259,11 +261,14 @@ Write-Log -message "Loaded '$( $dataCsv.count )' records"
 #-----------------------------------------------
 
 # Use the first row for creating the lines template
+Write-log -message "Rendering the lines:"
 $lines = [array]@()
 $firstRow = $dataCsv[0] 
 $firstRow | Get-Member -MemberType NoteProperty | where { $_.Name -like "line#*" } | sort { $_.Name } | ForEach {
     $prop = $_.Name
-    $lines += $firstRow.$prop
+    $line = $firstRow.$prop
+    Write-log -message "    '$( $line )'"
+    $lines += $line
 }
 
 
@@ -277,8 +282,10 @@ $size = $motifAlternative.raw.original_rect -split ", ",4
 $width = $size[2]
 $height = $size[3]
 
-$inputwidth = 1000
+$inputwidth = 2000 # TODO [ ] put this maybe into settings
+Write-log -message "Using $( $inputwidth ) width as reference for size calculation"
 $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
+Write-log -message "Calculated the the size of $( $sizes.width )x$( $sizes.height )"
 
 
 #-----------------------------------------------
@@ -287,12 +294,15 @@ $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $
 
 # Create the render job and get back the ids
 # TODO [ ] split the uploads in parts of n records
+Write-log -message "Creating a job for the image generation"
 $picJob = $motifAlternative.createJob($dataCsv, $params.UrnFieldName, $lines, $sizes.width, $sizes.height, $true)
 
 
 #-----------------------------------------------
 # WAIT FOR THE JOB
 #-----------------------------------------------
+
+Write-log -message "Waiting for the job to finish"
 
 #$picJob.updateStatus()
 $picJob.autoUpdate()
@@ -311,18 +321,23 @@ $picJob.autoUpdate()
 # TODO [ ] wait until the job is kind of done 
 if ( $settings.upload.waitForSuccess ) {
 
+    $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
+    Write-log -message "Asking for a maximum of $( $timeSpan ) seconds"
+
     # Initial wait of 5 seconds, so there is a good chance the messages are already send
+    Write-log -message "Initial wait of 5 seconds"
     Start-Sleep -Seconds 5 # TODO [ ] put this into settings
 
     $stopWatch = [System.Diagnostics.Stopwatch]::new()
-    $timeSpan = New-TimeSpan -Seconds $settings.upload.timeout
     $stopWatch.Start()
     do {
         # wait another n seconds
+        Write-log -message "Checking current status of job: $( $picJob.status )"
         Start-Sleep -Seconds 10 # TODO [ ] put this into settings
     } until (( $picJob.status -eq "DONE" ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
     
-    #Write-Log -message "Got back $( $sendsStatus.count ) successful sents"
+    Write-Log -message "Status of job: $( $picJob.status )"
+    Write-log -message "Elapsed time: $( $stopWatch.Elapsed )"
 
 }
 
@@ -332,6 +347,7 @@ if ( $settings.upload.waitForSuccess ) {
 # CREATE LINKS FOR RECEIVERS
 #-----------------------------------------------
 
+Write-Log -message "Creating the public links for the input data now"
 $renderedPicLinks = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
 
@@ -351,13 +367,16 @@ $dataCsv | ForEach {
     )
 }
 
+Write-Log -message "Created $( $renderedPicLinks.Count ) links"
+
 
 #-----------------------------------------------
 # EXPORT DATA
 #-----------------------------------------------
 
-$renderedPicLinks | Export-Csv -Path "$( $uploadsFolder )\$( $picJob.JobId ).csv" -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
-
+$jobFile = "$( $uploadsFolder )\$( $picJob.JobId ).csv"
+$renderedPicLinks | Export-Csv -Path $jobFile -Encoding UTF8 -NoTypeInformation -Delimiter "`t"
+Write-Log -message "Created the file '$( $jobFile )'"
 
 
 #-----------------------------------------------
