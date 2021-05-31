@@ -176,6 +176,7 @@ Function Create-VariableDefinitions {
 
         $postcodeSynonyms = @("Postleitzahl","zip","zip code","zip-code","PLZ")
         $countrycodeSynonyms = @("iso","country","land","länderkennzeichen")
+        $alphaPicturesSynonyms = @("Hintergrund") # TODO [ ] put this into settings
 
     }
     
@@ -240,6 +241,12 @@ Function Create-VariableDefinitions {
             $countrycodeSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["90"] = $true
+                }
+            } 
+
+            $alphaPicturesSynonyms | ForEach {
+                if ( $fieldname -like "*$( $_ )*" ) {
+                    $dataTypeCheck["60"] = $true
                 }
             } 
 
