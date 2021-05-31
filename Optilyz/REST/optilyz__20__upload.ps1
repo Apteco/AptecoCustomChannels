@@ -371,7 +371,7 @@ if ( $recipients.Count -gt 0 ) {
 
             # Create body for API call
             $body = @{
-                "addresses" = $recipients[$start..$end] | Select * -ExcludeProperty Urn,communicationkey
+                "addresses" = [System.Collections.ArrayList]@( $recipients[$start..$end] | Select * -ExcludeProperty Urn,communicationkey )
             }
 
             # Check size of recipients object
