@@ -307,7 +307,7 @@ Write-Log -message "Only fields $( $colsEqual.InputObject -join "," ) are matchi
 
 $urnFieldName = $params.UrnFieldName
 $commkeyFieldName = $params.CommunicationKeyFieldName
-$recipients = @()
+$recipients = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
 
     $addr = $_
@@ -349,7 +349,7 @@ $dataCsv | ForEach {
         "variation" = $addr.variation #$variations | Get-Random 
         "vouchers" = @() # array of @{"code"="XCODE123";"name"="voucher1"}
     }
-    $recipients += $recipient
+    $recipients.Add($recipient)
 }
 
 
