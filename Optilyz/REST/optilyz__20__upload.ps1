@@ -206,14 +206,7 @@ $contentType = "application/json;charset=utf-8"
 # IMPORT DATA
 #-----------------------------------------------
 
-#$dataCsv = Import-Csv -Path ".\random100.csv" -Delimiter "`t" -Encoding UTF8 -Verbose
-#$dataCsv = Import-Csv -Path ".\random3500.csv" -Delimiter "`t" -Encoding UTF8 -Verbose
-$dataCsv = Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose
-
-# https://de.wikipedia.org/wiki/Liste_deutscher_Vornamen_aus_der_Bibel
-#$firstnames = @("Aaron","Abraham","Ada","Adam","Andreas","Anna","Balthasar","Benjamin","Christian","Daniel","David","Debora","Delila","Elias","Elisabeth")
-# https://www.bedeutung-von-namen.de/top50-nachnamen-deutschland
-#$lastnames = @("Müller","Schmidt","Schneider","Fischer","Meyer","Weber","Hofmann",	"Wagner","Becker",	"Schulz",	"Schäfer",	"Koch",	"Bauer","Richter","Klein")
+$dataCsv = [System.Collections.ArrayList]@( import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
 
 
 #-----------------------------------------------
@@ -226,15 +219,6 @@ Try {
 } Catch {
     throw [System.IO.InvalidDataException] "Automation id does not exist, maybe not live anymore"  
 }
-
-# Get visuals
-#Invoke-RestMethod -Verbose -Uri "$( $settings.base )/v2/automations/$( $automationID )/visuals" -Method Get -Headers $headers -ContentType $contentType #-Body $bodyJson -TimeoutSec $maxTimeout
-
-# Get campaigns
-#Invoke-RestMethod -Verbose -Uri "$( $settings.base )/v2/automations/$( $automationID )/campaigns" -Method Get -Headers $headers -ContentType $contentType #-Body $bodyJson -TimeoutSec $maxTimeout
-
-# TODO [ ] change this
-#$variations = @("1","2","A") #$automationDetails.variations.id
 
 
 #-----------------------------------------------
@@ -323,7 +307,7 @@ Write-Log -message "Only fields $( $colsEqual.InputObject -join "," ) are matchi
 
 $urnFieldName = $params.UrnFieldName
 $commkeyFieldName = $params.CommunicationKeyFieldName
-$recipients = @()
+$recipients = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
 
     $addr = $_
@@ -365,7 +349,7 @@ $dataCsv | ForEach {
         "variation" = $addr.variation #$variations | Get-Random 
         "vouchers" = @() # array of @{"code"="XCODE123";"name"="voucher1"}
     }
-    $recipients += $recipient
+    $recipients.Add($recipient)
 }
 
 
@@ -387,7 +371,7 @@ if ( $recipients.Count -gt 0 ) {
 
             # Create body for API call
             $body = @{
-                "addresses" = $recipients[$start..$end] | Select * -ExcludeProperty Urn,communicationkey
+                "addresses" = [System.Collections.ArrayList]@( $recipients[$start..$end] | Select * -ExcludeProperty Urn,communicationkey )
             }
 
             # Check size of recipients object
