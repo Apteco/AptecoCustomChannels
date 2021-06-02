@@ -233,6 +233,20 @@ $uploadSettings = @{
     firstNameFieldname = "first_name"
     lastNameFieldname = "name"
     languageFieldname = "language"
+    validLanguages = @(                 # valid languages for upload, loaded from here: https://soap.flexmail.eu/documentation/service/15-importemailaddresses.html
+        "nl"
+        "fr"
+        "en"
+        "de"
+        "it"
+        "es"
+        "ru"
+        "da"
+        "se"
+        "zh"
+        "pt"
+        "pl"
+    )                
 }
 
 

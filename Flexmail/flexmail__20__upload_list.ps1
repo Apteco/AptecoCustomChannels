@@ -205,7 +205,7 @@ Create-Flexmail-Parameters
 # LOAD GLOBAL FLEXMAIL SETTINGS
 #-----------------------------------------------
 
-$globalList = Invoke-Flexmail -method "GetMailingLists"
+$globalList = @( Invoke-Flexmail -method "GetMailingLists" )
 
 # Read out current language
 # TODO [ ] use this language as default
@@ -572,12 +572,20 @@ $partFiles | ForEach {
         }
         #>
 
+        # Check language, if not valid, use the default setting
+        If ( $row.$languageFieldname -in $settings.uploadSettings.validLanguages ) {
+            $language = $row.$languageFieldname
+        } else {
+            $language = $globalList.where({ $_.mailingListType -eq "list" }).mailingListLanguage.ToLower() #$globalList.mailingListLanguage.ToLower()
+            #$language = $account.language.'#text'
+        }
+
         # Check if these fixed column names should be checked earlier
         $recipient = [PSCustomObject]@{
             email = $row.$emailFieldName
             first_name = $row.$firstNameFieldname
             name = $row.$lastNameFieldname
-            language = $globalList.mailingListLanguage.ToLower() 
+            language = $language
             custom_fields = [PSCustomObject]@{}
             sources = @( $listId )
             interest_labels = @()
