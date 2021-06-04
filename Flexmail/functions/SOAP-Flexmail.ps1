@@ -240,6 +240,7 @@ Function Invoke-Flexmail {
     # print response to console
     if ( $verboseCall ) {
         write-host $response.OuterXml
+        Out-File -InputObject $response.OuterXml -Encoding utf8 -FilePath ".\$( ([guid]::NewGuid()).guid ).xml"
     }
 
     # load namespaces of response
