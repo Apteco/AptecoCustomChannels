@@ -21,3 +21,6 @@ _archive
 _dev
 *.json
 *.csv
+*.part*
+*.txt
+*.xml
