@@ -18,35 +18,27 @@ Param(
     [hashtable] $params
 )
 
+
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
-        $params = [hashtable]@{
-
-                # Integration Parameters
-                scriptPath= "C:\FastStats\scripts\flexmail"
-                settingsFile = "C:\Users\Florian\Documents\GitHub\AptecoPrivateCustomChannels\eLettershop\settings.json"
-
-                # Parameters coming from PeopleStage
-                MessageName= "1631416 | Testmail_2"
-                abc= "def"
-                ListName= "252060"
-                Password= "def"
-                Username= "abc"
-
-                # Coming from Upload script
-                RecipientsSent = 4
-
-        }
+    $params = [hashtable]@{
+	    Password= "def"
+	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Flexmail"
+	    abc= "def"
+	    Username= "abc"
+    }
 }
+
 
 
 ################################################
@@ -63,7 +55,7 @@ if ( $debug ) {
         $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
     }
 } else {
-    $scriptPath = "$( $params.scriptPath )" 
+    $scriptPath = "$( $params.scriptPath )"
 }
 Set-Location -Path $scriptPath
 
@@ -78,8 +70,8 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "FLXBRDCST"
-$processId = $params.ProcessId #[guid]::NewGuid()
+$moduleName = "FLXWRKFLW"
+$processId = [guid]::NewGuid()
 
 if ( $params.settingsFile -ne $null ) {
     # Load settings file from parameters
@@ -89,15 +81,13 @@ if ( $params.settingsFile -ne $null ) {
     $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
 }
 
-
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
-
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        #,[System.Net.SecurityProtocolType]::Ssl3
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
@@ -116,6 +106,8 @@ if ( $debug ) {
 # FUNCTIONS & ASSEMBLIES
 #
 ################################################
+
+#Add-Type -AssemblyName System.Data
 
 # Load all PowerShell Code
 "Loading..."
@@ -169,53 +161,53 @@ if ( $paramsExisting ) {
 }
 
 
-
 ################################################
 #
 # PROGRAM
 #
 ################################################
 
-
-#"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing the recipient list $( $recipientListID )" >> $logfile
-
 #-----------------------------------------------
-# RECIPIENT LIST ID
+# LOAD WITH SOAP
 #-----------------------------------------------
 
-#$campaignId = ( $params.ListName -split $settings.messageNameConcatChar,2 )[0]
-#Write-log -message "Using the campaign id '$( $campaignId )'"
-Write-log -message "Nothing to do in broadcast script"
+$workflowsReturn = Invoke-Flexmail -method "GetCampaigns" | where { $_.campaignType -eq "Workflow" }
 
 
 #-----------------------------------------------
-# COUNT THE NO OF ROWS
+# BUILD WORKFLOW OBJECTS
 #-----------------------------------------------
 
+$workflowsList = [System.Collections.ArrayList]@()
 
-#$lines = Count-Rows -inputPath $f -header $true
+# Only workflows containing a split character like | so it contains a source in the messagename
+$workflowsReturn | where { $_.campaignName -like "*$( $settings.nameConcatChar  )*" } | foreach {
 
+    # Load data
+    $workflow = $_
 
-#-----------------------------------------------
-# RETURN VALUES TO PEOPLESTAGE
-#-----------------------------------------------
+    # Create mailing objects
+    [void]$workflowsList.Add(
+        [FlxWorkflow]::new($workflow.campaignId, $workflow.campaignName) 
+    )
 
-
-# TODO [x] this is only a workaround until the handover from the return upload hashtable to the broadcast is working
-$recipients = $params.RecipientsSent
-
-# return the campaign id because this will be the reference for the response data
-#$transactionId = $campaignId
-
-# build return object
-$return = [Hashtable]@{
-    "Recipients" = $recipients
-    "TransactionId" = $campaignId
-    "CustomProvider" = $moduleName
-    "ProcessId" = $processId
 }
 
-# return the results
-$return
+Write-Log -message "Got back $( $workflowsList.count ) workflows"
 
 
+#-----------------------------------------------
+# WRAP UP
+#-----------------------------------------------
+
+#$workflows = $workflowsReturn | select @{name="id";expression={ $_.campaignId }}, @{name="name";expression={ "$( $_.campaignId )$( $settings.messageNameConcatChar )$( $_.campaignName )" }}
+$workflows = $workflowsList | select @{name="id";expression={ $_.workflowId }}, @{name="name";expression={ $_.toString() }} | sort id
+
+
+################################################
+#
+# RETURN
+#
+################################################
+
+$workflows

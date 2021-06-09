@@ -31,3 +31,6 @@ _dev
 # others
 *.part*
 *.txt
+*.lock
+*.part*
+*.xml

@@ -30,13 +30,16 @@ $debug = $false
 #
 ################################################
 
-# Load scriptpath
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+if ( $debug ) {
+    # Load scriptpath
+    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    } else {
+        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    }
 } else {
-    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    $scriptPath = "$( $params.scriptPath )"
 }
-
 Set-Location -Path $scriptPath
 
 
@@ -48,10 +51,18 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
+$moduleName = "FLXRESPONSE"
+$processId = [guid]::NewGuid()
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+if ( $params.settingsFile -ne $null ) {
+    # Load settings file from parameters
+    $settings = Get-Content -Path "$( $params.settingsFile )" -Encoding UTF8 -Raw | ConvertFrom-Json
+} else {
+    # Load default settings
+    $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+}
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
@@ -64,19 +75,43 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
+# more settings
 $logfile = $settings.logfile
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 $exportFolder = $settings.responseSettings.responseFolder
 
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
+<#
+# Load all exe files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+$libExecutables | ForEach {
+    "... $( $_.FullName )"
+    
+}
+# Load dll files in subfolder
+$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+$libExecutables | ForEach {
+    "Loading $( $_.FullName )"
+    [Reflection.Assembly]::LoadFile($_.FullName) 
+}
+#>
 
 
 ################################################
@@ -85,20 +120,33 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tRESPONSE DOWNLOAD" >> $logfile
-
-<#
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
 }
-#>
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
+}
+
+
 
 # is debug mode on?
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tDebug mode is $( $debug )" >> $logfile
+Write-log -message "Debug mode is $( $debug )"
 
 
 ################################################
@@ -177,7 +225,7 @@ $endDateFormatted = $endDate.ToString($settings.responseSettings.dateFormat)
 $startDateFormatted = $startDate.ToString($settings.responseSettings.dateFormat)
 
 # log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoad responses in timeframe from $( $startDateFormatted ) until $( $endDateFormatted )" >> $logfile
+Write-log -message "Load responses in timeframe from $( $startDateFormatted ) until $( $endDateFormatted )"
 
 #-----------------------------------------------
 # GET CAMPAIGN HISTORY
@@ -223,12 +271,12 @@ $responseTypes.Keys | ForEach {
         }
 
         # log
-        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoad campaign $( $campaign ) with response type $( $responseTypeName )" >> $logfile
+        Write-log -message "Load campaign $( $campaign ) with response type $( $responseTypeName )"
 
         $campHistory = Invoke-Flexmail -method "GetCampaignHistory" -param $historyParams -verboseCall -responseType "EmailAddressHistoryActionType"
 
         # log
-        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tLoaded $( $campHistory.count ) $( $responseTypeName )" >> $logfile
+        Write-log -message "Loaded $( $campHistory.count ) $( $responseTypeName )"
 
         switch ( $responseTypeName ) {
         
@@ -283,7 +331,7 @@ if ( $reponseFiles.Count -gt 0 ) {
     $exportTimestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
     # log
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tThere are already $( $reponseFiles.Count ) files in response folder. Archiving them into $( $exportTimestamp )" >> $logfile
+    Write-log -message "There are already $( $reponseFiles.Count ) files in response folder. Archiving them into $( $exportTimestamp )"
 
     New-Item -Path "$( $exportFolder )\$( $exportTimestamp )" -ItemType "Directory"
     $reponseFiles | Move-Item -Destination "$( $exportFolder )\$( $exportTimestamp )"
@@ -296,7 +344,7 @@ if ( $reponseFiles.Count -gt 0 ) {
 #-----------------------------------------------
 
 # log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tExporting response data now" >> $logfile
+Write-log -message "Exporting response data now"
 
 
 $opens | Export-Csv -Path "$( $exportFolder )\opens.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
@@ -304,7 +352,7 @@ $clicks | Export-Csv -Path "$( $exportFolder )\clicks.csv" -Encoding UTF8 -Delim
 $sents | Export-Csv -Path "$( $exportFolder )\sents.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 
 # log
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tResponse data exported. Done!" >> $logfile
+Write-log -message "Response data exported. Done!"
 
 
 #-----------------------------------------------
