@@ -227,12 +227,23 @@ $previewSettings = @{
 #-----------------------------------------------
 
 $uploadSettings = @{
+    
     sleepTime = 10                      # seconds to wait between import checks
     maxSecondsWaiting = 360             # how many seconds to wait at maximum
     resubscribeBlacklistedContacts = $true
+    
+    # Static field name mapping
     firstNameFieldname = "first_name"
     lastNameFieldname = "name"
-    languageFieldname = "language"
+    languageFieldname = "language"      # If the language is not set, it will use the default global account language automatically
+    
+    <#
+
+
+    Contact languages are configured during onboarding of your accounts. This can not be changed by the user afterwards via GUI nor via API. So contact languages are considered static account data and there is no API endpoint to retrieve or change it.
+The only way it can be changed after onboarding is via a request to our support, but in that case you are aware of the changes to your accounts settings.
+If you would like to get a list of the configured contact languages per account, we could help you by providing that information if you present us with a list of your account id's you are interested in.
+    #>
     validLanguages = @(                 # valid languages for upload, loaded from here: https://soap.flexmail.eu/documentation/service/15-importemailaddresses.html
         "nl"
         "fr"
@@ -246,7 +257,9 @@ $uploadSettings = @{
         "zh"
         "pt"
         "pl"
-    )                
+    )
+    
+    
 }
 
 
