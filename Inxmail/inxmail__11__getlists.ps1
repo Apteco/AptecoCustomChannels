@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -66,6 +66,7 @@ Set-Location -Path $scriptPath
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
 $moduleName = "INXGETLISTS"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -81,7 +82,14 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
+# more settings
 $logfile = $settings.logfile
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 
 ################################################
 #

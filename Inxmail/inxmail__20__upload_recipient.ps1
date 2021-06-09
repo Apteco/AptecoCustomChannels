@@ -13,13 +13,33 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
+if( $debug ){
+    $params = [hashtable]@{
+       TransactionType = "Replace"
+       Password = "gutentag"
+       scriptPath = "D:\Scripts\Inxmail\Mailing"
+       MessageName = "16 / VorlageVonNikolas240321"
+       EmailFieldName = "email"
+       SmsFieldName = ""
+       Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_16  VorlageVonNikolas240321_0fba359b-4a20-4866-b610-751ebe732b06.txt"
+       ReplyToEmail = ""
+       Username = "absdede"
+       ReplyToSMS = ""
+       UrnFieldName = "Kunden ID"
+       ListName = "16 / VorlageVonNikolas240321"
+       CommunicationKeyFieldName = "Communication Key"
+    }
+}
+
+
+<#
 if ( $debug ) {
     $params = [hashtable]@{
 	    TransactionType= "Replace"
@@ -38,7 +58,7 @@ if ( $debug ) {
 
     }
 }
-
+#>
 ################################################
 #
 # NOTES
@@ -47,6 +67,7 @@ if ( $debug ) {
 
 <#
 
+TODO [ ] more log comments
 
 #>
 
@@ -142,7 +163,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param )= ""$( $params[$param] )"""
+        Write-Log -message "    $( $param ) = ""$( $params[$param] )"""
     }
 }
 
@@ -177,13 +198,16 @@ $header = @{
 $file = Get-Item -Path $params.Path
 
 # Transform PeopleStage data into csv file
-$dataCsv = @()
-$dataCsv = import-csv -Path $file.FullName -Delimiter "`t" -Encoding UTF8
+$dataCsv = [System.Collections.ArrayList]@( import-csv -Path $file.FullName -Delimiter "`t" -Encoding UTF8 )
 
 # Transform csv into compatible inxmail csv file (meaning that email field is in first place)
-$processId = [guid]::NewGuid()
-
 $props = $dataCsv | Get-Member -MemberType NoteProperty
+
+# Make sure the email column has the right name
+if ( $params.EmailFieldName -ne "email" ) {
+    Write-Log -message "Please make sure, the email column name is 'email' in the channel editor" -severity ( [LogSeverity]::ERROR )
+    throw [System.IO.InvalidDataException] "Please make sure, the email column name is 'email' in the channel editor"
+}
 
 # Adding first column directly to the array
 $columnOrder = @("email") 
@@ -193,7 +217,6 @@ $props.Name | Where-Object { $_ -notin $columnOrder } | ForEach-Object {
 
 # Rearranging the order that email is the first column as this is a requirement of inxmail
 $csvString = $dataCsv | Select-Object $columnOrder | ConvertTo-Csv -Delimiter ";" -NoTypeInformation   #| Export-Csv -Path $path -Encoding UTF8 -Delimiter ";" -Verbose -NoTypeInformation
-
 
 
 #-----------------------------------------------
@@ -233,7 +256,6 @@ $attributesNames = $attributes.name
 $csvAttributesObject = Get-Member -InputObject $dataCsv[0] -MemberType NoteProperty 
 $csvAttributesNames = $csvAttributesObject.name
 
-
 # Check if email field is present in csv
 $equalWithRequirements = Compare-Object -ReferenceObject $csvAttributesNames -DifferenceObject $requiredFields -IncludeEqual -PassThru | Where-Object { $_.SideIndicator -eq "==" }
 
@@ -242,6 +264,7 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
 
 } else {
     # Required fields not equal -> error!
+    Write-Log -message "No email field present!" -severity ( [LogSeverity]::ERROR )
     throw [System.IO.InvalidDataException] "No email field present!"  
 }
 
@@ -252,11 +275,9 @@ $differences = Compare-Object -ReferenceObject $attributesNames -DifferenceObjec
 $colsInCsvButNotAttr = $differences | Where-Object { $_.SideIndicator -eq "=>" }
 
 
-
 #------------------------------------------------------
 # CREATE GLOBAL/LOCAL ATTRIBUTES THAT ARE NOT IN CSV
 #------------------------------------------------------
-
 
 $object = "attributes"
 $endpoint = "$( $apiRoot )$( $object )"
@@ -287,13 +308,10 @@ $colsInCsvButNotAttr | ForEach-Object {
             https://apidocs.inxmail.com/xpro/rest/v1/#_create_recipient_attribute
         #>
         $newAttributes += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose
-    }else{
-        return
-    }
-    
+
+    }     
      
 }   
-
 
 
 #-----------------------------------------------
@@ -302,11 +320,17 @@ $colsInCsvButNotAttr | ForEach-Object {
 
 $arr = $params.MessageName -split " / ",2
 
+# TODO [ ] use the split character from settings
+# TODO [ ] check if list exists before using it
+
 # If a given local list exists in the params change endpoint to that list
 # Now recipients will be imported in the given list and not to the global inxmail list
 # If there is no list given there will be one created automatically
 $object = "lists"
-if($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageName -eq $params.ListName){
+if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageName -eq $params.ListName) {
+
+    $createdNewList = $true
+
     $endpoint = "$( $apiRoot )$( $object )"
     
     # Neue Liste wird hinzufügt
@@ -314,7 +338,8 @@ if($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNam
         "name" = [datetime]::Now.ToString("MM.dd.yyyy-HH:mm:ss-ID:$( $arr[0] )Name:$( $arr[1] )")
         "type" = "STANDARD"
         
-        "senderAddress" = "john.doe@example.com"
+        # TODO [ ] put senderAddress and other info into settings and read from there
+        "senderAddress" = "info@apteco.de"
         #"senderName" = "Sibylle"
         # "replyToAddress" = "jane.doe@example.com"
         # "replyToName" = "Jane Doe"
@@ -325,25 +350,34 @@ if($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNam
     $bodyBetaJson = $bodyBeta | ConvertTo-Json
 
     #$upload = @()
-    try{
+    try {
+
         <#
             https://apidocs.inxmail.com/xpro/rest/v1/#_create_mailing_list
         #>
         $upload = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyBetaJson -ContentType $contentType -Verbose
         $listID = $upload.id
-    }catch{
+
+    } catch {
+
         $e = ParseErrorForResponseBody($_)
         Write-Log -message ( $e | ConvertTo-Json -Depth 20 )
         throw $_.exception
+
     }
 
-}else{
+} else {
+
     # Splitting the ListName with "/" in order to get the listID
+    # TODO [ ] use the split character from settings
     $listNameSplit = $params.ListName.Split(" / ")
     $listID = $listNameSplit[0]
     # Endpoint is the list with the corresponding listID
-       
+    
+    $createdNewList = $false
+
 }
+
 
 #-----------------------------------------------
 # UPSERT DATA INTO LISTS
@@ -352,21 +386,23 @@ if($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNam
 # A certain method to correctly invoke
 $multipart = Prepare-MultipartUpload -string $csvString
 
-
 # Dem server gibt man Informationen mit über das Format, was es für den server leichter macht
 $object = "imports/recipients"
 $endpoint = "$( $apiRoot )$( $object )?listId=$( $listID )"
 
+<#
+    Now the data is going to be uploaded to Inxmail
 
-$upload = @()
-    <#
-        Now the data is going to be uploaded to Inxmail
+    https://apidocs.inxmail.com/xpro/rest/v1/#_import_multiple_recipients_by_uploading_a_csv_file
+#>
+$upload = [System.Collections.ArrayList]@( Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $multipart.body -ContentType $multipart.contentType -Verbose )
 
-        https://apidocs.inxmail.com/xpro/rest/v1/#_import_multiple_recipients_by_uploading_a_csv_file
-    #>
-$upload = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $multipart.body -ContentType $multipart.contentType -Verbose
+Write-Log -message "Created upload with id '$( $upload.id )'"
 
 
+#-----------------------------------------------
+# WAIT UNTIL IMPORT IS DONE
+#-----------------------------------------------
 
 $check = $null
 $sleepTime = 4
@@ -391,10 +427,11 @@ do {
     $totalSleepTime += $sleepTime
     Write-Host $totalSleepTime
     
-} while (@("SUCCESS","FAILED","CANCELED") -notcontains $check.state)
+} while ( @("SUCCESS","FAILED","CANCELED") -notcontains $check.state)
         
-
-Write-Host $check.state
+Write-Log -message "Got back status '$( $check.state )' after $( $totalSleepTime ) seconds"
+Write-Log -message "$( $check.successCount ) records uploaded successfully"
+Write-Log -message "$( $check.failCount ) records uploaded failed"
 
 
 ################################################
@@ -404,17 +441,23 @@ Write-Host $check.state
 ################################################
 
 # count the number of successful upload rows
-$recipients = $upload.count
+$recipients = $check.successCount
 
 # put in the source id as the listname
 $transactionId = $processId
 
 # return object
 $return = [Hashtable]@{
+
     "Recipients"=$recipients
     "TransactionId"=$transactionId
-    "successfulRecipients" = $upload.count
-    #"ListId"= 
+    "successfulRecipients" = $recipients
+    "failedRecipients" = $check.failCount
+
+    # List information
+    "CreatedNewList" = $createdNewList.ToString()
+    "ListId" = $listID
+
 }
 
 # return the results

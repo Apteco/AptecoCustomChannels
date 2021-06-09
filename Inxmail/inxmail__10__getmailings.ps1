@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -69,6 +69,7 @@ $functionsSubfolder = "functions"
 #$libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "INXGETMAILINGS"
+$processId = [guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json

@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -144,7 +144,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param )= ""$( $params[$param] )"""
+        Write-Log -message "    $( $param ) = ""$( $params[$param] )"""
     }
 }
 

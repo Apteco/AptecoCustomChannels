@@ -13,7 +13,8 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -21,6 +22,7 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
+        <#
 	    TransactionType= "Replace"
         Password= "gutentag"
         scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing"
@@ -34,6 +36,18 @@ if ( $debug ) {
         UrnFieldName= "Kunden ID"
         ListName= "4 / testListe"
         CommunicationKeyFieldName= "Communication Key"
+        #>
+
+        CreatedNewList = "True"
+        MessageName = "16 / VorlageVonNikolas240321"
+        Username = "absdede"
+        TransactionId = "fc27c221-e2d5-468f-8341-5c0cab1a2adf"
+        successfulRecipients = "4"
+        ListId = "25"
+        Password = "gutentag"
+        ListName = "16 / VorlageVonNikolas240321"
+        failedRecipients = "0"
+        scriptPath = "D:\Scripts\Inxmail\Mailing"
 
     }
 }
@@ -81,7 +95,7 @@ $functionsSubfolder = "functions"
 #$libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "INXBROADCAST"
-#$processId = [guid]::NewGuid()
+$processId =  $params.TransactionId #[guid]::NewGuid()
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -156,7 +170,7 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 if ( $paramsExisting ) {
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    $( $param ) = ""$( $params[$param] )"""
     }
 }
 
@@ -166,6 +180,13 @@ if ( $paramsExisting ) {
 # PROGRAM
 #
 ################################################
+
+#-----------------------------------------------
+# MORE SETTINGS FIRST
+#-----------------------------------------------
+
+$sendMailing = $setting.sendMailing
+
 
 #-----------------------------------------------
 # AUTHENTICATION
@@ -178,20 +199,26 @@ $header = @{
     "Authorization" = $auth
 }
 
+
 #-----------------------------------------------
 # GET MAILING / LIST DETAILS 
 #-----------------------------------------------
 
 # Splitting MailingName and ListName to get Ids
 $mailingIdArray = $params.MessageName -split " / "
-$listIdArray = $params.ListName -split " / "
+#$listIdArray = $params.ListName -split " / "
+
+# TODO [ ] use the split character from settings
+# TODO [ ] check if mailing exists before using it
 
 $mailingId = $mailingIdArray[0]
-$listId = $listIdArray[0]
+$listId = $params.ListId
+
 
 #-----------------------------------------------------------------
 # COPY MAILING
 #-----------------------------------------------------------------
+
 $object = "operations"
 $endpoint = "$( $apiRoot )$( $object )/mailings?command=copy"
 
@@ -209,13 +236,15 @@ $bodyJson = $body | ConvertTo-Json
     https://apidocs.inxmail.com/xpro/rest/v1/#copy-mailing
 #>
 $copiedMailing = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
-$copiedMailingId = $copiedMailing.id
+
+Write-Log -message "Copied mailing '$( $mailingId )' with new id '$( $copiedMailing.id )' and name '$( $copiedMailing.name )' and type '$( $copiedMailing.type )'"
 
 
 #-----------------------------------------------------------------
 # GET COPIED MAILING
 #-----------------------------------------------------------------
 
+# TODO [ ] is this call needed?
 $endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:response-statistics,inx:sending-statistics"
 <#
     https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-single-regular-mailings
@@ -223,19 +252,23 @@ $endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:res
 $mailingsDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType $contentType -Verbose
 
 
-
-
 #-----------------------------------------------------------------
-# SEND A MAILING 
+# SCHEDULE/SEND A MAILING 
 #-----------------------------------------------------------------
 
-if( $sendMailing -eq $true ){
+
+if ( $sendMailing -eq $true ) {
+
+    #-----------------------------------------------------------------
+    # SEND A MAILING 
+    #-----------------------------------------------------------------
+
     $object = "sendings"
     $endpoint = "$( $apiRoot )$( $object )"
     $contentType = "application/json; charset=utf-8"
     
     $body = [hashtable]@{
-        mailingId = $copiedMailingId
+        mailingId = $copiedMailing.id
     }
     
     $bodyJson = $body | ConvertTo-Json
@@ -247,16 +280,15 @@ if( $sendMailing -eq $true ){
     #>
     $sentMailing = Invoke-RestMethod -Method Post -Uri $endpoint -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
     
-}
+} else {
+
+    #-----------------------------------------------------------------
+    # SCHEDULE MAILING / BROADCASTING
+    #-----------------------------------------------------------------
 
 
-#-----------------------------------------------------------------
-# SCHEDULE MAILING / BROADCASTING
-#-----------------------------------------------------------------
-
-if( $sendMailing -eq $false ){
     $object = "regular-mailings"
-    $endpoint = "$( $apiRoot )$( $object )/$( $copiedMailingId )/schedule"
+    $endpoint = "$( $apiRoot )$( $object )/$( $copiedMailing.id )/schedule"
     # Time is in seconds
     $time = 10
 
@@ -276,12 +308,18 @@ if( $sendMailing -eq $false ){
         #>
         $sentMailing = Invoke-RestMethod -Method Post -Uri $endpoint -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
     
-    }catch{
+    } catch {
+
         $e = ParseErrorForResponseBody($_)
         Write-Log -message ( $e | ConvertTo-Json -Depth 20 )
         throw $_.exception
+
     }
+
+    Write-Log -message "Scheduled mailing successfully with id '$( $sentMailing.id )' at '$( $date )'"
+
 }
+
 
 
 
@@ -294,12 +332,16 @@ if( $sendMailing -eq $false ){
 $recipients = $params.successfulRecipients
 
 # put in the source id as the listname
-$transactionId = $mailingId
+$transactionId = $sentMailing.id
 
 # return object
 $return = [Hashtable]@{
+
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "CustomProvider"=$moduleName
+    "ProcessId" = $processId
+
 }
 
 # return the results
