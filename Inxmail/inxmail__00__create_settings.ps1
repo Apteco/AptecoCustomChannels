@@ -85,6 +85,24 @@ $settings = @{
     "nameConcatChar" = " / "
     "approved" = $true
     "sendMailing" = $false
+
+    # Detail settings for upload
+    "upload" = [PSCustomObject]@{
+        
+        # fixed column names
+        "emailColumnName" = "email"
+        "permissionColumnName" = "trackingPermission"   # needs value "GRANTED"
+
+        # permission defaults
+        #"trackingPermissionConflictMode" = "OVERWRITE_FULL" # OVERWRITE_FULL|KEEP_EXISTING|OVERWRITE_FULL
+
+        # Other settings
+        # "importConflictMode" = "OVERWRITE_FULL" # OVERWRITE_FULL|KEEP_EXISTING|OVERWRITE_FULL|UPDATE
+        #truncate
+        #resubscribe
+
+    }
+
 }
 
 

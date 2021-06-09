@@ -22,19 +22,19 @@ $debug = $false
 
 if( $debug ){
     $params = [hashtable]@{
-       TransactionType = "Replace"
-       Password = "gutentag"
-       scriptPath = "D:\Scripts\Inxmail\Mailing"
-       MessageName = "16 / VorlageVonNikolas240321"
-       EmailFieldName = "email"
-       SmsFieldName = ""
-       Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_16  VorlageVonNikolas240321_0fba359b-4a20-4866-b610-751ebe732b06.txt"
-       ReplyToEmail = ""
-       Username = "absdede"
-       ReplyToSMS = ""
-       UrnFieldName = "Kunden ID"
-       ListName = "16 / VorlageVonNikolas240321"
-       CommunicationKeyFieldName = "Communication Key"
+        TransactionType = "Replace"
+        Password = "gutentag"
+        scriptPath = "D:\Scripts\Inxmail\Mailing"
+        MessageName = "16 / VorlageVonNikolas240321"
+        EmailFieldName = "email"
+        SmsFieldName = ""
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_16  VorlageVonNikolas240321_d1a9a3e4-8d58-4492-9df7-5fb9b2138881.txt"
+        ReplyToEmail = ""
+        Username = "absdede"
+        ReplyToSMS = ""
+        UrnFieldName = "Kunden ID"
+        ListName = "16 / VorlageVonNikolas240321"
+        CommunicationKeyFieldName = "Communication Key"        
     }
 }
 
@@ -203,6 +203,21 @@ $dataCsv = [System.Collections.ArrayList]@( import-csv -Path $file.FullName -Del
 # Transform csv into compatible inxmail csv file (meaning that email field is in first place)
 $props = $dataCsv | Get-Member -MemberType NoteProperty
 
+# Only add the granted column, if not present
+# TODO [ ] add and prove this logic, otherwise no tracking will be possible
+If ( $props.Name -notcontains $settings.upload.permissionColumnName ) {
+    $dataCsv = $dataCsv | Select *, @{name="$( $settings.upload.permissionColumnName )";expression={ "GRANTED"  }}
+    $props = $dataCsv | Get-Member -MemberType NoteProperty
+}
+
+# add urn column always - it is needed later for response matching
+$urnFieldName = $params.UrnFieldName
+$dataCsv = $dataCsv | Select *, @{name="urn";expression={ $_.$urnFieldName }}
+
+# Redefine the properties now
+$props = $dataCsv | Get-Member -MemberType NoteProperty
+
+
 # Make sure the email column has the right name
 if ( $params.EmailFieldName -ne "email" ) {
     Write-Log -message "Please make sure, the email column name is 'email' in the channel editor" -severity ( [LogSeverity]::ERROR )
@@ -245,7 +260,6 @@ $attributesObject = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $heade
 $attributes = $attributesObject._embedded."inx:attributes"
 $attributesNames = $attributes.name
 
-
 <#
     NoteProperties are generic properties that are created by Powershell.
 
@@ -263,9 +277,11 @@ if ( $equalWithRequirements.count -eq $requiredFields.Count ) {
     # Required fields are all included
 
 } else {
+
     # Required fields not equal -> error!
     Write-Log -message "No email field present!" -severity ( [LogSeverity]::ERROR )
     throw [System.IO.InvalidDataException] "No email field present!"  
+
 }
 
 # Compare columns
@@ -288,28 +304,25 @@ $bodyJson = $null
 $body = $null
 
 # For each object in the CSV that was not in the attributes
-$colsInCsvButNotAttr | ForEach-Object {
+$colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
 
     # Getting the Attribute Name
     $newAttributeName = $_.InputObject
     
     # If Attribute isn't email (as this is already given), then it will be created
-    if($newAttributeName -ne "email"){
-        $body = @{
-            "name" = "$( $newAttributeName )"
-            # We assume that each entry will be from type "TEXT"
-            "type" = "TEXT"                     # TEXT|DATE_AND_TIME|DATE_ONLY|TIME_ONLY|INTEGER|FLOATING_POINT_NUMBER|BOOLEAN
-            "maxLength" = 255
-        }
+    $body = @{
+        "name" = "$( $newAttributeName )"
+        # We assume that each entry will be from type "TEXT"
+        "type" = "TEXT"                     # TEXT|DATE_AND_TIME|DATE_ONLY|TIME_ONLY|INTEGER|FLOATING_POINT_NUMBER|BOOLEAN
+        "maxLength" = 255
+    }
 
-        $bodyJson = $body | ConvertTo-Json
-        # Server gibt schon ein Hashtable zurück
-        <#
-            https://apidocs.inxmail.com/xpro/rest/v1/#_create_recipient_attribute
-        #>
-        $newAttributes += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose
-
-    }     
+    $bodyJson = $body | ConvertTo-Json
+    # Server gibt schon ein Hashtable zurück
+    <#
+        https://apidocs.inxmail.com/xpro/rest/v1/#_create_recipient_attribute
+    #>
+    $newAttributes += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose
      
 }   
 
@@ -433,6 +446,8 @@ Write-Log -message "Got back status '$( $check.state )' after $( $totalSleepTime
 Write-Log -message "$( $check.successCount ) records uploaded successfully"
 Write-Log -message "$( $check.failCount ) records uploaded failed"
 
+# TODO [ ] retrieve errors if they happen: https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_import_errors_collection
+
 
 ################################################
 #
@@ -446,6 +461,8 @@ $recipients = $check.successCount
 # put in the source id as the listname
 $transactionId = $processId
 
+# TODO [ ] put in boolean to only do broadcast, if upload was successful
+
 # return object
 $return = [Hashtable]@{
 
@@ -455,7 +472,7 @@ $return = [Hashtable]@{
     "failedRecipients" = $check.failCount
 
     # List information
-    "CreatedNewList" = $createdNewList.ToString()
+    "CreatedNewList" = $createdNewList
     "ListId" = $listID
 
 }
