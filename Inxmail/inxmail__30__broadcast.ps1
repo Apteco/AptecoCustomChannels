@@ -15,9 +15,6 @@ Param(
 
 $debug = $true
 
-$sendMailing = $true
-$scheduleMailing = $false
-
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
@@ -186,8 +183,8 @@ $header = @{
 #-----------------------------------------------
 
 # Splitting MailingName and ListName to get Ids
-$mailingIdArray = $params.MessageName.Split(" / ")
-$listIdArray = $params.ListName.Split(" / ")
+$mailingIdArray = $params.MessageName -split " / "
+$listIdArray = $params.ListName -split " / "
 
 $mailingId = $mailingIdArray[0]
 $listId = $listIdArray[0]
@@ -232,7 +229,7 @@ $mailingsDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header 
 # SEND A MAILING 
 #-----------------------------------------------------------------
 
-if( $sendMailing ){
+if( $sendMailing -eq $true ){
     $object = "sendings"
     $endpoint = "$( $apiRoot )$( $object )"
     $contentType = "application/json; charset=utf-8"
@@ -257,25 +254,16 @@ if( $sendMailing ){
 # SCHEDULE MAILING / BROADCASTING
 #-----------------------------------------------------------------
 
-if( $scheduleMailing ){
+if( $sendMailing -eq $false ){
     $object = "regular-mailings"
     $endpoint = "$( $apiRoot )$( $object )/$( $copiedMailingId )/schedule"
     # Time is in seconds
     $time = 10
 
-    # Formating the Date to the correct format
-    $date = (Get-Date).AddSeconds( $time ).ToString("yyyy-MM-ddTHH:mm:ss")
-    $date2 = Get-Date -Format "ssK"
-    $arr = $date2.Split(":")
-    $arr2 = $arr[0].Split("+")
-    $elem = $arr2[1]
-    $elem = $elem + $arr[1]
-    $elem = "+" + $elem
-    $elem = $date + $elem
-    $elem
-    
+    $date = (Get-Date).AddSeconds( $time ).ToString("yyyy-MM-ddTHH:mm:ssK")
+
     $body = [hashtable]@{
-        scheduleDate = $elem # exampleFormat: "2022-04-22T13:29:57+0000"
+        scheduleDate = $date # exampleFormat: "2022-04-22T13:29:57+02:00"
     }
     
     $bodyJson = $body | ConvertTo-Json
@@ -303,7 +291,7 @@ if( $scheduleMailing ){
 #
 ################################################
 
-$recipients = $null 
+$recipients = $params.successfulRecipients
 
 # put in the source id as the listname
 $transactionId = $mailingId

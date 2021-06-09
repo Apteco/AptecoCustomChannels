@@ -91,7 +91,7 @@ $logfile = $settings.logfile
 
 # Load all PowerShell Code
 "Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach-Object {
     . $_.FullName
     "... $( $_.FullName )"
 }
@@ -149,19 +149,16 @@ $header = @{
 Write-Log -message "Downloading all lists"
 
 # Precooked variables for the loop
-$i2 = 0
-$p2 = 5
+$pageSize = 3
+$messageLists = [System.Collections.ArrayList]@()
+$object = "lists"
+
 $totalNumOfLists = 0
 $numOfLists = 0
-$messageLists = $null
-$object2 = "lists"
 
+$endpoint = "$( $apiRoot )$( $object )?pageSize=$( $pageSize )"
 # Beginning of do-until loop
 do{
-
-    # This is the url that is being called as a URL in the browser
-    $endpoint = "$( $apiRoot )$( $object2 )?afterId=$( $i2 )&pageSize=$( $p2 )"
-
     <#
         This contains now all the lists Information till $p
     
@@ -185,10 +182,10 @@ do{
         name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }
     }
 
-    $i2 = $i2 + $p2
+    $endpoint = $lists._links.next.href
 
 # If number of lists are less than $p2 = 5, then that it is the last loop cycle
-}until($numOfLists -lt $p2)
+}until($null -eq $lists._links.next)
 
 Write-Log -message "Found $( $totalNumOfLists ) lists"
 

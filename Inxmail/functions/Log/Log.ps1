@@ -8,7 +8,11 @@ $logfile = "C:\logfile.txt"
 $processId = [guid]::NewGuid()
 * The process id is good for parallel calls so you know they belong together
 
+<<<<<<< Updated upstream:Inxmail/functions/Log/Log.ps1
 Current Version = 202102171337
+=======
+Current Version = 202002052330
+>>>>>>> Stashed changes:Inxmail/functions/Log.ps1
 
 #>
 

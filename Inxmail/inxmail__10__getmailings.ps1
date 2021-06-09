@@ -15,12 +15,6 @@ Param(
 $debug = $true
 
 #-----------------------------------------------
-# APPROVED SWITCH
-#-----------------------------------------------
-
-$approved = $true
-
-#-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
@@ -89,7 +83,15 @@ if ( $settings.changeTLS ) {
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
+
+# more settings
 $logfile = $settings.logfile
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 ################################################
 #
 # FUNCTIONS & ASSEMBLIES
@@ -144,6 +146,7 @@ if ( $paramsExisting ) {
 $apiRoot = $settings.base
 $contentType = "application/json; charset=utf-8"
 $auth = "$( Get-SecureToPlaintext -String $settings.login.authenticationHeader )"
+$auth
 $header = @{
     "Authorization" = $auth
 }
@@ -156,20 +159,18 @@ $header = @{
 Write-Log -message "Downloading all mailings"
 
 # Precooked variables for the loop
-$i = 0
-$p = 5
-$messages = $null
+$pageSize = 5
+$messages = [System.Collections.ArrayList]@()
 
-if($approved -eq $false){
+if($settings.approved -eq $false){
     
     $totalNumOfMailings = 0
     $numOfMailings = 0
     $object = "mailings"
     
-    do{
-        # This is the url that is being called as a URL in the browser
-        $endpoint = "$( $apiRoot )$( $object )?afterId=$( $i )&pageSize=$( $p )"
+    $endpoint = "$( $apiRoot )$( $object )?pageSize=$( $pageSize )"
 
+    do{
         <#
             This contains now all the mailing Information till $p
 
@@ -192,25 +193,28 @@ if($approved -eq $false){
             name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }
     }
 
-    $i = $i + $p
+    $endpoint = $mailings._links.next.href
 
-    }until($numOfMailings -lt $p)
+    }until($null -eq $mailings._links.next)
+
+    Write-Log -message "Found $( $totalNumOfMailings ) mailings"
+ 
 }
 
 
 #-----------------------------------------------
 # GET MAILINGS (APPROVED)
 #-----------------------------------------------
-
-if($approved -eq $true){
+if($settings.approved -eq $true){
     
     $totalNumOfMailingsApproved = 0
     $numOfMailingsApproved = 0  
     $object = "regular-mailings"
 
+    
+    $endpoint = "$( $apiRoot )$( $object )?pageSize=$( $pageSize )&mailingStates=APPROVED"
+
     do{
-        # This is the url that is being called as a URL in the browser
-        $endpoint = "$( $apiRoot )$( $object )?afterId=$( $i )&pageSize=$( $p )&mailingStates=APPROVED"
         <#
             Only retrieving those mailings which have the status APPROVED
 
@@ -218,7 +222,7 @@ if($approved -eq $true){
         #>
         $mailingsApproved = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
 
-        $numOfMailingsApproved = $mailings._embedded."inx:regular-mailings".count
+        $numOfMailingsApproved = $mailingsApproved._embedded."inx:regular-mailings".count
         $totalNumOfMailingsApproved += $numOfMailingsApproved
 
         Write-Log -message "Found $( $numOfMailingsApproved ) APPROVED mailings"
@@ -232,15 +236,16 @@ if($approved -eq $true){
             name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }
     }
 
-    # Increasing the counter variable $i by $p (how many mails loaded at once)
-    $i = $i + $p
+    $endpoint = $mailingsApproved._links.next.href
 
-    }until($numOfMailingsApproved -lt $p)
+    # Hint: $null comparisons on the left side
+    }until($null -eq $mailingsApproved._links.next)
+    
+    Write-Log -message "Found $( $totalNumOfMailingsApproved ) APPROVED mailings"
+
 }
 
-# Finally we log the $totalNumberOfMailings
-Write-Log -message "Found $( $totalNumOfMailings ) mailings"
-Write-Log -message "Found $( $totalNumOfMailingsApproved ) APPROVED mailings"
+
 
 
 ################################################

@@ -300,6 +300,7 @@ $colsInCsvButNotAttr | ForEach-Object {
 # CHECK IF LIST EXISTS, IF NOT CREATE NEW LIST
 #-----------------------------------------------
 
+$arr = $params.MessageName -split " / ",2
 
 # If a given local list exists in the params change endpoint to that list
 # Now recipients will be imported in the given list and not to the global inxmail list
@@ -310,7 +311,7 @@ if($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNam
     
     # Neue Liste wird hinzufügt
     $bodyBeta = @{
-        "name" = [datetime]::Now.ToString("yyyyMMddHHmmss")
+        "name" = [datetime]::Now.ToString("MM.dd.yyyy-HH:mm:ss-ID:$( $arr[0] )Name:$( $arr[1] )")
         "type" = "STANDARD"
         
         "senderAddress" = "john.doe@example.com"
@@ -412,6 +413,7 @@ $transactionId = $processId
 $return = [Hashtable]@{
     "Recipients"=$recipients
     "TransactionId"=$transactionId
+    "successfulRecipients" = $upload.count
     #"ListId"= 
 }
 

@@ -6,15 +6,15 @@
 ################################################
 
 # Load scriptpath
-# MyInvocation wird verwendet, um den aktuellen Path des Skriptes zurückzugeben
-# Da er bei anderen Usern wahrscheinlich woanders gespeichert ist, ist das notwendig
+# MyInvocation is used because it returns the current path of the script
+# It is necessary because the path on other computers can differ
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
     $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 } else {
     $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
 }
 
-# Aktuelle Location wird nun als default festgelegt
+# Current Location will be set as default
 Set-Location -Path $scriptPath
 
 
@@ -46,34 +46,28 @@ Get-ChildItem ".\$( $functionsSubfolder )" -Filter "*.ps1" -Recurse | ForEach-Ob
 #
 ################################################
 
-
 #-----------------------------------------------
 # LOGIN DATA INXMAIL
 #-----------------------------------------------
 
 # Entering the username and password
+$base = Read-Host "Please enter account name"
 $username = Read-Host "Please enter the username for Inxmail"
 $password = Read-Host -AsSecureString "Please enter the password for Inxmail"
 
+
 # Combining username and password; making it ready for BasicAuth
-$credentials = "$($username):$($password)"
+$credentials = "$($username):$(( New-Object PSCredential "dummy",$password).GetNetworkCredential().Password)"
 
 # Encoding to Base64
 $BytesCredentials = [System.Text.Encoding]::ASCII.GetBytes($credentials)
 $EncodedCredentials = [Convert]::ToBase64String($BytesCredentials)
 
-# Creating Authorization header value
-$basic = @{
-    intro = "Basic "
-    encodedCredentials = $EncodedCredentials
-}
-
 # Authorizatioin header value 
-$auth = "$($basic.intro)$($basic.encodedCredentials)"
+$auth = "Basic $( $EncodedCredentials )"
 
 # Encrypting Authorization header
-$auth = ConvertTo-SecureString $auth -AsPlainText -Force
-$credentialsEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$auth).GetNetworkCredential().Password)
+$credentialsEncrypted = Get-PlaintextToSecure $auth
 
 $login = @{
     "authenticationHeader" = $credentialsEncrypted
@@ -84,11 +78,13 @@ $login = @{
 # SETTINGS INXMAIL
 #-----------------------------------------------
 $settings = @{
-    "base" = "https://api.inxmail.com/apteco-apitest/rest/v1/"
+    "base" = "https://api.inxmail.com/$base/rest/v1/"
     "encoding" = "UTF8"
     "login" = $login
-    "logfile" = "$( $scriptPath )\cr.log"
+    "logfile" = "$( $scriptPath )\inxmail.log"
     "nameConcatChar" = " / "
+    "approved" = $true
+    "sendMailing" = $false
 }
 
 
