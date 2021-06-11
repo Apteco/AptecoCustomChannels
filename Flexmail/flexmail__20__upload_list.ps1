@@ -109,6 +109,7 @@ if ( $settings.changeTLS ) {
 $logfile = $settings.logfile                    # Generic logfile variable
 $exp = { $_.Kunde_oder_Seed -ne "Kunde" }       # Expression to identify seeds, can be changed. In this case there is a virtual variable containing the string "Kunde", all records
                                                 # not equals Kunde are Seeds
+$writeJson = $true
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -648,6 +649,9 @@ $partFiles | ForEach {
 #>
 
     $uploadBodyJson = ConvertTo-Json -InputObject $recipients -Verbose -Depth 8 -Compress
+    if ( $writeJson ) {
+        Set-Content -Value $uploadBodyJson -Path "$( $f.FullName ).json" -Encoding UTF8
+    }
     try {
 
         $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $uploadBodyJson
