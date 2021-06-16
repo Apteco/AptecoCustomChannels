@@ -446,8 +446,26 @@ Write-Log -message "Got back status '$( $check.state )' after $( $totalSleepTime
 Write-Log -message "$( $check.successCount ) records uploaded successfully"
 Write-Log -message "$( $check.failCount ) records uploaded failed"
 
-# TODO [ ] retrieve errors if they happen: https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_import_errors_collection
+# TODO [x] retrieve errors if they happen: https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_import_errors_collection
 
+# if the sum of errors are greater than 0 -> at least one error
+if($check.failCount -gt 0){
+    $i = 0
+    
+    # do until loop iterates over all existing errors and writing the error kind in the log
+    do{
+        $endpoint = "$( $settings.base )imports/recipients/$( $check.id )/files/$( $check.id )/errors"
+
+        <#
+            https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_import_errors_collection
+        #>
+        $errors = Invoke-RestMethod -Uri $endpoint -Method Get -Headers $header -ContentType $contentType -Verbose
+        Write-Log -message "Error No. $( $i+1 ): $( $errors._embedded."inx:errors".error )"
+        Write-Log -message "Value: $( $errors._embedded."inx:errors".value )"
+        $i++
+    }until($check.failCount -gt $i)
+
+}
 
 ################################################
 #
