@@ -205,10 +205,10 @@ $header = @{
 #-----------------------------------------------
 
 # Splitting MailingName and ListName to get Ids
-$mailingIdArray = $params.MessageName -split " / "
+$mailingIdArray = $params.MessageName -split $settings.nameConcatChar,2
 #$listIdArray = $params.ListName -split " / "
 
-# TODO [ ] use the split character from settings
+# TODO [x] use the split character from settings
 # TODO [ ] check if mailing exists before using it
 
 $mailingId = $mailingIdArray[0]
