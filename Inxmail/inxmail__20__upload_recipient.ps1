@@ -304,7 +304,7 @@ $bodyJson = $null
 $body = $null
 
 # For each object in the CSV that was not in the attributes
-$colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
+$colsInCsvButNotAttr | Where-Object { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
 
     # Getting the Attribute Name
     $newAttributeName = $_.InputObject
@@ -331,9 +331,9 @@ $colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.up
 # CHECK IF LIST EXISTS, IF NOT CREATE NEW LIST
 #-----------------------------------------------
 
-$arr = $params.MessageName -split " / ",2
+$arr = $params.MessageName -split $settings.nameConcatChar,2
 
-# TODO [ ] use the split character from settings
+# TODO [x] use the split character from settings
 # TODO [ ] check if list exists before using it
 
 # If a given local list exists in the params change endpoint to that list
@@ -349,15 +349,15 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
     # Neue Liste wird hinzufügt
     $bodyBeta = @{
         "name" = [datetime]::Now.ToString("MM.dd.yyyy-HH:mm:ss-ID:$( $arr[0] )Name:$( $arr[1] )")
-        "type" = "STANDARD"
+        "type" = $settings.newList.type
         
-        # TODO [ ] put senderAddress and other info into settings and read from there
-        "senderAddress" = "info@apteco.de"
+        # TODO [x] put senderAddress and other info into settings and read from there
+        "senderAddress" = $settings.newList.senderAddress
         #"senderName" = "Sibylle"
         # "replyToAddress" = "jane.doe@example.com"
         # "replyToName" = "Jane Doe"
         
-        "description" = "Dies ist eine automatisch erstellte Liste."
+        "description" = $settings.newList.description
     }
 
     $bodyBetaJson = $bodyBeta | ConvertTo-Json

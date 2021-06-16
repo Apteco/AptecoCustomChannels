@@ -85,6 +85,14 @@ $settings = @{
     "nameConcatChar" = " / "
     "approved" = $true
     "sendMailing" = $false
+    
+    "newList" = [PSCustomObject]@{
+        "senderAdress" = "info@apteco.de"
+        "type" = "STANDARD"
+        "description" = "Dies ist eine automatisch erstellte Liste."
+    }
+    
+
 
     # Detail settings for upload
     "upload" = [PSCustomObject]@{
