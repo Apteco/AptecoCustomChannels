@@ -185,20 +185,8 @@ $mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )mailings/$( $
 
 $arr = $params.MessageName -split " / ",2
 
-# TODO [x] use the split character from settings
-# TODO [x] check if list exists before using it
-
-$arr2 = $params.ListName -split $settings.nameConcatChar, 2
-try{
-    <#
-        https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_single_mailing_list
-    #>
-    $listExist = Invoke-Restmehod -Method Get -Uri "$( $apiRoot )lists/$( $arr2[0] )" -Header $header -ContentType "application/hal+json" -Verbose
-}catch{
-    "list cannot be found"
-}
-
-
+# TODO [ ] use the split character from settings
+# TODO [ ] check if list exists before using it
 
 # If a given local list exists in the params change endpoint to that list
 # Now recipients will be imported in the given list and not to the global inxmail list
@@ -214,8 +202,8 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
     # existing list
 
     # Splitting the ListName with "/" in order to get the listID
-    # TODO [x] use the split character from settings
-    $listNameSplit = $params.ListName -Split $settings.nameConcatChar,2
+    # TODO [ ] use the split character from settings
+    $listNameSplit = $params.ListName.Split(" / "),2
     $listID = $listNameSplit[0]
 
 
@@ -321,23 +309,11 @@ $colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.up
 # GET ALL TEST PROFILES
 #-----------------------------------------------
 
-# TODO [x] paging
-$pageSize = 20
-$endpoint = "$( $apiRoot )test-profiles?pageSize=$( $pageSize )"
-do{
-    try{
-        $testProfilesRes = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
-    }catch{
-        "There are currently no test profiles"
-    }
-    $testProfiles += $testProfilesRes._embedded.'inx:test-profiles'
+# TODO [ ] paging
+$testProfilesRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )test-profiles" -Header $header -ContentType "application/hal+json" -Verbose
+$testProfiles = $testProfilesRes._embedded.'inx:test-profiles'
 
-
-    $endpoint = $testProfilesRes._links.next.href
-}until($null -eq $testProfilesRes._links.next)
-
-
-$latestProfile = $testProfiles | Where-Object { $_.email -eq $testRecipient.Email } | Sort-Object id -Descending | Select-Object -first 1
+$latestProfile = $testProfiles | where { $_.email -eq $testRecipient.Email } | sort id -Descending | select -first 1
 
 #-----------------------------------------------
 # CREATE/UPDATE TEST PROFILE
