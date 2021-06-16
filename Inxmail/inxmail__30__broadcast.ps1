@@ -244,12 +244,12 @@ Write-Log -message "Copied mailing '$( $mailingId )' with new id '$( $copiedMail
 # GET COPIED MAILING
 #-----------------------------------------------------------------
 
-# TODO [ ] is this call needed?
-$endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:response-statistics,inx:sending-statistics"
+# TODO [x] is this call needed?
+#$endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:response-statistics,inx:sending-statistics"
 <#
     https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-single-regular-mailings
 #>
-$mailingsDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType $contentType -Verbose
+#$mailingsDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType $contentType -Verbose
 
 
 #-----------------------------------------------------------------
