@@ -382,8 +382,8 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
 } else {
 
     # Splitting the ListName with "/" in order to get the listID
-    # TODO [ ] use the split character from settings
-    $listNameSplit = $params.ListName.Split(" / ")
+    # TODO [x] use the split character from settings
+    $listNameSplit = $params.ListName -Split $settings.nameConcatChar,2
     $listID = $listNameSplit[0]
     # Endpoint is the list with the corresponding listID
     
@@ -399,7 +399,7 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
 # A certain method to correctly invoke
 $multipart = Prepare-MultipartUpload -string $csvString
 
-# Dem server gibt man Informationen mit über das Format, was es für den server leichter macht
+# The server is getting more Information over the format with prepare-multipart, making it easier for the server to read
 $object = "imports/recipients"
 $endpoint = "$( $apiRoot )$( $object )?listId=$( $listID )"
 
