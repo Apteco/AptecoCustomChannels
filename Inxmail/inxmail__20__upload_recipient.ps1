@@ -205,14 +205,14 @@ $props = $dataCsv | Get-Member -MemberType NoteProperty
 
 # Only add the granted column, if not present
 # TODO [ ] add and prove this logic, otherwise no tracking will be possible
-If ( $props.Name -notcontains $settings.upload.permissionColumnName ) {
-    $dataCsv = $dataCsv | Select *, @{name="$( $settings.upload.permissionColumnName )";expression={ "GRANTED"  }}
+if ( $props.Name -notcontains $settings.upload.permissionColumnName ) {
+    $dataCsv = $dataCsv | Select-Object *, @{name="$( $settings.upload.permissionColumnName )";expression={ "GRANTED"  }}
     $props = $dataCsv | Get-Member -MemberType NoteProperty
 }
 
 # add urn column always - it is needed later for response matching
 $urnFieldName = $params.UrnFieldName
-$dataCsv = $dataCsv | Select *, @{name="urn";expression={ $_.$urnFieldName }}
+$dataCsv = $dataCsv | Select-Object *, @{name="urn";expression={ $_.$urnFieldName }}
 
 # Redefine the properties now
 $props = $dataCsv | Get-Member -MemberType NoteProperty
@@ -451,7 +451,7 @@ Write-Log -message "$( $check.failCount ) records uploaded failed"
 # if the sum of errors are greater than 0 -> at least one error
 if($check.failCount -gt 0){
     $i = 0
-    
+    $uploadSuccessful = $false
     # do until loop iterates over all existing errors and writing the error kind in the log
     do{
         $endpoint = "$( $settings.base )imports/recipients/$( $check.id )/files/$( $check.id )/errors"
@@ -465,6 +465,8 @@ if($check.failCount -gt 0){
         $i++
     }until($check.failCount -gt $i)
 
+}else{
+    $uploadSuccessful = $true
 }
 
 ################################################
@@ -479,7 +481,7 @@ $recipients = $check.successCount
 # put in the source id as the listname
 $transactionId = $processId
 
-# TODO [ ] put in boolean to only do broadcast, if upload was successful
+# TODO [x] put in boolean to only do broadcast, if upload was successful
 
 # return object
 $return = [Hashtable]@{
@@ -492,6 +494,7 @@ $return = [Hashtable]@{
     # List information
     "CreatedNewList" = $createdNewList
     "ListId" = $listID
+    "UploadSuccessful" = $uploadSuccessful
 
 }
 
