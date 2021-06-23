@@ -1,6 +1,4 @@
 # settings files
-settings.json
-session.json
 *.json
 
 # logfiles
@@ -8,9 +6,8 @@ session.json
 *.debug
 *.txt
 
-
 # encryption files
-aes.key
+*.key
 
 # specific folders
 Flexmail/responses
@@ -25,12 +22,10 @@ _dev
 
 # visual files
 *.html
-*.csv
 *.png
 
 # others
 *.part*
-*.txt
 *.lock
-*.part*
+*.csv
 *.xml

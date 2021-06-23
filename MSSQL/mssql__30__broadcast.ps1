@@ -71,7 +71,14 @@ $settingsFilename = "settings.json"
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+
+# more settings
 $logfile = $settings.logfile
+
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
 
 
 ################################################
@@ -82,8 +89,11 @@ $logfile = $settings.logfile
 
 Add-Type -AssemblyName System.Data
 
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
 
 
@@ -94,12 +104,27 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tBROADCAST" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
+}
+
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
 }
 
 
@@ -110,7 +135,7 @@ $params.Keys | ForEach {
 ################################################
 
 # log 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tDone with Broadcast!" >> $logfile
+Write-Log -message "Done with Broadcast!" 
 
 
 #-----------------------------------------------
