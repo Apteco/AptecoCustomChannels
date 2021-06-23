@@ -79,18 +79,24 @@ $settingsFilename = "settings.json"
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+
+# more settings
 $logfile = $settings.logfile
 $uploadsFolder = $settings.uploadsFolder
 $mssqlConnectionString = $settings.psConnectionString -replace "#DATABASE#", $params.database
 
+# append a suffix, if in debug mode
+if ( $debug ) {
+    $logfile = "$( $logfile ).debug"
+}
+
 # SQL files
-$campaignsSqlFilename = "mssql__21__load_delivery_metadata.sql"
-$customersSqlFilename = "mssql__22__load_customers.sql"
-$levelUpdateSqlFilename = "mssql__23__change_level.sql"
+$campaignsSqlFilename = "sql\mssql__21__load_delivery_metadata.sql"
+$customersSqlFilename = "sql\mssql__22__load_customers.sql"
+$levelUpdateSqlFilename = "sql\mssql__23__change_level.sql"
 
 # Export file
 $updateId = [guid]::NewGuid()
-
 
 
 ################################################
@@ -100,8 +106,12 @@ $updateId = [guid]::NewGuid()
 ################################################
 
 Add-Type -AssemblyName System.Data
-Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
+
+# Load all PowerShell Code
+"Loading..."
+Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
     . $_.FullName
+    "... $( $_.FullName )"
 }
 
 
@@ -112,15 +122,28 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 ################################################
 
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tUPLOAD!" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-$params.Keys | ForEach {
-    $param = $_
-    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
+# Start the log
+Write-Log -message "----------------------------------------------------"
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
+# Check if params object exists
+if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
+    $paramsExisting = $true
+} else {
+    $paramsExisting = $false
 }
 
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tUsing update id: $( $updateId )" >> $logfile
+# Log the params, if existing
+if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
+}
 
 
 ################################################
@@ -132,6 +155,8 @@ $params.Keys | ForEach {
 #-----------------------------------------------
 # CHECK FILE EXISTS
 #-----------------------------------------------
+
+Write-Log -message "Using update id: $( $updateId )"
 
 $fileExists = Check-Path -Path $params.Path
 
@@ -159,7 +184,7 @@ if ( !(Test-Path -Path $uploadsFolder) ) {
 #
 ################################################
 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tLoad campaign metadata" >> $logfile
+Write-Log -message "Load campaign metadata"
 
 # TODO [ ] replace this part with a function
 
@@ -188,7 +213,7 @@ try {
 
     $errText = $_.Exception
     $errText | Write-Output
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tError: $( $errText )" >> $logfile
+    Write-Log -message "Error: $( $errText )"
 
 } finally {
     
@@ -203,9 +228,9 @@ $campaignRun = $campaignMetadata[0].Run
 $stepId = $campaignMetadata[0].DeliveryStepId
 
 # log 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tGot back campaign ID: $( $campaignID )" >> $logfile
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tGot back run ID: $( $campaignRun )" >> $logfile
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tGot back step ID: $( $stepId )" >> $logfile
+Write-Log -message "Got back campaign ID: $( $campaignID )"
+Write-Log -message "Got back run ID: $( $campaignRun )"
+Write-Log -message "Got back step ID: $( $stepId )"
 
 
 ################################################
@@ -214,7 +239,7 @@ $stepId = $campaignMetadata[0].DeliveryStepId
 #
 ################################################
 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tLoad customers metadata" >> $logfile
+Write-Log -message "Load customers metadata"
 
 $maxIdsPerBatch = $settings.maxIdsPerBatch
 
@@ -268,7 +293,10 @@ if ($campaignID -gt 0 -and $campaignRun -gt 0 -and $stepId -gt 0 ) {
 
             $errText = $_.Exception
             $errText | Write-Output
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tError: $( $errText )" >> $logfile
+            Write-Log -message "Error: $( $errText )" -severity ([LogSeverity]::ERROR)
+
+            # throw it back to PeopleStage
+            throw $_
 
         } finally {
     
@@ -281,7 +309,7 @@ if ($campaignID -gt 0 -and $campaignRun -gt 0 -and $stepId -gt 0 ) {
     $customerMetadata | Export-Csv -Path ".\$( $uploadsFolder )\$( $updateId )__input.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 
     # log 
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tGot back $( $customerMetadata.Rows.Count ) customers to change the level" >> $logfile
+    Write-Log -message "Got back $( $customerMetadata.Rows.Count ) customers to change the level"
 
     # close connection
     $mssqlConnection.Close()
@@ -298,7 +326,7 @@ if ($campaignID -gt 0 -and $campaignRun -gt 0 -and $stepId -gt 0 ) {
 # Determine which level to change
 $levelToUpdate = ( $params.MessageName -split $settings.messageNameConcatChar )[0]
 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tChanging level for $( $customerMetadata.rows.Count ) customers to level $( $levelToUpdate )" >> $logfile
+Write-Log -message "Changing level for $( $customerMetadata.rows.Count ) customers to level $( $levelToUpdate )"
 
 # loop through all customers to change
 if ($customerMetadata.rows.Count -gt 0 ) {
@@ -336,7 +364,10 @@ if ($customerMetadata.rows.Count -gt 0 ) {
 
             $errText = $_.Exception
             $errText | Write-Output
-            "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tError: $( $errText )" >> $logfile
+            Write-Log -message "Error: $( $errText )" -severity ([LogSeverity]::ERROR)
+
+            # Throwing this exception back to PeopleStage now
+            throw $_
 
         } finally {
     
@@ -353,7 +384,7 @@ if ($customerMetadata.rows.Count -gt 0 ) {
     # close connection
     $mssqlConnection.Close()
 
-    "$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tChanged level for $( $changedLevel.count ) customers to level $( $levelToUpdate )" >> $logfile
+    Write-Log -message "Changed level for $( $changedLevel.count ) customers to level $( $levelToUpdate )"
 
     $changedLevel | Export-Csv -Path ".\$( $uploadsFolder )\$( $updateId )__output.csv" -Encoding UTF8 -Delimiter "`t" -NoTypeInformation
 
@@ -368,7 +399,7 @@ if ($customerMetadata.rows.Count -gt 0 ) {
 ################################################
 
 # log 
-"$( [datetime]::UtcNow.ToString("yyyyMMddHHmmss") )`tDone with Upload!" >> $logfile
+Write-Log -message "Done with Upload!"
 
 
 #-----------------------------------------------
