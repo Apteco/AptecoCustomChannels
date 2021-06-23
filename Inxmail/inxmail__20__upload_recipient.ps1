@@ -13,52 +13,51 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
+$niksGitFolder = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
-if( $debug ){
-    $params = [hashtable]@{
-        TransactionType = "Replace"
-        Password = "gutentag"
-        scriptPath = "D:\Scripts\Inxmail\Mailing"
-        MessageName = "16 / VorlageVonNikolas240321"
-        EmailFieldName = "email"
-        SmsFieldName = ""
-        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_16  VorlageVonNikolas240321_d1a9a3e4-8d58-4492-9df7-5fb9b2138881.txt"
-        ReplyToEmail = ""
-        Username = "absdede"
-        ReplyToSMS = ""
-        UrnFieldName = "Kunden ID"
-        ListName = "16 / VorlageVonNikolas240321"
-        CommunicationKeyFieldName = "Communication Key"        
+if($debug){
+    if($niksGitFolder){
+        $params = [hashtable]@{
+            TransactionType= "Replace"
+            Password= "gutentag"
+            scriptPath= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail"
+            MessageName= "16 / VorlageVonNikolas240321"
+            EmailFieldName= "email"
+            SmsFieldName= ""
+            Path= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail\PeopleStage\DatenPeopleStage.txt"
+            ReplyToEmail= ""
+            Username= "absdede"
+            ReplyToSMS= ""
+            UrnFieldName= "Kunden ID"
+            ListName= "4 / testListe"
+            CommunicationKeyFieldName= "Communication Key"
+        }
+    }else{
+        $params = [hashtable]@{
+            TransactionType = "Replace"
+            Password = "gutentag"
+            scriptPath = "D:\Scripts\Inxmail\Mailing"
+            MessageName = "16 / VorlageVonNikolas240321"
+            EmailFieldName = "email"
+            SmsFieldName = ""
+            Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_16  VorlageVonNikolas240321_d1a9a3e4-8d58-4492-9df7-5fb9b2138881.txt"
+            ReplyToEmail = ""
+            Username = "absdede"
+            ReplyToSMS = ""
+            UrnFieldName = "Kunden ID"
+            ListName = "16 / VorlageVonNikolas240321"
+            CommunicationKeyFieldName = "Communication Key"        
+        }  
     }
 }
 
 
-<#
-if ( $debug ) {
-    $params = [hashtable]@{
-	    TransactionType= "Replace"
-        Password= "gutentag"
-        scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing"
-        MessageName= "16 / VorlageVonNikolas240321"
-        EmailFieldName= "email"
-        SmsFieldName= ""
-        Path= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing\PeopleStage\DatenPeopleStage.txt"
-        ReplyToEmail= ""
-        Username= "absdede"
-        ReplyToSMS= ""
-        UrnFieldName= "Kunden ID"
-        ListName= "4 / testListe"
-        CommunicationKeyFieldName= "Communication Key"
-
-    }
-}
-#>
 ################################################
 #
 # NOTES

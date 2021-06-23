@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,10 +20,9 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail"
+	    scriptPath= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail"
     }
 }
-
 
 ################################################
 #

@@ -13,44 +13,47 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
 
+$niksGitFolder = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
 if ( $debug ) {
-    $params = [hashtable]@{
-        <#
-	    TransactionType= "Replace"
-        Password= "gutentag"
-        scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing"
-        MessageName= "97 / Copy von VorlageVonNikolas240321"
-        EmailFieldName= "email"
-        SmsFieldName= ""
-        Path= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing\PowerShell_16  VorlageVonNikolas240321_2bad7cca-1922-4ace-8e48-252f9afb8c75.txt"
-        ReplyToEmail= ""
-        Username= "absdede"
-        ReplyToSMS= ""
-        UrnFieldName= "Kunden ID"
-        ListName= "4 / testListe"
-        CommunicationKeyFieldName= "Communication Key"
-        #>
-
-        CreatedNewList = "True"
-        MessageName = "16 / VorlageVonNikolas240321"
-        Username = "absdede"
-        TransactionId = "fc27c221-e2d5-468f-8341-5c0cab1a2adf"
-        successfulRecipients = "4"
-        ListId = "25"
-        Password = "gutentag"
-        ListName = "16 / VorlageVonNikolas240321"
-        failedRecipients = "0"
-        scriptPath = "D:\Scripts\Inxmail\Mailing"
-
-    }
+    if($niksGitFolder){
+        $params = [hashtable]@{
+            TransactionType= "Replace"
+            Password= "gutentag"
+            scriptPath= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail"
+            MessageName= "97 / Copy von VorlageVonNikolas240321"
+            EmailFieldName= "email"
+            SmsFieldName= ""
+            Path= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail\PeopleStage\DatenPeopleStage.txt"
+            ReplyToEmail= ""
+            Username= "absdede"
+            ReplyToSMS= ""
+            UrnFieldName= "Kunden ID"
+            ListName= "4 / testListe"
+            CommunicationKeyFieldName= "Communication Key"
+        }
+    }else{
+        $params = [hashtable]@{
+            CreatedNewList = "True"
+            MessageName = "16 / VorlageVonNikolas240321"
+            Username = "absdede"
+            TransactionId = "fc27c221-e2d5-468f-8341-5c0cab1a2adf"
+            successfulRecipients = "4"
+            ListId = "25"
+            Password = "gutentag"
+            ListName = "16 / VorlageVonNikolas240321"
+            failedRecipients = "0"
+            scriptPath = "D:\Scripts\Inxmail\Mailing"
+        }
+    }       
 }
+
 
 
 ################################################
@@ -209,7 +212,12 @@ $mailingIdArray = $params.MessageName -split $settings.nameConcatChar,2
 #$listIdArray = $params.ListName -split " / "
 
 # TODO [x] use the split character from settings
-# TODO [ ] check if mailing exists before using it
+# TODO [x] check if mailing exists before using it
+if($params.MessageName.isNullOrWhiteSpace()){
+    Write-Log -message "Mailing does not exist"
+    throw "Mailing does not exist"
+}
+
 
 $mailingId = $mailingIdArray[0]
 $listId = $params.ListId
@@ -245,6 +253,7 @@ Write-Log -message "Copied mailing '$( $mailingId )' with new id '$( $copiedMail
 #-----------------------------------------------------------------
 
 # TODO [x] is this call needed?
+# --> no it is not needed
 #$endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:response-statistics,inx:sending-statistics"
 <#
     https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-single-regular-mailings

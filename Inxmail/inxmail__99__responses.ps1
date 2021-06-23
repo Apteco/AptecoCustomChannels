@@ -197,7 +197,7 @@ $opensRes = Invoke-RestMethod @params
 $opens = $opensRes._embedded."inx:web-beacon-hits"
 
 #$opens | ft
-$opens | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | ft
+$opens | Select-Object @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | Format-Table
 
 
 #-----------------------------------------------
