@@ -333,7 +333,11 @@ $colsInCsvButNotAttr | Where-Object { @( $settings.upload.emailColumnName, $sett
 $arr = $params.MessageName -split $settings.nameConcatChar,2
 
 # TODO [x] use the split character from settings
-# TODO [ ] check if list exists before using it
+# TODO [x] check if list exists before using it
+if([string]::IsNullOrEmpty($params.ListName)){
+    Write-Log -message "Mailing does not exist"
+    throw "Mailing does not exist"
+}
 
 # If a given local list exists in the params change endpoint to that list
 # Now recipients will be imported in the given list and not to the global inxmail list
