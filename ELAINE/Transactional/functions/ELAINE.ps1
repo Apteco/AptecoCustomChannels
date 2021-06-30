@@ -179,6 +179,7 @@ Function Invoke-ELAINE {
         } else {
             $param = ""
         }
+        $errorsToIgnore = @(-14, -12)
     }
     
     process {
@@ -239,11 +240,15 @@ Function Invoke-ELAINE {
             If ( Is-Int($result) ) {
                 # If negative, it is definitely an error
                 If ( $result -lt 0 ) {
-                    # Get the error description
-                    $errMsg = "Got error '$( $result ) : $( Get-ELAINE-ErrorDescription -errCode $result )'"
-                    Write-Log -message $errMsg
-                    throw [System.IO.InvalidDataException] $errMsg  
-                    $errMsg = ""
+                    If ( $errorsToIgnore -contains $result ) {
+                        # Do nothing, those errors are created by blacklist entries or wrong email addresses
+                    } else {
+                        # Get the error description
+                        $errMsg = "Got error '$( $result ) : $( Get-ELAINE-ErrorDescription -errCode $result )'"
+                        Write-Log -message $errMsg
+                        throw [System.IO.InvalidDataException] $errMsg  
+                        $errMsg = ""
+                    }
                 }
             }
             
