@@ -29,3 +29,5 @@ _dev
 *.csv
 *.html
 *.png
+*.part*
+*.xml
