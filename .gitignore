@@ -28,4 +28,5 @@ _dev
 *.part*
 *.lock
 *.csv
+*.part*
 *.xml

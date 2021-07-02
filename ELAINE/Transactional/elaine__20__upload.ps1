@@ -244,8 +244,7 @@ if ( $mailingDetails.status_data.is_transactionmail ) {
 # IMPORT DATA
 #-----------------------------------------------
 
-$dataCsv = @()
-$dataCsv += Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose
+$dataCsv = [System.Collections.ArrayList]@( import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
 Write-Log -message "Loaded '$( $dataCsv.count )' records"
 
 
