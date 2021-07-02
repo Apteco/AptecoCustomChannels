@@ -264,8 +264,7 @@ if ( $listId -notin $sources.id ) {
 
 $url = "$( $apiRoot )/custom-fields"
 $customFieldsREST = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
-$customFields = $customFieldsREST | Select * -ExpandProperty name | select @{name="label";expression={ $_.value }}, * -ExcludeProperty name
-
+$customFields = $customFieldsREST._embedded.item | select @{name="label";expression={ $_.name }}, * -ExcludeProperty name
 
 
 #-----------------------------------------------
