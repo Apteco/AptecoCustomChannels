@@ -13,6 +13,7 @@ Param(
 #-----------------------------------------------
 
 $debug = $true
+$responses = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -197,7 +198,18 @@ $opensRes = Invoke-RestMethod @params
 $opens = $opensRes._embedded."inx:web-beacon-hits"
 
 #$opens | ft
-$opens | Select-Object @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | Format-Table
+$opens | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | ft
+
+
+### This is for the OPENS of the Apteco Email Response Gatherer ###
+if($responses){
+    
+    $dataCsv = $opens | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, @{name="MessageType"; expression={ "Open" }}, * -ExcludeProperty "_links", "_embedded"
+
+    $path = "D:\Scripts\Inxmail\Mailing\ferge-opens.csv"
+    $dataCsv | Export-Csv -Path $path -NoTypeInformation -Verbose -Encoding UTF8 -Delimiter "`t"
+}
+
 
 
 #-----------------------------------------------
@@ -220,15 +232,45 @@ $clicks = $clicksRes._embedded."inx:clicks"
 $clicks | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | ft
 
 
+
+### This is for the CLICKS of the Apteco Email Response Gatherer ###
+if($responses){
+    
+    $data = $clicks | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email }}, @{ name="MessageType"; expression={ "Click" }}, * -ExcludeProperty "_links", "_embedded"
+
+    $path = "D:\Scripts\Inxmail\Mailing\ferge-clicks.csv"
+    $data | Export-Csv -Path $path -NoTypeInformation -Verbose -Encoding UTF8 -Delimiter "`t"
+
+}
+
+
+
+
+
+
 #-----------------------------------------------
 # Bounces https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-bounce-collection
 #-----------------------------------------------
 
-$bouncesRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )clicks?embedded=inx:recipient&recipientAttributes=urn&trackedOnly=$( $trackedOnly )" -Header $header -ContentType "application/hal+json" -Verbose
+$bouncesRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )bounces?embedded=inx:recipient&recipientAttributes=urn&trackedOnly=$( $trackedOnly )" -Header $header -ContentType "application/hal+json" -Verbose
 $bounces = $bouncesRes._embedded."inx:bounces"
 
 #$bounces | ft
-$bounces | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | ft
+
+
+### This is for the BOUNCES of the Apteco Email Response Gatherer ###
+if($responses){
+    
+    $data = $bounces | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, @{name="MessageType"; expression={ "Bounce" }}, * -ExcludeProperty "_links", "_embedded"
+
+    $path = "D:\Scripts\Inxmail\Mailing\ferge-bounces.csv"
+    $data | Export-Csv -Path $path -NoTypeInformation -Verbose -Encoding UTF8 -Delimiter "`t"
+
+}
+    
+# TODO [ ] Remove Columns from ResponseDetails Database 
+
+
 
 
 #-----------------------------------------------
@@ -239,8 +281,34 @@ $bounces | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attri
 #-----------------------------------------------
 # Unsubscribes https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-unsubscription-events
 #-----------------------------------------------
+$params = [hashtable]@{
+    Method = "Get"
+    Uri = "$( $apiRoot )events/unsubscriptions?embedded=inx:recipient&recipientAttributes=$( $attributesString )&trackedOnly=$( $trackedOnly )&startDate=$( $start )&endDate=$( $end )"
+    Header = $header
+    ContentType = "application/hal+json"
+    Verbose = $true
+}
+
+$unsubscribesRes = Invoke-RestMethod @params
+$unsubscribes = $unsubscribesRes._embedded."inx:unsubscription-events"
+
+
+### This is for the UNSUBSCRIPTIONS of the Apteco Email Response Gatherer ###
+if($responses){
+    
+    $data = $unsubscribes | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, @{name="MessageType"; expression={ "Unsubscription" }}, * -ExcludeProperty "_links", "_embedded"
+
+    $path = "D:\Scripts\Inxmail\Mailing\ferge-unsubscription.csv"
+    $data | Export-Csv -Path $path -NoTypeInformation -Verbose -Encoding UTF8 -Delimiter "`t"
+
+}
+
+
+
 
 # for mailing specific unsubscribes see the sending protocol stuff
+
+
 
 #-----------------------------------------------
 # Sends -> the sendings should have some buffer in the time frame that is being requested as described here: https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-all-sendings
@@ -259,17 +327,28 @@ $protocol = [System.Collections.ArrayList]@()
 Possible states
 NOT_SENT, SENT, RECIPIENT_NOT_FOUND, ERROR, ADDRESS_REJECTED, HARDBOUNCE, SOFTBOUNCE, UNKNOWNBOUNCE, SPAMBOUNCE, MUST_ATTRIBUTE, NO_MAIL
 #>
-$sendings | ForEach {
 
-    $sending = $_
+if($responses){
+    
+    $sendings | ForEach {
 
-    $protocolRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/sendings/$( $sending.id )/protocol?embedded=inx:recipient&recipientAttributes=urn" -Header $header -ContentType "application/hal+json" -Verbose
-    $protocol.AddRange( @( $protocolRes._embedded."inx:protocol-entries" | select @{name="sendingId";expression={ $sending.id }}, * ) )
-
+        $sending = $_
+    
+        $protocolRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/sendings/$( $sending.id )/protocol?embedded=inx:recipient&recipientAttributes=urn" -Header $header -ContentType "application/hal+json" -Verbose
+        $protocol.AddRange( @( $protocolRes._embedded."inx:protocol-entries" | select @{name="sendingId";expression={ $sending.id }}, @{name="mailingId";expression={ $sending.mailingId }}, @{name="MessageType"; expression={ "Send" }}, * ) )
+    
+    }
+    
+    $data = $protocol | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * -ExcludeProperty "_links", "_embedded"
+    
+    $path = "D:\Scripts\Inxmail\Mailing\ferge-sends.csv"
+    $data | Export-Csv -Path $path -NoTypeInformation -Verbose -Encoding UTF8 -Delimiter "`t"
 }
 
-$protocol | select @{ name="urn"; expression={ $_._embedded."inx:recipient".attributes.urn } }, @{ name="email"; expression={ $_._embedded."inx:recipient".email } }, * | ft
-
+exit 0
+if($responses){
+    & EmailResponseGatherer64.exe .\responses.xml
+}
 
 #-----------------------------------------------
 # SAVE TIMESTAMP FOR NEXT LOAD
