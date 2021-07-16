@@ -36,7 +36,7 @@ Function Create-Flexmail-Parameters {
         #-----------------------------------------------
 
         $script:apiRoot = $settings.baseREST
-        $script:contentType = "application/json" #"application/json; charset=utf-8"
+        $script:contentType = "application/json; charset=utf-8" #"application/json"
 
         $script:headers += @{
 
