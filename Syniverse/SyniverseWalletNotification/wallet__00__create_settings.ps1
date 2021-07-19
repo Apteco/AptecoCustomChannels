@@ -99,6 +99,7 @@ $settings = @{
     "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
     "contentType" = "application/json" #"application/json; charset=utf-8"
     "uploadsFolder" = "$( $scriptPath )\uploads"
+    "changeTLS" = $true
 
     # Authentication
     "login" = $login

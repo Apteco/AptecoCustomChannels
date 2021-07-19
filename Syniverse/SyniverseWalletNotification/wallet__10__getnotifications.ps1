@@ -21,7 +21,7 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "D:\Scripts\Syniverse\WalletNotification"
+	    scriptPath= "D:\Scripts\Syniverse\WalletNotification_v2"
 	    Username= "abc"
     }
 }
@@ -34,9 +34,6 @@ if ( $debug ) {
 ################################################
 
 <#
-
-TODO [ ] more logging
-TODO [ ] replace mssql with already existent functions of EpiServer
 
 #>
 
@@ -68,7 +65,7 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
+$moduleName = "GETNTFTEMPL"
 $processId = [guid]::NewGuid()
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
@@ -112,22 +109,6 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     "... $( $_.FullName )"
 }
 
-<#
-# Load all exe files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
-$libExecutables | ForEach {
-    "... $( $_.FullName )"
-    
-}
-
-# Load dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
-$libExecutables | ForEach {
-    "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
-}
-#>
-
 
 ################################################
 #
@@ -137,23 +118,27 @@ $libExecutables | ForEach {
 
 # Start the log
 Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $moduleName )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-  $paramsExisting = $true
+    $paramsExisting = $true
 } else {
-  $paramsExisting = $false
+    $paramsExisting = $false
 }
 
 # Log the params, if existing
 if ( $paramsExisting ) {
-  $params.Keys | ForEach-Object {
-      $param = $_
-      Write-Log -message " $( $param ): $( $params[$param] )"
-  }
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
 }
+
 
 
 ################################################
@@ -163,10 +148,19 @@ if ( $paramsExisting ) {
 ################################################
 
 #-----------------------------------------------
+# DECRYPT CONNECTION STRING
+#-----------------------------------------------
+
+$mssqlConnectionString = Get-SecureToPlaintext -String $settings.login.sqlserver
+
+
+#-----------------------------------------------
 # LOAD TEMPLATES FROM MSSQL
 #-----------------------------------------------
 
-$mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
+Write-Log "Loading notification templates from SQLSERVER"
+
+$mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
 $mssqlConnection.ConnectionString = $mssqlConnectionString
 
 $mssqlConnection.Open()
@@ -174,18 +168,7 @@ $mssqlConnection.Open()
 "Trying to load the data from MSSQL"
 
 # define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = @"
-SELECT *
-FROM (
- SELECT *
-  ,row_number() OVER (
-   PARTITION BY CreativeTemplateId ORDER BY Revision DESC
-   ) AS prio
- FROM [dbo].[CreativeTemplate]
- ) ct
-WHERE ct.prio = '1' and MessageContentType = 'SMS'
-ORDER BY CreatedOn
-"@
+$mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
 
 # execute command
 $mssqlCommand = $mssqlConnection.CreateCommand()
@@ -204,23 +187,24 @@ $mssqlConnection.Close()
 
 
 #-----------------------------------------------
-# TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
+# BUILD MAILING OBJECTS
 #-----------------------------------------------
 
-$templates = @()
-$mssqlTable | ForEach {
+$mailings = [System.Collections.ArrayList]@()
+$mssqlTable | foreach {
 
-    $currentRow = $_
+    # Load data
+    $template = $_
 
-    $row = New-Object PSCustomObject
-
-    $row | Add-Member -MemberType NoteProperty -Name "id" -Value $currentRow.CreativeTemplateId
-    $row | Add-Member -MemberType NoteProperty -Name "name" -Value $currentRow.Name
-
-    $templates += $row
+    # Create mailing objects
+    [void]$mailings.Add([Mailing]@{
+        mailingId=$template.CreativeTemplateId
+        mailingName=$template.Name
+    })
 
 }
 
+$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
 
 
 ###############################
@@ -229,4 +213,4 @@ $mssqlTable | ForEach {
 #
 ###############################
 
-return $templates
+return $messages
