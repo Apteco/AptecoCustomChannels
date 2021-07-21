@@ -342,7 +342,7 @@ $parsedData | ForEach {
 
 
 $notificationResponses | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\response.json" -Encoding UTF8
-$notificationErrors | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\errors.csv" -Encoding UTF8
+$notificationErrors | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\errors.json" -Encoding UTF8
 
 
 ################################################
