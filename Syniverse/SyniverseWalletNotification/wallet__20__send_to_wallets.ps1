@@ -299,6 +299,7 @@ $headers = @{
 #-----------------------------------------------
 
 $notificationResponses = [System.Collections.ArrayList]@()
+$notificationErrors = [System.Collections.ArrayList]@()
 $parsedData | ForEach {
     
     $text = $_.message
@@ -313,14 +314,35 @@ $parsedData | ForEach {
     $walletItemDetailUrl = "$( $baseUrl )$( $mobile )"
 
     #Write-Log -message "Push to: '$( $walletItemDetailUrl )' and content '$( $notificationBody )'"
+    $notificationParams = @{
+        Uri = $walletItemDetailUrl
+        Method = "Put"
+        Verbose = $true
+        Headers = $headers
+        Body = $notificationBody
+        ContentType = $contentType
+    }
 
-    $notificationResponse = Invoke-RestMethod -ContentType $contentType -Method Put -Uri $walletItemDetailUrl -Headers $headers -Body $notificationBody -Verbose
-    [void]$notificationResponses.Add($notificationResponse)
+    try {
+        $notificationResponse = Invoke-RestMethod @notificationParams
+        [void]$notificationResponses.Add($notificationResponse)
+    } catch {
+        $e = ParseErrorForResponseBody -err $_
+        [void]$notificationErrors.Add([PsCustomObject]@{
+            "item" = $mobile
+            "text" = $text
+            "error" = $e.errors.message
+        })
+        #Write-Log $e
+    }
+    
     #Write-Log -message "Push result: $( $notificationResponse | ConvertTo-Json -Compress )"
 
 }
 
-$notificationResponses | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\response.csv" -Encoding UTF8
+
+$notificationResponses | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\response.json" -Encoding UTF8
+$notificationErrors | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\errors.csv" -Encoding UTF8
 
 
 ################################################
@@ -352,6 +374,7 @@ $transactionId = $processId #$recipientListID
     #"RecipientsIgnored" = 
     #"RecipientsQueued" = $queued
     #"RecipientsSent" = 
+    "RecipientsFailed" = $notificationErrors.Count
 
 }
 

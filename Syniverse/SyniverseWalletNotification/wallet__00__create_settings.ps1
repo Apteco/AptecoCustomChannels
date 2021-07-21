@@ -72,7 +72,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
 # API LOGIN DATA
 #-----------------------------------------------
 
-$token = Read-Host -AsSecureString "Please enter the token for syniverse api"
+$token = Read-Host -AsSecureString "Please enter the token for syniverse api without the 'Basic'"
 $tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password)
 
 $connectionstring = Read-Host -AsSecureString "Please enter the connection string for sqlserver" # "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_srvc;Password=abcde;"
@@ -97,7 +97,7 @@ $settings = @{
     "logfile" = "$( $scriptPath )\walletnotifications.log"
     "delimiter" = "`t" # "`t"|","|";" usw.
     "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
-    "contentType" = "application/json" #"application/json; charset=utf-8"
+    "contentType" = "application/json; charset=utf-8" #"application/json"
     "uploadsFolder" = "$( $scriptPath )\uploads"
     "changeTLS" = $true
 
