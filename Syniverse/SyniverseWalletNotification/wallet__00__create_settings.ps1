@@ -62,6 +62,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     "... $( $_.FullName )"
 }
 
+
 ################################################
 #
 # SETTINGS
@@ -72,14 +73,27 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
 # API LOGIN DATA
 #-----------------------------------------------
 
-$token = Read-Host -AsSecureString "Please enter the token for syniverse api without the 'Basic'"
-$tokenEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$token).GetNetworkCredential().Password)
+# Entering the username and password
+$companyId = Read-Host "Please enter company ID"
+$username = Read-Host "Please enter the username for syniverse wallet api"
+$password = Read-Host -AsSecureString "Please enter the password for syniverse wallet api"
 
-$connectionstring = Read-Host -AsSecureString "Please enter the connection string for sqlserver" # "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_srvc;Password=abcde;"
+# Combining username and password; making it ready for BasicAuth
+$credentials = "$( $username ):$( ( New-Object PSCredential "dummy",$password).GetNetworkCredential().Password )"
+
+# Encoding to Base64
+$BytesCredentials = [System.Text.Encoding]::ASCII.GetBytes($credentials)
+$EncodedCredentials = [Convert]::ToBase64String($BytesCredentials)
+
+# Encrypting Authorization header
+$credentialsEncrypted = Get-PlaintextToSecure $EncodedCredentials
+
+# Asking for connection string to response database
+$connectionstring = Read-Host -AsSecureString "Please enter the connection string for sqlserver" # "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=fa5t5tat5!;"
 $connectionstringEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$connectionstring).GetNetworkCredential().Password)
 
 $login = @{
-    "accesstoken" = $tokenEncrypted
+    "accesstoken" = $credentialsEncrypted
     "sqlserver" = $connectionstringEncrypted
 }
 
@@ -92,7 +106,7 @@ $settings = @{
 
     # General settings
     "base"="https://public-api.cm.syniverse.eu"
-    "companyId" = "<companyId>"
+    "companyId" = $companyId
     "nameConcatChar" = " | "
     "logfile" = "$( $scriptPath )\walletnotifications.log"
     "delimiter" = "`t" # "`t"|","|";" usw.
@@ -136,6 +150,5 @@ $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UT
 ################################################
 
 if ( !(Test-Path -Path $settings.uploadsFolder) ) {
-    Write-Log -message "Upload $( $settings.uploadsFolder ) does not exist. Creating the folder now!"
     New-Item -Path "$( $settings.uploadsFolder )" -ItemType Directory
 }
