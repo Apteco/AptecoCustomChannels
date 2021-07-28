@@ -6,6 +6,13 @@
 
 <#
 
+[ ] possibly a user token could make sense
+
+To access these APIs , customers need to authenticate and authorize their access within the API call.
+This requires passing the access token, and potentially the user token, in the API call headers.
+User token requirement is dependent on how the company environment has been setup by the customer. 
+
+
 #>
 
 ################################################
@@ -71,7 +78,7 @@ $authentication = @{
 # SEND SMS
 #-----------------------------------------------
 
-$sendMethod = "sender_id" # sender_id|channel
+$sendMethod = "channel" # sender_id|channel
 $senderId = ""
 
 if ($sendMethod -eq "sender_id") {
@@ -125,7 +132,9 @@ $settings = @{
     providername = "synsms"                             # identifier for this custom integration, this is used for the response allocation
 
     # Proxy settings, if needed... this needs to be commented in in the code
-    proxyUrl = "http://proxyurl:8080"
+    useDefaultCredentials = $false
+    ProxyUseDefaultCredentials = $false
+    proxyUrl = "" # ""|"http://proxyurl:8080"
 
     # Authentication
     authentication = $authentication
