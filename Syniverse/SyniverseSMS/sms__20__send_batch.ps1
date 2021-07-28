@@ -182,30 +182,20 @@ if ( $paramsExisting ) {
 # READ TEMPLATE
 #-----------------------------------------------
 
-# TODO [ ] replace this with the generic mssql functions
+
+#$chosenTemplate = [Mailing]::new($params.MessageName)
 
 Write-Log -message "Loading template with name $( $params.MessageName )"
 
-$mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
+$mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
 $mssqlConnection.ConnectionString = $mssqlConnectionString
 
 $mssqlConnection.Open()
 
 "Trying to load the data from MSSQL"
 
-# define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = @"
-SELECT *
-FROM (
- SELECT *
-  ,row_number() OVER (
-   PARTITION BY CreativeTemplateId ORDER BY Revision DESC
-   ) AS prio
- FROM [dbo].[CreativeTemplate]
- ) ct
-WHERE ct.prio = '1' and MessageContentType = 'SMS' and Name = '$( $params.MessageName )'
-ORDER BY CreatedOn
-"@
+# define query
+$mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
 
 # execute command
 $mssqlCommand = $mssqlConnection.CreateCommand()
@@ -213,11 +203,15 @@ $mssqlCommand.CommandText = $mssqlQuery
 $mssqlResult = $mssqlCommand.ExecuteReader()
     
 # load data
-$mssqlTable = new-object System.Data.DataTable
+$mssqlTable = [System.Data.DataTable]::new()
 $mssqlTable.Load($mssqlResult)
     
-# close connection
+# Closing connection
 $mssqlConnection.Close()
+
+# Find the right template
+$template = $mssqlTable | where { $_.Name -eq $params.MessageName }
+#$template = $mssqlTable | where { $_.CreativeTemplateId -eq $chosenTemplate.mailingId }
 
 
 #-----------------------------------------------
@@ -239,8 +233,15 @@ $regexForLinks = "(http[s]?)(:\/\/)({{(.*?)}}|[^\s,])+"
 # extract the important template information
 # https://stackoverflow.com/questions/34212731/powershell-get-all-strings-between-curly-braces-in-a-file
 $creativeTemplateText = $mssqlTable[0].Creative
+$creativeTemplateText = $template.Creative
 $creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValuesBetweenCurlyBrackets) | Select -ExpandProperty Value
 $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value
+
+Write-Log -message "Found $( $creativeTemplateToken.count ) tokens to replace in the template:"
+$creativeTemplateToken | ForEach { Write-Log -message "  $( $_ )" }
+Write-Log -message "Found $( $creativeTemplateLinks.count ) links to parse in the template:"
+$creativeTemplateLinks | ForEach { Write-Log -message "  $( $_ )" }
+
 
 
 #-----------------------------------------------
@@ -260,14 +261,13 @@ $originalConsoleCodePage = [Console]::OutputEncoding.CodePage
 # DEFINE NUMBERS
 #-----------------------------------------------
 
-Write-Log -message "Start to create a new file"
+Write-Log -message "Loading input file"
 
 # TODO [ ] use split file process for larger files
 # TODO [ ] load parameters from creative template for default values
 
 #$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
 $data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-Csv -Delimiter "`t"
-
 
 
 #-----------------------------------------------
@@ -277,7 +277,6 @@ $data = get-content -path "$( $params.Path )" -encoding UTF8 -raw | ConvertFrom-
 $headers = @{
     "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
 }
-
 $contentType = "application/json; charset=utf-8"
 
 
@@ -288,8 +287,7 @@ $contentType = "application/json; charset=utf-8"
 # TODO [ ] put this workflow in parallel groups
 Write-Log -message "Parsing data and putting links into syniverse functions via regex"
 
-
-$parsedData = @()
+$parsedData = [System.Collections.ArrayList]@()
 $data | ForEach {
 
     $row = $_
@@ -302,7 +300,7 @@ $data | ForEach {
         $creativeTemplateToken | ForEach {
             $token = $_
             $linkReplaced = $linkReplaced -replace [regex]::Escape("{{$( $token )}}"), [uri]::EscapeDataString($row.$token)
-            Write-Log -message "$( ($row.$token).toString() ) - $( [uri]::EscapeDataString($row.$token) )"
+            #Write-Log -message "$( ($row.$token).toString() ) - $( [uri]::EscapeDataString($row.$token) )"
         }
         # the #track function in syniverse automatically creates a trackable short link in the SMS
         $txt = $txt -replace [regex]::Escape($linkTemplate), "#track(""$( $linkReplaced )"")"
@@ -316,17 +314,20 @@ $data | ForEach {
 
     # Unescape and escape data to catch remaining umlauts in the template
     #$txt = [uri]::EscapeDataString([uri]::UnescapeDataString($txt))
-
-    # create new object with data
-    $newRow = New-Object PSCustomObject
-    $newRow | Add-Member -MemberType NoteProperty -Name "mdn" -Value $row."$( $params.SmsFieldName )"
-    $newRow | Add-Member -MemberType NoteProperty -Name "message" -Value $txt
-    $newRow | Add-Member -MemberType NoteProperty -Name "Urn" -Value $row.($params.UrnFieldName)
-    $newRow | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $row.($params.CommunicationKeyFieldName)
     
     # add to array
-    $parsedData += $newRow
+    [void]$parsedData.Add(
+        [PSCustomObject]@{
+            "mdn" = $row."$( $params.SmsFieldName )"
+            "message" = $txt
+            "Urn" = $row.($params.UrnFieldName)
+            "CommunicationKey" = $row.($params.CommunicationKeyFieldName)
+        }
+    )
+
 }
+
+Write-Log -message "Start to create a new file"
 
 # create new guid
 $smsId = $processId.Guid
@@ -342,6 +343,7 @@ $parsedData | Export-Csv -Path $smsFile -Encoding UTF8 -Delimiter "`t" -NoTypeIn
 $url = "$( $settings.base )scg-external-api/api/v1/messaging/message_requests"
 
 $results = [System.Collections.ArrayList]@()
+$errors = [System.Collections.ArrayList]@()
 $parsedData | ForEach {
     
     $parsedRow = $_
@@ -375,6 +377,7 @@ $parsedData | ForEach {
 
     $body = $bodyContent | ConvertTo-Json -Depth 8 -Compress
     #$body
+
     try {
 
         $paramsPost = [Hashtable]@{
@@ -399,21 +402,43 @@ $parsedData | ForEach {
         $res = Invoke-RestMethod @paramsPost
         #$res = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body -Verbose -ContentType $contentType # -UseDefaultCredentials -ProxyUseDefaultCredentials -Proxy $settings.proxyUrl
 
+        Write-Log -message "SMS result: $( $res.id )"
+
+        # create new object with data
+        [void]$results.Add(
+            [PSCustomObject]@{
+                "messageid" = $res.id
+                "Urn" = $parsedRow.Urn
+                "CommunicationKey" = $parsedRow.CommunicationKey
+            }
+        )
+
     } catch {
+
         $e = ParseErrorForResponseBody -err $_
-        Write-Log -message $e
+        Write-Log -message $e -severity ([LogSeverity]::ERROR)
+        [void]$errors.add( $e )
+
     }
 
-    Write-Log -message "SMS result: $( $res.id )"
+}
 
-    # create new object with data
-    $newResult = New-Object PSCustomObject
-    $newResult | Add-Member -MemberType NoteProperty -Name "messageid" -Value $res.id
-    $newResult | Add-Member -MemberType NoteProperty -Name "Urn" -Value $parsedRow.Urn
-    $newResult | Add-Member -MemberType NoteProperty -Name "CommunicationKey" -Value $parsedRow.CommunicationKey
+# Logging
+$errorfile = "$( $tempFolder )\errors.json"
+$errors | ConvertTo-Json -Depth 20 | Set-Content -Path $errorfile -Encoding UTF8
 
-    [void]$results.Add( $newResult )
+Write-Log -message "Successful http requests: $( $results.count )"
+If ( $errors.Count -gt 0 ) {
+    Write-Log -message "Errored http requests: $( $errors.count )" -severity ([LogSeverity]::WARNING)
+    Write-Log -message "Errors written into file '$( $errorfile )'"
+} else {
+    Write-Log -message "Errored http requests: $( $errors.count )" -severity ([LogSeverity]::INFO)
+}
 
+# If nothing was successful, just throw an exception
+If ( $results.count -eq 0 ) {
+    Write-Log -message "No successful records were uploaded, throwing exception" -severity ([LogSeverity]::ERROR)
+    throw [System.IO.InvalidDataException] "No successful records were uploaded"
 }
 
 
@@ -427,11 +452,11 @@ Write-Log -message "Putting results in response database"
 
 # open connection again
 $mssqlConnection.Open()
+$updateResult = 0
 
 # Initial wait of 15 seconds, so there is a good chance the messages are already "DELIVERED" OR "FAILED" instead of "SENT" (the state before...)
-$secondsToWait = 15  # TODO [ ] put this into settings if wished
-$maxWaitTime = 45 # TODO [ ] put this into settings if wished
-Start-Sleep -Seconds $secondsToWait
+$secondsToWait = $settings.firstResultWaitTime
+$maxWaitTime = $settings.maxResultWaitTime
 
 # Loop for requesting the results
 $stopWatch = [System.Diagnostics.Stopwatch]::new()
@@ -441,6 +466,13 @@ $states = [System.Collections.ArrayList]@()
 
 do {
 
+    Start-Sleep -Seconds $secondsToWait
+
+    # Prepare insert command and transaction
+    $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+    $messageUpdateMssqlCommand.Transaction = $mssqlConnection.BeginTransaction()
+
+    # Go through the single results
     $results | where { $_.messageid -notin $states.id } | ForEach {
         
         $result = $_
@@ -534,18 +566,18 @@ do {
             try {
 
                 # execute command
-                $messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
                 $messageUpdateMssqlCommand.CommandText = $insert
-                $updateResult = $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+                $updateResult += $messageUpdateMssqlCommand.ExecuteNonQuery()
             
             } catch [System.Exception] {
 
                 $errText = $_.Exception
                 $errText | Write-Output
-                Write-Log -message $errText
+                Write-Log -message "Error happened during insert on sqlserver" -severity ([LogSeverity]::ERROR)
+                Write-Log -message $errText -severity ([LogSeverity]::ERROR)
 
             } finally {
-            
+
             }
 
         } catch {
@@ -554,21 +586,53 @@ do {
             When getting a 404, the script will retry again until the timeout occurs
             #>
             $e = ParseErrorForResponseBody -err $_
+            Write-Log -message "Error happened during status request at syniverse" -severity ([LogSeverity]::ERROR)
             Write-Log -message $e
 
         }        # TODO [ ] Only add to array and to database, if it wasn't a 404 
 
     }
 
-    Start-Sleep -Seconds $secondsToWait
+    # Commit the changes to sqlserver
+    $messageUpdateMssqlCommand.Transaction.Commit()
+    #$messageUpdateMssqlCommand.Transaction.Rollback()
 
 } until (( $stopWatch.Elapsed -ge $timeSpan -or $results.count -eq $states.Count)) # until (( $sends.Count -eq $sendsStatus.count ) -or ( $stopWatch.Elapsed -ge $timeSpan ))
 
-# close connection
+
+# Insert all entries without a status that was given back in time
+# Prepare insert command and transaction
+$messageUpdateMssqlCommand = $mssqlConnection.CreateCommand()
+$messageUpdateMssqlCommand.Transaction = $mssqlConnection.BeginTransaction()
+$results | where { $_.messageid -notin $states.id } | ForEach {
+        
+    $result = $_
+
+    # Prepare insert statement
+    $insert = @"
+    INSERT INTO [dbo].[Messages] ([service],[Urn],[BroadcastTransactionID],[MessageID],[CommunicationKey])
+    VALUES (
+        'SYNSMS'
+        ,'$( $result.Urn )'
+        ,'$( $processId.Guid )'
+        ,'$( $result.messageid )'
+        ,'$( $result.CommunicationKey )'
+        )
+"@
+
+    # execute command
+    $messageUpdateMssqlCommand.CommandText = $insert
+    $updateResult += $messageUpdateMssqlCommand.ExecuteScalar() #$mssqlCommand.ExecuteNonQuery()
+
+}
+
+# Commit the last transaction and close the connection
+$messageUpdateMssqlCommand.Transaction.Commit()
 $mssqlConnection.Close()
 
 # Logging
 Write-Log -message "Sent out $( $results.Count ) SMS"
+Write-Log -message "Written $( $updateResult ) records to SQLServer"
 Write-Log -message "Got message status back from $( $states.Count ) messages, in detail:"
 $states.state | group | foreach {
     Write-Log -message "    $( $_.Name ): $( $_.Count )"

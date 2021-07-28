@@ -12,7 +12,8 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $false
+$debug = $true
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,12 +21,8 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "D:\Scripts\Syniverse\WalletNotification"
-	    Username= "abc"
     }
 }
-
 
 ################################################
 #
@@ -35,8 +32,9 @@ if ( $debug ) {
 
 <#
 
-TODO [ ] more logging
-TODO [ ] replace mssql with already existent functions of EpiServer
+https://github.com/Syniverse/QuickStart-BatchNumberLookup-Python/blob/master/ABA-example-external.py
+
+FILEUPLOAD UP TO 2 GB allowed
 
 #>
 
@@ -47,14 +45,14 @@ TODO [ ] replace mssql with already existent functions of EpiServer
 ################################################
 
 if ( $debug ) {
-  # Load scriptpath
-  if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-      $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-  } else {
-      $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-  }
+    # Load scriptpath
+    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    } else {
+        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    }
 } else {
-  $scriptPath = "$( $params.scriptPath )" 
+    $scriptPath = "$( $params.scriptPath )" 
 }
 Set-Location -Path $scriptPath
 
@@ -67,8 +65,9 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
+$libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
+$moduleName = "SYNSMSREPORT"
 $processId = [guid]::NewGuid()
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
@@ -78,22 +77,20 @@ $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encodin
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
 if ( $settings.changeTLS ) {
-  $AllProtocols = @(    
-      [System.Net.SecurityProtocolType]::Tls12
-      #[System.Net.SecurityProtocolType]::Tls13,
-      ,[System.Net.SecurityProtocolType]::Ssl3
-  )
-  [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    $AllProtocols = @(    
+        [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        ,[System.Net.SecurityProtocolType]::Ssl3
+    )
+    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
 # more settings
 $logfile = $settings.logfile
-$mssqlConnectionString = $settings.responseDB
-
 
 # append a suffix, if in debug mode
 if ( $debug ) {
-  $logfile = "$( $logfile ).debug"
+    $logfile = "$( $logfile ).debug"
 }
 
 
@@ -103,7 +100,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data  #, System.Text.Encoding
+#Add-Type -AssemblyName System.Data #, System.Web  #, System.Text.Encoding
 
 # Load all PowerShell Code
 "Loading..."
@@ -111,7 +108,6 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
-
 <#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
@@ -142,91 +138,84 @@ Write-Log -message "Got a file with these arguments: $( [Environment]::GetComman
 
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-  $paramsExisting = $true
+    $paramsExisting = $true
 } else {
-  $paramsExisting = $false
+    $paramsExisting = $false
 }
 
 # Log the params, if existing
 if ( $paramsExisting ) {
-  $params.Keys | ForEach-Object {
-      $param = $_
-      Write-Log -message " $( $param ): $( $params[$param] )"
-  }
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    $( $param )= ""$( $params[$param] )"""
+    }
 }
 
 
 ################################################
 #
-# CHECK MSSQL FOR TEMPLATES
+# PROGRAM
 #
 ################################################
 
-#-----------------------------------------------
-# LOAD TEMPLATES FROM MSSQL
-#-----------------------------------------------
-
-$mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
-$mssqlConnection.ConnectionString = $mssqlConnectionString
-
-$mssqlConnection.Open()
-
-"Trying to load the data from MSSQL"
-
-# define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = @"
-SELECT *
-FROM (
- SELECT *
-  ,row_number() OVER (
-   PARTITION BY CreativeTemplateId ORDER BY Revision DESC
-   ) AS prio
- FROM [dbo].[CreativeTemplate]
- ) ct
-WHERE ct.prio = '1' and MessageContentType = 'SMS'
-ORDER BY CreatedOn
-"@
-
-# execute command
-$mssqlCommand = $mssqlConnection.CreateCommand()
-$mssqlCommand.CommandText = $mssqlQuery
-$mssqlResult = $mssqlCommand.ExecuteReader()
-    
-# load data
-$mssqlTable = new-object System.Data.DataTable
-$mssqlTable.Load($mssqlResult)
-    
-
-$mssqlConnection.Close()
-
-# show result
-#$mssqlTable
-
 
 #-----------------------------------------------
-# TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
+# PREPARE HEADERS
 #-----------------------------------------------
 
-$templates = @()
-$mssqlTable | ForEach {
-
-    $currentRow = $_
-
-    $row = New-Object PSCustomObject
-
-    $row | Add-Member -MemberType NoteProperty -Name "id" -Value $currentRow.CreativeTemplateId
-    $row | Add-Member -MemberType NoteProperty -Name "name" -Value $currentRow.Name
-
-    $templates += $row
-
+$headers = @{
+    "Authorization"= "Bearer $( Get-SecureToPlaintext -String $settings.authentication.accessToken )"
 }
 
+$contentType = "application/json; charset=utf-8"
 
 
-###############################
-#
-# RETURN MESSAGES
-#
-###############################
+#-----------------------------------------------
+# DEBUG SWITCH
+#-----------------------------------------------
 
-return $templates
+
+# types: SMS, MMS, PSH, FB
+$results = [System.Collections.ArrayList]@()
+$limit = 100
+$offset = 0
+
+# The result includes 50 entries per call
+Do {
+    
+    $url = "$( $settings.base )scg-external-api/api/v1/messaging/messages?offset=$( $offset )&type=SMS&limit=$( $limit )&sort=created_date"# &created_date=[2020-05-31T22:00:00.000Z,2021-06-11T14:31:59.000Z]"
+
+    try {
+
+        $paramsPost = [Hashtable]@{
+            Uri = $url
+            Method = "Get"
+            Headers = $headers
+            Verbose = $true
+            ContentType = $contentType
+        }
+
+        "$( $paramsPost.uri )"
+
+        $res = Invoke-RestMethod @paramsPost
+        $results.AddRange($res.list)
+
+    } catch {
+
+        $e = ParseErrorForResponseBody -err $_
+        Write-Log -message $e
+
+    }
+
+    $offset += $res.limit
+
+
+} until ( $offset -ge $res.total )
+
+
+
+
+#Write-Log -message "Just forwarding parameters to broadcast"
+
+$results | select *, @{name="fragments_count";expression={ $_.fragments_info.count }} | ConvertTo-Csv -NoTypeInformation -Delimiter "`t" | % { $_ -replace "`n",' ' } | Out-File ".\$( $timestamp )_$( $processId.Guid )_messages.csv" -Encoding utf8
+$results | select id -ExpandProperty fragments_info | ConvertTo-Csv -NoTypeInformation -Delimiter "`t" | % { $_ -replace "`n",' ' } | Out-File ".\$( $timestamp )_$( $processId.Guid )_fragments.csv" -Encoding utf8

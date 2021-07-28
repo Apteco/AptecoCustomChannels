@@ -6,6 +6,13 @@
 
 <#
 
+[ ] possibly a user token could make sense
+
+To access these APIs , customers need to authenticate and authorize their access within the API call.
+This requires passing the access token, and potentially the user token, in the API call headers.
+User token requirement is dependent on how the company environment has been setup by the customer. 
+
+
 #>
 
 ################################################
@@ -71,7 +78,7 @@ $authentication = @{
 # SEND SMS
 #-----------------------------------------------
 
-$sendMethod = "sender_id" # sender_id|channel
+$sendMethod = "channel" # sender_id|channel
 $senderId = ""
 
 if ($sendMethod -eq "sender_id") {
@@ -80,7 +87,7 @@ if ($sendMethod -eq "sender_id") {
 
 
 $countryMap = @{
-    "+44"="uk"
+    #"+44"="uk"
     #"+33"="fr"
     "+49"="de"
     #"+34"="es"
@@ -94,9 +101,9 @@ $countryMap = @{
 # sender number is not fixed.
 # we have public shared codes available for 58 countries listed here
 $channelIds = @{
-    "uk"="JXxaP5zAitsUnd66Ynavc" #"DJm-vHcnSBKbeK4b2FAOLQ"
+    #"uk"="JXxaP5zAitsUnd66Ynavc" #"DJm-vHcnSBKbeK4b2FAOLQ"
     #"fr"="RUHDTglIodfuVx2vBg7qg3"
-    "de"="JXxaP5zAitsUnd66Ynavc" #"qSOdzTqaSfO0bmwLEQGNdw"
+    "de"="qSOdzTqaSfO0bmwLEQGNdw" #"JXxaP5zAitsUnd66Ynavc" #"qSOdzTqaSfO0bmwLEQGNdw"
     #"es"="zm8lO9Y9QKGKTeS-BoHCKA"
     #"dk"="o4u6_YvUSLas0SjuFYCtDw"
     #"se"="qAQwTeyCQsi5UturUnJApQ"
@@ -118,28 +125,33 @@ $mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_LumaYoga;User
 $settings = @{
 
     # General
-    base="https://api.syniverse.com/"					# Default url
-    changeTLS = $true                      	            # should tls be changed on the system?
-    nameConcatChar = " / "                 	            # character to concat mailing/campaign id with mailing/campaign name
-    logfile="$( $scriptPath )\syn_sms.log"		        # path and name of log file
-    providername = "synsms"                             # identifier for this custom integration, this is used for the response allocation
+    "base"="https://api.syniverse.com/"					# Default url
+    "changeTLS" = $true                      	        # should tls be changed on the system?
+    "nameConcatChar" = " | "               	            # character to concat mailing/campaign id with mailing/campaign name
+    "logfile"="$( $scriptPath )\syn_sms.log"		    # path and name of log file
+    "providername" = "synsms"                           # identifier for this custom integration, this is used for the response allocation
 
-    # Proxy settings, if needed... this needs to be commented in in the code
-    proxyUrl = "http://proxyurl:8080"
+    # Proxy settings, if needed - will be automatically used
+    "useDefaultCredentials" = $false
+    "ProxyUseDefaultCredentials" = $false
+    "proxyUrl" = "" # ""|"http://proxyurl:8080"
 
     # Authentication
-    authentication = $authentication
+    "authentication" = $authentication
     
     # Upload settings
-    uploadsFolder = "$( $scriptPath )\uploads"
-    rowsPerUpload = 100
-    sendMethod = $sendMethod
-    senderId = $senderId
+    "uploadsFolder" = "$( $scriptPath )\uploads"
+    "rowsPerUpload" = 100
+    "sendMethod" = $sendMethod
+    "senderId" = $senderId
+    "firstResultWaitTime" = 15                          # First wait time after sending out SMS for the first results
+                                                        # and also wait time after each loop
+    "maxResultWaitTime" = 100                           # Maximum time to request SMS sending status
 
     # Detail settings
-    countryMap = $countryMap
-    channels = $channelIds
-    responseDB = $mssqlConnectionString
+    "countryMap" = $countryMap
+    "channels" = $channelIds
+    "responseDB" = $mssqlConnectionString
 
 }
 
@@ -176,6 +188,6 @@ $json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UT
 
 $uploadsFolder = $settings.uploadsFolder
 if ( !(Test-Path -Path $uploadsFolder) ) {
-    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    #Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
     New-Item -Path "$( $uploadsFolder )" -ItemType Directory
 }

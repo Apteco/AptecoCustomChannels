@@ -53,3 +53,25 @@ Function Create-KeyFile {
     
     
 }
+
+<#
+Password encryption for Apteco Orbit
+#>
+Function Crypt-Password {
+
+    param(
+        [String]$password
+    )
+
+    $cryptedPassword = @()
+    $password.ToCharArray() | %{[int][char]$_} | ForEach {    
+        If ($_ % 2 -eq 0) {
+            $cryptedPassword += [char]( $_ + 1 )
+        } else {
+            $cryptedPassword += [char]( $_ - 1 )
+        } 
+    }
+
+    $cryptedPassword -join ""
+
+}
