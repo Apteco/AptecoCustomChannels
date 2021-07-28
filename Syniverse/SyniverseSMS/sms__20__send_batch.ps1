@@ -183,7 +183,7 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 
 
-#$chosenTemplate = [Mailing]::new($params.MessageName)
+$chosenTemplate = [Mailing]::new($params.MessageName)
 
 Write-Log -message "Loading template with name $( $params.MessageName )"
 
@@ -210,8 +210,8 @@ $mssqlTable.Load($mssqlResult)
 $mssqlConnection.Close()
 
 # Find the right template
-$template = $mssqlTable | where { $_.Name -eq $params.MessageName }
-#$template = $mssqlTable | where { $_.CreativeTemplateId -eq $chosenTemplate.mailingId }
+#$template = $mssqlTable | where { $_.Name -eq $params.MessageName }
+$template = $mssqlTable | where { $_.CreativeTemplateId -eq $chosenTemplate.mailingId }
 
 
 #-----------------------------------------------
@@ -232,7 +232,6 @@ $regexForLinks = "(http[s]?)(:\/\/)({{(.*?)}}|[^\s,])+"
 
 # extract the important template information
 # https://stackoverflow.com/questions/34212731/powershell-get-all-strings-between-curly-braces-in-a-file
-$creativeTemplateText = $mssqlTable[0].Creative
 $creativeTemplateText = $template.Creative
 $creativeTemplateToken = [Regex]::Matches($creativeTemplateText, $regexForValuesBetweenCurlyBrackets) | Select -ExpandProperty Value
 $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks) | Select -ExpandProperty Value

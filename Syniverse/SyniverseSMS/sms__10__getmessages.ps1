@@ -194,20 +194,21 @@ $mssqlConnection.Close()
 # TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
 #-----------------------------------------------
 
-$templates = @()
-$mssqlTable | ForEach {
+$mailings = [System.Collections.ArrayList]@()
+$mssqlTable | foreach {
 
-    $currentRow = $_
+    # Load data
+    $template = $_
 
-    $row = New-Object PSCustomObject
-
-    $row | Add-Member -MemberType NoteProperty -Name "id" -Value $currentRow.CreativeTemplateId
-    $row | Add-Member -MemberType NoteProperty -Name "name" -Value $currentRow.Name
-
-    $templates += $row
+    # Create mailing objects
+    [void]$mailings.Add([Mailing]@{
+        mailingId=$template.CreativeTemplateId
+        mailingName=$template.Name
+    })
 
 }
 
+$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
 
 
 ###############################
@@ -216,4 +217,4 @@ $mssqlTable | ForEach {
 #
 ###############################
 
-return $templates
+return $messages
