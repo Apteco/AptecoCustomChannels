@@ -8,11 +8,13 @@ Param(
     [hashtable] $params
 )
 
+
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
 
 $debug = $false
+
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -165,7 +167,7 @@ if ( $paramsExisting ) {
 # LOAD TEMPLATES FROM MSSQL
 #-----------------------------------------------
 
-$mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
+$mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
 $mssqlConnection.ConnectionString = $mssqlConnectionString
 
 $mssqlConnection.Open()
@@ -173,18 +175,7 @@ $mssqlConnection.Open()
 "Trying to load the data from MSSQL"
 
 # define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = @"
-SELECT *
-FROM (
- SELECT *
-  ,row_number() OVER (
-   PARTITION BY CreativeTemplateId ORDER BY Revision DESC
-   ) AS prio
- FROM [dbo].[CreativeTemplate]
- ) ct
-WHERE ct.prio = '1' and MessageContentType = 'SMS'
-ORDER BY CreatedOn
-"@
+$mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
 
 # execute command
 $mssqlCommand = $mssqlConnection.CreateCommand()
@@ -195,11 +186,8 @@ $mssqlResult = $mssqlCommand.ExecuteReader()
 $mssqlTable = new-object System.Data.DataTable
 $mssqlTable.Load($mssqlResult)
     
-
+# Close connection
 $mssqlConnection.Close()
-
-# show result
-#$mssqlTable
 
 
 #-----------------------------------------------
