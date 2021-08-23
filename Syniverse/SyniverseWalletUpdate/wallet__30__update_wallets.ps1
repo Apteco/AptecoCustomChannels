@@ -255,7 +255,7 @@ Write-Log -message "Got a file with no of rows: $( $data.Count )"
 #-----------------------------------------------
 
 if ( $campaignId -ne "all" ) {
-    $dataWallets = $data | where { $_."$( $params.UrnFieldName )" -like "*$( $campaignId )*" }
+    $dataWallets = $data | where { $_."$( $params.SmsFieldName )" -like "*$( $campaignId )*" }
 } else {
     $dataWallets = $data
 }

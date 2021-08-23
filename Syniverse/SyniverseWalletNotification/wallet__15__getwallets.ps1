@@ -89,7 +89,7 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$mssqlConnectionString = $settings.responseDB
+#$mssqlConnectionString = $settings.responseDB
 
 
 # append a suffix, if in debug mode
@@ -104,7 +104,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data  #, System.Text.Encoding
+#Add-Type -AssemblyName System.Data  #, System.Text.Encoding
 
 # Load all PowerShell Code
 "Loading..."
@@ -185,15 +185,8 @@ $headers = @{
 
 Write-Log "Loading available wallets"
 
-$walletDetails = @()
+$walletDetails = [System.Collections.ArrayList]@()
 
-<#
-$walletIds | ForEach {
-    $walletId = $_
-    $walletUrl = "$( $baseUrl )/companies/$( $companyId )/campaigns/wallet/$( $walletId )"
-    $walletDetails += Invoke-RestMethod -ContentType $contentType -Method Get -Uri $walletUrl -Headers $headers
-}
-#>
 $param = @{
     "Uri" = "$( $baseUrl )/companies/$( $settings.companyId )/campaigns/wallet"
     "ContentType" = $contentType
@@ -203,17 +196,33 @@ $param = @{
 }
 $walletDetails = Invoke-RestMethod @param
 
-$wallets = $walletDetails | Select @{name="id";expression={ $_.wallet_id }}, @{name="name";expression={ "$( $_.wallet_id )$( $settings.nameConcatChar )$( $_.Name )" }}
-
 Write-Log "Loaded $( $wallets.count ) wallets through the API"
 
-$wallets
+#-----------------------------------------------
+# BUILD MAILING OBJECTS
+#-----------------------------------------------
+
+$mailings = [System.Collections.ArrayList]@()
+$walletDetails | foreach {
+
+    # Load data
+    $campaign = $_
+
+    # Create mailing objects
+    [void]$mailings.Add([Mailing]@{
+        mailingId=$campaign.wallet_id
+        mailingName=$campaign.Name
+    })
+
+}
+
+$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
 
 
-################################################
+###############################
 #
-# RETURN VALUES TO PEOPLESTAGE
+# RETURN MESSAGES
 #
-################################################
+###############################
 
-$wallets
+$messages
