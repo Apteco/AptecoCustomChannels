@@ -14,6 +14,7 @@ Param(
 
 $debug = $false
 
+# TODO [ ] add more log messages
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -33,12 +34,12 @@ if ( $debug ) {
         "MessageName" = "1087 | 1 | Greeting Card with Balloons - 1 - "
         "EmailFieldName" = "email"
         "SmsFieldName" = ""
-        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_1087  1  Greeting Card with Balloons - 1 - _1f4cdf68-9854-4865-8499-0338b0c8ac34.txt"
+        "Path" = "D:\Apteco\Publish\GV\system\Deliveries\PowerShell_1087  1  Greeting Card with Balloons - 1 - _53808900-1d48-48b5-862d-40c306e7af95.txt"
         "ReplyToEmail" = ""
         "Username" = "ab"
         "ReplyToSMS" = ""
-        "UrnFieldName" = "Kunden ID"
-        "importFile" = "D:\FastStats\Publish\Handel\public\alphapictures.csv"
+        "UrnFieldName" = "Con Acc Id"
+        "importFile" = "D:\Apteco\Publish\GV\public\alphapictures.csv"
         "CommunicationKeyFieldName" = "Communication Key"
         "ListName" = "1087 | 1 | Greeting Card with Balloons - 1 - "
 
@@ -99,6 +100,8 @@ $settings = @{
     logfile = ".\alpha.log"
 
     login = @{
+        account = "<accountname>"
+        password = "<password>"
     }
 
     upload = @{
@@ -252,7 +255,7 @@ Write-log -message "Using the motif '$( $chosenMotifAlternative.motif.id )' - '$
 # IMPORT DATA
 #-----------------------------------------------
 
-$dataCsv = [System.Collections.ArrayList]@( import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
+$dataCsv = @( Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 -Verbose )
 Write-Log -message "Loaded '$( $dataCsv.count )' records"
 
 
@@ -295,7 +298,7 @@ Write-log -message "Calculated the the size of $( $sizes.width )x$( $sizes.heigh
 # Create the render job and get back the ids
 # TODO [ ] split the uploads in parts of n records
 Write-log -message "Creating a job for the image generation"
-$picJob = $motifAlternative.createJob($dataCsv, $params.UrnFieldName, $lines, $sizes.width, $sizes.height, $true)
+$picJob = $motifAlternative.createJob($dataCsv, $params.UrnFieldName, $lines, $sizes.width, $sizes.height, $false)
 
 
 #-----------------------------------------------
@@ -347,7 +350,6 @@ if ( $settings.upload.waitForSuccess ) {
 # CREATE LINKS FOR RECEIVERS
 #-----------------------------------------------
 
-Write-Log -message "Creating the public links for the input data now"
 $renderedPicLinks = [System.Collections.ArrayList]@()
 $dataCsv | ForEach {
 
@@ -407,7 +409,7 @@ if ( $params.importFile ) {
     } else {
 
         # Load existing file
-        $existingRecords = import-csv -path $params.importFile -Delimiter "`t" -Encoding UTF8
+        $existingRecords = @( import-csv -path $params.importFile -Delimiter "`t" -Encoding UTF8 )
 
         # Open up connection to new in-memory database
         # TODO [ ] put the dll path into settings
@@ -433,11 +435,11 @@ if ( $params.importFile ) {
         # Prepare data parameters
         $sqliteParameterKey = $sqliteCommand.CreateParameter()
         $sqliteParameterKey.ParameterName = ":key"
-        $sqliteCommand.Parameters.Add($sqliteParameterKey)
+        [void]$sqliteCommand.Parameters.Add($sqliteParameterKey)
 
         $sqliteParameterValue = $sqliteCommand.CreateParameter()
         $sqliteParameterValue.ParameterName = ":value"
-        $sqliteCommand.Parameters.Add($sqliteParameterValue)
+        [void]$sqliteCommand.Parameters.Add($sqliteParameterValue)
 
         Write-Log -message "Prepared parameters for the import"
 
