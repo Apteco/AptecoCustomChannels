@@ -212,10 +212,124 @@ $campaigns | ForEach {
 
     $campaign = $_
 
+    $reportDate = [Datetime]::Today.AddDays(-30)
+    $endDate = [Datetime]::Today.AddDays(-1)
+
+    $reports = [System.Collections.ArrayList]@()
+    Do {
+        $reportDate = $reportDate.AddDays(1)            
+        $headers.accept = "text/csv"
+        $report = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/recipientreport/detail?campaignId=$( $campaign.id )&customerId=$( $customerId )&reportDate=$( $reportDate.ToString("yyyy-MM-dd") )" -Verbose -Headers $headers -ContentType $contentType
+        if ( ($report | measure -line ).lines -gt 1 ) {
+            $reports.AddRange(( $report | ConvertFrom-Csv -Delimiter $settings.report.delimiter ))
+        }
+    } until ( $reportDate -eq $endDate )
+
+    <#
     $reportCsv = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/recipientreport/detail?campaignId=$( $campaign.id )&customerId=$( $customerId )&reportDate=2021-03-03" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
     $csvData = $reportCsv | ConvertFrom-Csv -Delimiter $settings.report.delimiter
     if ( $csvData.count -gt 0 ) {
         [void]$reportDetail.AddRange(( $csvData ))
+    }
+    #>
+    $reportDetail.AddRange($reports)
+
+}
+
+
+#-----------------------------------------------
+# CREATE A SCHEDULED TASK FOR THIS SCRIPT
+#-----------------------------------------------
+
+# TODO [ ] separate this task creation from the script?
+# TODO [ ] Ask to add task for daily download of reports
+# Check if task already exists
+
+# Do you want to create a daily running task for this?
+$confirmation = Read-Host "Do you want to create a daily running task for this [y/n]?"
+if ($confirmation -eq "y") {
+
+    #-----------------------------------------------
+    # SETTINGS
+    #-----------------------------------------------
+
+    # Get the local app data folder of the user executing the scheduled task
+    $scriptBlock = [Scriptblock]{
+        [System.Environment]::GetEnvironmentVariables()['LOCALAPPDATA']
+    }
+
+
+    #-----------------------------------------------
+    # ASK FOR CREDENTIALS + TEST
+    #-----------------------------------------------
+
+    # Ask for credentials for the task
+    $usr = "$( [System.Environment]::MachineName )\$( [Environment]::UserName )"
+    $username = Read-Host "Please enter username, if you want to another one than [$( $usr )]?"
+    if ( [string]::IsNullOrEmpty($username) ) {
+        $username = $usr
+    }
+
+    # Get the users credentials and ask for password
+    $cred = Get-Credential -Message "Please enter the password for '$( $username )'" -UserName $username 
+
+    # Try to start another powershell session with the credentials
+    $loginSuccessful = $false
+    $j = Start-Job -ScriptBlock $scriptBlock -Credential $cred
+    while($j.State -eq "Running") {
+        write-host "*" -NoNewLine
+        Start-Sleep -Milliseconds 500
+    }
+    If ( $j.state -eq "Completed" ) {
+        $loginSuccessful = $true
+        Write-Log "The login with the provided credentials was successful"
+        $result = Receive-Job -Job $j
+    } else {
+        Write-Log "The login with the provided credentials failed - Please try with other ones"
+        Receive-Job -Job $j # let the exception be listed here
+    }
+
+
+    #-----------------------------------------------
+    # COPY SCRIPT TO %LOCALAPPDATA%
+    #-----------------------------------------------
+
+    # TODO [ ] Copy the script to [System.Environment]::GetEnvironmentVariable("LocalAppData") and replace it, when neccessary. Create subfolders for this job
+    # "%USERPROFILE%\AppData\Local\Temp"
+    # Use $result for this
+
+    #-----------------------------------------------
+    # CREATE A TASK
+    #-----------------------------------------------
+
+    if ( $loginSuccessful ) {
+
+        # Settings for the task
+        $actionName = "Apteco Download Deutsche Post Print Mailing Automation Reports"
+        $taskPath = "\Apteco\"
+        $timeToStart = "06:00:00" # The time is automatically transformed into UTC, with  "06:00:00Z" it can be defined directly in UTC
+        $existingTasks = Get-ScheduledTask -TaskPath $taskPath
+
+        $createTask = $false
+        if ( $existingTasks.TaskName -contains $actionName ) {
+            $replaceTask = Read-Host "Do you want to replace the existing task [y/n]?"
+            if ( $replaceTask -eq "y" ) {
+                $createTask = $true
+                Unregister-ScheduledTask -TaskName $actionName
+            }
+        } else {
+            $createTask = $true
+        }
+        
+        if ( $createTask ) {
+
+            $stAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NonInteractive -NoLogo -NoProfile -File "C:\MyScript.ps1"'
+            $stTrigger = New-ScheduledTaskTrigger -Daily -At $timeToStart
+            $stSettings = New-ScheduledTaskSettingsSet
+            $st = New-ScheduledTask -Action $stAction -Trigger $stTrigger -Settings $stSettings
+            Register-ScheduledTask -TaskName $actionName -InputObject $st -TaskPath $taskPath -User $cred.UserName -Password $cred.GetNetworkCredential().Password
+            
+        }
     }
 
 }
