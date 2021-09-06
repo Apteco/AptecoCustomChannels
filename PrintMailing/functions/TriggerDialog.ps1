@@ -110,7 +110,7 @@ Function Get-LoginViaCredentials {
         "authenticationSecret"= Get-SecureToPlaintext -String $settings.authentication.authenticationSecret
         "locale"= "de"
     }    
-    $bodyJson = $body | ConvertTo-Json
+    $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
     
     $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/credentialsbased" -Headers @{ "accept" = $settings.contentType } -ContentType $settings.contentType -Body $bodyJson -Verbose 
     return $cred.jwtToken
@@ -124,7 +124,7 @@ Function Get-LoginViaToken {
     $body = @{
         "jwtToken" = $jwt
     }
-    $bodyJson = $body | ConvertTo-Json
+    $bodyJson = $body | ConvertTo-Json -Depth 99
     
     $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/tokenbased" -Headers @{"accept" = $settings.contentType} -ContentType $settings.contentType -Body $bodyJson -Verbose
     return $cred.jwtToken
@@ -390,7 +390,7 @@ Function Invoke-TriggerDialog {
                 if ( $rawBody -ne "" ) {
                     $bodyJson = $rawBody
                 } else {
-                    $bodyJson = $body | ConvertTo-Json -Depth 8
+                    $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
                 }
 
                 $params = $defaultParams + @{
@@ -405,7 +405,7 @@ Function Invoke-TriggerDialog {
 
                 $deactivatePaging = $true
 
-                $bodyJson = $body | ConvertTo-Json -Depth 8
+                $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
 
                 $params = $defaultParams + @{
                     Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"

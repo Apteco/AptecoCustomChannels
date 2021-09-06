@@ -358,6 +358,8 @@ Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
 # Should be max 100 recipients per batch
 # TODO [ ] change this back to variable 
 $batchsize = 2 #$settings.upload.rowsPerUpload
+# TODO [x] change this back to variable 
+$batchsize = $settings.upload.rowsPerUpload
 
 $results = [System.Collections.ArrayList]@()
 if ( $recipients.Count -gt 0 ) {
@@ -380,6 +382,9 @@ if ( $recipients.Count -gt 0 ) {
             # Check size of recipients object
             Write-Host "start $($start) - end $($end) - $( $body.recipients.Count ) objects"
 
+            # Write body to jsonfile
+            $body | ConvertTo-Json -Depth 20 | Set-Content -path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).json" -Encoding UTF8
+
             # Do API call
             $result = Invoke-TriggerDialog -customerId $customerId -path "recipients" -method Post -headers $headers -body $body -returnRawObject
             
@@ -398,7 +403,6 @@ Write-Log -message "Queued $( $recipients.Count ) records in $( $chunks ) chunks
 
 # Exporting the correlation IDs for later
 $results | Export-Csv -Path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).csv" -Delimiter "`t" -NoTypeInformation -Encoding UTF8
-
 
 
 #-----------------------------------------------

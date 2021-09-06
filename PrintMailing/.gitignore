@@ -1,0 +1,30 @@
+# settings files
+settings.json
+session.json
+*.json
+
+# logfiles
+*.log
+*.debug
+*.txt
+
+
+# encryption files
+aes.key
+
+# specific folders
+Flexmail/responses
+
+# specific files
+last_request.xml
+recipientlists.json
+
+# archive folders
+_archive
+_dev
+
+# visual files
+*.csv
+*.png
+*.xml
+*.part*
