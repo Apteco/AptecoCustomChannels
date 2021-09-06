@@ -205,7 +205,7 @@ $campaigns = Invoke-TriggerDialog -customerId $customerId -path "longtermcampaig
 #-----------------------------------------------
 # LOAD CAMPAIGNS REPORT
 #-----------------------------------------------
-
+<#
 $headers.accept = "text/csv"
 $reportDetail = [System.Collections.ArrayList]@()
 $campaigns | ForEach {
@@ -224,6 +224,7 @@ $campaigns | ForEach {
             $reports.AddRange(( $report | ConvertFrom-Csv -Delimiter $settings.report.delimiter ))
         }
     } until ( $reportDate -eq $endDate )
+    $reportDetail.AddRange($reports)
 
     <#
     $reportCsv = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/recipientreport/detail?campaignId=$( $campaign.id )&customerId=$( $customerId )&reportDate=2021-03-03" -Verbose -Headers $headers -ContentType $contentType #-Body $bodyJson
@@ -232,9 +233,9 @@ $campaigns | ForEach {
         [void]$reportDetail.AddRange(( $csvData ))
     }
     #>
-    $reportDetail.AddRange($reports)
 
-}
+#}
+#>
 
 
 #-----------------------------------------------
@@ -253,14 +254,51 @@ if ($confirmation -eq "y") {
     # SETTINGS
     #-----------------------------------------------
 
+    # Load main file source code
+    $c = Get-Content -Path "D:\Scripts\TriggerDialog\PrintMailing__40__reports.ps1" -encoding UTF8
+
+    # Load all functions as sourcecode
+    $sources = [hashtable]@{}
+    Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
+        $sourceCode = Get-Content -Path $_.FullName -Encoding UTF8
+        $sources.Add( $_.Name, $sourceCode )
+    }
+
+    # Fill the input object for the script creation
+    $inputObject = [hashtable]@{
+        sourceCode = $c
+        processId = $processId
+        functions = $sources
+    }
+
     # Get the local app data folder of the user executing the scheduled task
     $scriptBlock = [Scriptblock]{
-        [System.Environment]::GetEnvironmentVariables()['LOCALAPPDATA']
+        
+        # Loading data of current user
+        $targetFolder = [System.Environment]::GetEnvironmentVariables()['LOCALAPPDATA']
+        
+        $inputObj = $input.Clone()
+
+        # Writing the main source code file
+        $newFolder = New-Item -Path "$( $targetFolder )\Apteco\ScheduledTasks\PrintMailing_$( $inputObj.processId )" -ItemType Directory
+        $targetFile = "$( $newFolder.FullName )\PrintMailing__ReportDownload.ps1"
+        $inputObj.sourceCode | Set-Content -Path $targetFile -Encoding UTF8
+
+        # Writing the functions source code
+        $newFunctionsFolder = New-Item -Path "$( $newFolder.FullName )\Functions" -ItemType Directory
+        $inputObj.functions.Keys | ForEach { # | Get-Member -MemberType NoteProperty | where { $_.Name -like "function#*" }
+            $key = $_
+            $inputObj.functions.$key | Set-Content -Path "$( $newFunctionsFolder.FullName )\$( $key )" -Encoding UTF8
+        }
+
+        # Return
+        $targetFile # give this value back to the calling parent process
+
     }
 
 
     #-----------------------------------------------
-    # ASK FOR CREDENTIALS + TEST
+    # ASK FOR CREDENTIALS + TEST + WRITE FILE TO LOCALAPPDATA
     #-----------------------------------------------
 
     # Ask for credentials for the task
@@ -275,7 +313,7 @@ if ($confirmation -eq "y") {
 
     # Try to start another powershell session with the credentials
     $loginSuccessful = $false
-    $j = Start-Job -ScriptBlock $scriptBlock -Credential $cred
+    $j = Start-Job -ScriptBlock $scriptBlock -Credential $cred -InputObject $inputObject
     while($j.State -eq "Running") {
         write-host "*" -NoNewLine
         Start-Sleep -Milliseconds 500
@@ -291,17 +329,9 @@ if ($confirmation -eq "y") {
 
 
     #-----------------------------------------------
-    # COPY SCRIPT TO %LOCALAPPDATA%
-    #-----------------------------------------------
-
-    # TODO [ ] Copy the script to [System.Environment]::GetEnvironmentVariable("LocalAppData") and replace it, when neccessary. Create subfolders for this job
-    # "%USERPROFILE%\AppData\Local\Temp"
-    # Use $result for this
-
-    #-----------------------------------------------
     # CREATE A TASK
     #-----------------------------------------------
-
+    
     if ( $loginSuccessful ) {
 
         # Settings for the task
@@ -331,5 +361,6 @@ if ($confirmation -eq "y") {
             
         }
     }
+    
 
 }
