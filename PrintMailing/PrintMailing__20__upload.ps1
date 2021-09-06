@@ -348,16 +348,11 @@ $dataCsv | ForEach {
 Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
 
 
-
-
 #-----------------------------------------------
 # UPLOAD DATA
 #-----------------------------------------------
 
-
 # Should be max 100 recipients per batch
-# TODO [ ] change this back to variable 
-$batchsize = 2 #$settings.upload.rowsPerUpload
 # TODO [x] change this back to variable 
 $batchsize = $settings.upload.rowsPerUpload
 
@@ -449,17 +444,17 @@ If ( $queued -eq 0 ) {
 $return = [Hashtable]@{
 
     # Mandatory return values
-    "Recipients"=$queued 
-    "TransactionId"=$newCustomers.correlationId
+    "Recipients"        = $queued 
+    "TransactionId"     = $result.correlationId
 
     # General return value to identify this custom channel in the broadcasts detail tables
-    "CustomProvider"=$moduleName
-    "ProcessId" = $processId
+    "CustomProvider"    = $moduleName
+    "ProcessId"         = $processId
 
     # Some more information for the broadcasts script
-    "Path"= $params.Path
-    "UrnFieldName"= $params.UrnFieldName
-    "CorrelationId"=$newCustomers.correlationId
+    "Path"              = $params.Path
+    "UrnFieldName"      = $params.UrnFieldName
+    "CorrelationId"     = $result.correlationId
 
     # More information about the different status of the import
     #"RecipientsIgnored" = $ignored
