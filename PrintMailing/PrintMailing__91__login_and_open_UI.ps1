@@ -155,7 +155,7 @@ $uri = [uri]$settings.base
 $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
 # https://dm.deutschepost.de?partnersystem={YOUR-SIGNED-JWT}.
-$authUri = "https://dm-uat.deutschepost.de?partnersystem=$( $jwt )"
+$authUri = "$( $hostUri )?partnersystem=$( $jwt )"
 #$authUri = "$( $hostUri )/campaign/editLongTermCampaign/34364?partnersystem=$( $jwt )"
 $authUri
 
