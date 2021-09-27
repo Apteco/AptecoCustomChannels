@@ -20,6 +20,18 @@ enum TriggerDialogTemplateType {
     Advanced = 230  # "Unique in UI" 
 }
 
+enum TriggerDialogDataTypes {
+    String = 10    # String, is always an option
+    Int = 20
+    Bool = 30
+    Date = 40
+    Image = 50
+    ImageUrl = 60
+    Float = 70
+    Postcode = 80
+    CountryCode = 90
+}
+
 
 ################################################
 #
@@ -174,9 +186,9 @@ Function Create-VariableDefinitions {
 
     begin {
 
-        $postcodeSynonyms = @("Postleitzahl","zip","zip code","zip-code","PLZ")
-        $countrycodeSynonyms = @("iso","country","land","länderkennzeichen")
-        $alphaPicturesSynonyms = @("Hintergrund") # TODO [ ] put this into settings
+        $postcodeSynonyms = $settings.dataTypes.postcodeSynonyms
+        $countrycodeSynonyms = $settings.dataTypes.countrycodeSynonyms
+        $alphaPicturesSynonyms = $settings.dataTypes.alphaPicturesSynonyms
 
     }
     

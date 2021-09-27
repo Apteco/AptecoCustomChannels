@@ -135,6 +135,17 @@ $auth = @{
 
 
 #-----------------------------------------------
+# DATATYPE SETTINGS
+#-----------------------------------------------
+
+$dataTypeSettings = @{
+    "postcodeSynonyms" = @("Postleitzahl","zip","zip code","zip-code","PLZ")
+    "countrycodeSynonyms" = @("iso","country","land","länderkennzeichen")
+    "alphaPicturesSynonyms" = @("Hintergrund", "bild")
+}
+
+
+#-----------------------------------------------
 # PREVIEW SETTINGS
 #-----------------------------------------------
 
@@ -235,6 +246,7 @@ $settings = @{
 
     # sub settings categories
     "authentication" = $auth
+    "dataTypes" = $dataTypeSettings
     "preview" = $previewSettings
     "upload" = $uploadSettings
     "mail" = $mail
