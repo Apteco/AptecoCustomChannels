@@ -38,8 +38,6 @@ if ( $debug ) {
 
 <#
 
-Good hints on PowerShell Classes and inheritance
-
 #>
 
 ################################################
@@ -63,81 +61,27 @@ Set-Location -Path $scriptPath
 
 ################################################
 #
-# SETTINGS
+# SETTINGS AND STARTUP
 #
 ################################################
 
 # General settings
-$functionsSubfolder = "functions"
-$libSubfolder = "lib"
-$settingsFilename = "settings.json"
-$processId = [guid]::NewGuid()
 $modulename = "TRGETMESSAGES"
-$timestamp = [datetime]::Now
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+# Load other generic settings like process id, startup timestamp, ...
+. ".\bin\general_settings.ps1"
 
-# Allow only newer security protocols
-# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-if ( $settings.changeTLS ) {
-    $AllProtocols = @(    
-        [System.Net.SecurityProtocolType]::Tls12
-    )
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-}
+# Setup the network security like SSL and TLS
+. ".\bin\load_networksettings.ps1"
 
-# Log
-$logfile = $settings.logfile
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
 
-# append a suffix, if in debug mode
-if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
-}
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
 
-
-
-################################################
-#
-# FUNCTIONS AND ASSEMBLIES
-#
-################################################
-
-# Load all PowerShell Code
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
-}
-
-Add-Type -AssemblyName System.Security
-
-
-################################################
-#
-# LOG INPUT PARAMETERS
-#
-################################################
-
-# Start the log
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $modulename )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
-# Check if params object exists
-if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-    $paramsExisting = $true
-} else {
-    $paramsExisting = $false
-}
-
-# Log the params, if existing
-if ( $paramsExisting ) {
-    $params.Keys | ForEach-Object {
-        $param = $_
-        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
-    }
-}
+# Setup the log and do the initial logging e.g. for input parameters
+. ".\bin\startup_logging.ps1"
 
 
 ################################################
@@ -208,6 +152,7 @@ $campaignDetails = [System.Collections.ArrayList]@()
 $campaignDetails.AddRange(
     @( Invoke-TriggerDialog -customerId $customerId -path "longtermcampaigns" -headers $headers )
 )
+
 <#
 
 # ready to be edited
@@ -244,6 +189,7 @@ $campaignDetails.elements | where {$_.actions -contains "DELETE"}
 # TODO [ ] implement paging for mailings
 #$mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
 $mailingDetails = Invoke-TriggerDialog -customerId $customerId -path "mailings" -headers $headers
+
 
 #-----------------------------------------------
 # BUILD MAILING OBJECTS
@@ -314,17 +260,14 @@ $mailings += [TriggerDialogMailing]@{
 #    $mailings += [TriggerDialogMailing]@{mailingId=0;campaignId=$campaign.id;campaignName="$( $campaign.campaignName ) - new Mailing"}
 #}
 
-
-
 $messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+
 
 ################################################
 #
 # RETURN
 #
 ################################################
-
-
 
 # real messages
 return $messages
