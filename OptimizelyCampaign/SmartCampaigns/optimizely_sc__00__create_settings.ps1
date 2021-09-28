@@ -47,7 +47,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 # LOGIN DATA
 #-----------------------------------------------
 
-$pass = Read-Host -AsSecureString "Please enter the password for epi"
+$pass = Read-Host -AsSecureString "Please enter the password for Optimizely Campaign"
 $passEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$pass).GetNetworkCredential().Password)
 
 $loginSettings = @{
@@ -127,8 +127,8 @@ $broadcastSettings = @{
 #-----------------------------------------------
 
 $responseSettings = @{
-    responseConfig = "$( $scriptPath )\epi__ferge.xml"  # response config file, leave it like this if ferge is not triggered from this script
-    triggerFerge = $false                               # $true|$false should ferge be triggered in the epi__80__trigger_ferge part?
+    responseConfig = "$( $scriptPath )\optimizely__ferge.xml"  # response config file, leave it like this if ferge is not triggered from this script
+    triggerFerge = $false                               # $true|$false should ferge be triggered in the optimizely_sc__80__trigger_ferge part?
     decryptConfig = $false                               # $true|$false
 }
 
@@ -242,8 +242,6 @@ $listAttributesRaw = Invoke-Epi -webservice "RecipientList" -method "getAttribut
 $listAttributes = $listAttributesRaw | Out-GridView -PassThru
 $settings.excludedAttributes = $listAttributes
 
-<<<<<<< Updated upstream
-=======
 
 #-----------------------------------------------
 # URN FIELD
@@ -259,7 +257,6 @@ if ($urnField.count -gt 0 ) {
     $settings.urnFieldName = $urnField[0]
 }
 
->>>>>>> Stashed changes
 
 #-----------------------------------------------
 # SAVE

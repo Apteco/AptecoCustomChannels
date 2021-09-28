@@ -3,7 +3,7 @@
 # Get Started
 
 * Create settings
-* Replace those tokens in epi__00__create_settings.ps1
+* Replace those tokens in optimizely_sc__00__create_settings.ps1
 <mandantid>
 <apiuser>
 <masterlistid>

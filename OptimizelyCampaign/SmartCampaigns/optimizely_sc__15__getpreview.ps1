@@ -20,10 +20,13 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\FastStats\scripts\episervercampaign"
-	    abc= "def"
-	    Username= "abc"
+        scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\_dev\EpiServerCampaign\SmartCampaigns"
+        TestRecipient= '{"Email":"florian.von.bracht@apteco.de","Sms":null,"Personalisation":{"voucher_1":"voucher no 1","voucher_2":"voucher no 2","voucher_3":"voucher no 3","Kunden ID":"Kunden ID","title":"title","name":"name","surname":"surname","language":"language","Communication Key":"e48c3fd3-7317-4637-aeac-4fa1505273ac"}}'
+        MessageName= "275324762694 / Test: Smart Campaign Mailing"
+        abc= "def"
+        ListName= ""
+        Password= "def"
+        Username= "abc"  
     }
 }
 
@@ -36,8 +39,10 @@ if ( $debug ) {
 
 <#
 
-https://world.episerver.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/webservice-overview/
+https://world.optimizely.com/documentation/developer-guides/campaign/SOAP-API/introduction-to-the-soap-api/basic-usage/
 WSDL: https://api.campaign.episerver.net/soap11/RpcSession?wsdl
+
+TODO [ ] implement more logging
 
 #>
 
@@ -69,7 +74,6 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
 $processId = [guid]::NewGuid()
 
 # Load settings
@@ -86,12 +90,8 @@ if ( $settings.changeTLS ) {
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
 
-# TODO [ ] change campaign type
-
 # more settings
 $logfile = $settings.logfile
-#$guid = ([guid]::NewGuid()).Guid
-$campaignType = $settings.campaignType
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -115,26 +115,14 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" | ForEach {
 #
 ################################################
 
-# Start the log
+
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t----------------------------------------------------" >> $logfile
-"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t$( $moduleName )" >> $logfile
+"$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tPREVIEW" >> $logfile
 "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`tGot a file with these arguments: $( [Environment]::GetCommandLineArgs() )" >> $logfile
-
-# Check if params object exists
-if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-    $paramsExisting = $true
-} else {
-    $paramsExisting = $false
+$params.Keys | ForEach {
+    $param = $_
+    "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
 }
-
-# Log the params, if existing
-if ( $paramsExisting ) {
-    $params.Keys | ForEach-Object {
-        $param = $_
-        "$( [datetime]::Now.ToString("yyyyMMddHHmmss") )`t $( $param ): $( $params[$param] )" >> $logfile
-    }
-}
-
 
 
 ################################################
@@ -143,78 +131,40 @@ if ( $paramsExisting ) {
 #
 ################################################
 
+#-----------------------------------------------
+# SMART CAMPAIGN ID
+#-----------------------------------------------
+
+# cut out the smart campaign id or mailing id
+$messageName = $params.MessageName
+$smartCampaignID = $messageName -split $settings.nameConcatChar | select -First 1
+
 
 #-----------------------------------------------
 # GET CURRENT SESSION OR CREATE A NEW ONE
 #-----------------------------------------------
 
-Write-Log -message "Opening a new session in EpiServer valid for $( $settings.ttl )"
-
 Get-EpiSession
 
 
 #-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS
-#-----------------------------------------------
-<#
-switch ( $campaignType ) {
-
-    "classic" {
-
-        $campaigns = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("regular", "NEW") -useSessionId $true
-        
-    }
-
-    # smart campaigns are the default value
-    default {
-
-        # get all mailings in smart campaigns
-        $mailings = Invoke-Epi -webservice "Mailing" -method "getIdsInStatus" -param @("campaign", "ACTIVATION_REQUIRED") -useSessionId $true
-
-        # get all compound elements for the mailings => campaign
-        $campaigns = @()
-        $mailings | Select -Unique | ForEach {
-            $mailingId = $_
-            $campaigns += Invoke-Epi -webservice "SplitMailing" -method "getSplitMasterId" -param @(@{value=$mailingId;datatype="long"}) -useSessionId $true   
-        }
-        
-    }
-
-}
-#>
-
-$campaigns = Get-EpiCampaigns -campaignType $campaignType
-
-Write-Log -message "Got back $( $campaigns.count ) campaigns/mailings"
-
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
+# HTML CONTENT
 #-----------------------------------------------
 
-$campaignDetails = @()
-$campaigns | Select -Unique | ForEach {
+$splits = Invoke-Epi -webservice "SplitMailing" -method "getSplitChildIds" -param @(@{value=$smartCampaignID;datatype="long"}) -useSessionId $true
 
-    $campaignId = $_
 
-    # create new object
-    $campaign = New-Object PSCustomObject
-    $campaign | Add-Member -MemberType NoteProperty -Name "ID" -Value $campaignId
 
-    # ask for name
-    $campaignName = Invoke-Epi -webservice "Mailing" -method "getName" -param @(@{value=$campaignId;datatype="long"}) -useSessionId $true
-    $campaign | Add-Member -MemberType NoteProperty -Name "Name" -Value $campaignName
-
-    $campaignDetails += $campaign
+$htmlArr = @()
+$splits | ForEach-Object {
+    
+    $split = $_
+    $html = Invoke-Epi -webservice "Mailing" -method "getContent" -param @(@{value=$split;datatype="long"},"text/html") -useSessionId $true
+    $htmlArr += $html
 
 }
 
-
-#-----------------------------------------------
-# GET MAILINGS / CAMPAIGNS DETAILS
-#-----------------------------------------------
-
-$messages = $campaignDetails | Select @{name="id";expression={ $_.ID }}, @{name="name";expression={ "$( $_.ID )$( $settings.nameConcatChar )$( $_.Name )" }}
+# TODO [ ] remove the Epi Markup to show clean html
 
 
 ################################################
@@ -223,6 +173,22 @@ $messages = $campaignDetails | Select @{name="id";expression={ $_.ID }}, @{name=
 #
 ################################################
 
-# real messages
-return $messages
+# TODO [ ] implement subject and more of these things rather than using default values
+
+$return = [Hashtable]@{
+    "Type" = $settings.previewSettings.Type
+    "FromAddress"=$settings.previewSettings.FromAddress
+    "FromName"=$settings.previewSettings.FromName
+    "Html"= $htmlArr -join "<p>&nbsp;</p>"
+    "ReplyTo"=$settings.previewSettings.ReplyTo
+    "Subject"=$settings.previewSettings.Subject
+    "Text"="Lorem Ipsum"
+}
+
+return $return
+
+
+
+
+
 

@@ -21,3 +21,5 @@ _dev
 EpiServerCampaign/MarketingAutomation/recipientlists.json
 *.csv
 *.txt
+*.part*
+*.json
