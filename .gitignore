@@ -31,3 +31,5 @@ _dev
 *.part*
 *.xml
 *.txt
+*.part*
+*.json

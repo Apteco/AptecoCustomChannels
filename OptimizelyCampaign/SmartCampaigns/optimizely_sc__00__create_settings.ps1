@@ -128,8 +128,8 @@ $broadcastSettings = @{
 #-----------------------------------------------
 
 $responseSettings = @{
-    responseConfig = "$( $scriptPath )\epi__ferge.xml"  # response config file, leave it like this if ferge is not triggered from this script
-    triggerFerge = $false                               # $true|$false should ferge be triggered in the epi__80__trigger_ferge part?
+    responseConfig = "$( $scriptPath )\optimizely__ferge.xml"  # response config file, leave it like this if ferge is not triggered from this script
+    triggerFerge = $false                               # $true|$false should ferge be triggered in the optimizely_sc__80__trigger_ferge part?
     decryptConfig = $false                               # $true|$false
 }
 
