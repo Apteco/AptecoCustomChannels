@@ -62,7 +62,7 @@ if(Test-Path -LiteralPath $settingsFile -IsValid ) {
 #-----------------------------------------------
 
 # Default file
-$logfileDefault = "$( $scriptPath )\triggerdialog.log"
+$logfileDefault = "$( $scriptPath )\printmailing.log"
 
 # Ask for another path
 $logfile = Read-Host -Prompt "Where do you want the log file to be saved? Just press Enter for this default [$( $logfileDefault )]"
@@ -117,10 +117,10 @@ if(Test-Path -LiteralPath $upload -IsValid ) {
 # LOGIN DATA
 #-----------------------------------------------
 
-$authSecret = Read-Host -AsSecureString "Please enter the authentication secret for TriggerDialog"
+$authSecret = Read-Host -AsSecureString "Please enter the authentication secret for Deutsche Post Print Mailing Automation"
 $authSecretEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$authSecret).GetNetworkCredential().Password)
 
-$ssoTokenKey = Read-Host -AsSecureString "Please enter the SSO token key for TriggerDialog"
+$ssoTokenKey = Read-Host -AsSecureString "Please enter the SSO token key for Deutsche Post Print Mailing Automation"
 $ssoTokenKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$ssoTokenKey).GetNetworkCredential().Password)
 
 
@@ -130,6 +130,19 @@ $auth = @{
     "partnerSystemCustomerIdExt" = "<partnerSystemCustomerIdExt>"                 # The alphanumeric id identifying your customer, you want to act for.
     "authenticationSecret" = $authSecretEncrypted           # A shared secret for authentication.
     "ssoTokenKey" = $ssoTokenKeyEncrypted                   # A shared secret used for signing the JWT you generated.    
+
+}
+
+
+#-----------------------------------------------
+# DATATYPE SETTINGS
+#-----------------------------------------------
+
+$dataTypeSettings = @{
+    "postcodeSynonyms" = @("Postleitzahl","zip","zip code","zip-code","PLZ")
+    "countrycodeSynonyms" = @("iso","country","land","länderkennzeichen")
+    "picturesEmbeddedSynonyms" = @("bild")
+    "picturesLinkSynonyms" = @("Hintergrund")
 
 }
 
@@ -193,15 +206,15 @@ $mail = @{
 $settings = @{
 
     # General settings
-    "logfile" = "$( $scriptPath )\triggerdialog.log"              # logfile
     "nameConcatChar" =   " / "
-    "providername" = "triggerdialog"                              # identifier for this custom integration, this is used for the response allocation
+    "logfile" = $logfile                                    # logfile
+    "providername" = "printmailauto"                        # identifier for this custom integration, this is used for the response allocation
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
-    "sessionFile" = "$( $scriptPath )\session.json"       # name of the session file
-    "ttl" = 25                                            # Time to live in minutes for the current session, normally 30 minutes for TriggerDialog
-    "encryptToken" = $true                                # $true|$false if the session token should be encrypted
+    "sessionFile" = "$( $scriptPath )\session.json"         # name of the session file
+    "ttl" = 25                                              # Time to live in minutes for the current session, normally 30 minutes for TriggerDialog
+    "encryptToken" = $true                                  # $true|$false if the session token should be encrypted
 
     # Network settings
     "changeTLS" = $true
@@ -235,6 +248,7 @@ $settings = @{
 
     # sub settings categories
     "authentication" = $auth
+    "dataTypes" = $dataTypeSettings
     "preview" = $previewSettings
     "upload" = $uploadSettings
     "mail" = $mail
@@ -293,12 +307,27 @@ $headers = @{
 # CREATE SESSION
 #-----------------------------------------------
 
+# Remove the session file to force a new session
+Remove-Item -Path $settings.sessionFile -Force
+
+# Create a new session now
 $newSessionCreated = Get-TriggerDialogSession
-#$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
-$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
 
-$headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
+If ( $newSessionCreated ) {
 
+    "Authentication successful. New session created."
+
+    #$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
+    $jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
+
+    $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
+
+} else {
+
+    "Authentication failed. No new session created."
+    exit 1
+
+}
 
 #-----------------------------------------------
 # CHOOSE CUSTOMER ACCOUNT
@@ -309,7 +338,8 @@ if ( $jwtDecoded.payload.customerIds.Count -gt 1 ) {
 } elseif ( $jwtDecoded.payload.customerIds.Count -eq 1 ) {
     $customerId = $jwtDecoded.payload.customerIds[0]
 } else {
-    exit 0
+    "No account chosen or available"
+    exit 1
 }
 
 $settings.customerId = $customerId

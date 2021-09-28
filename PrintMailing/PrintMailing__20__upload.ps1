@@ -47,7 +47,6 @@ if ( $debug ) {
 
 <#
 
-Good hints on PowerShell Classes and inheritance
 
 #>
 
@@ -77,97 +76,22 @@ Set-Location -Path $scriptPath
 ################################################
 
 # General settings
-$functionsSubfolder = "functions"
-$libSubfolder = "lib"
-$settingsFilename = "settings.json"
-$processId = [guid]::NewGuid()
 $modulename = "TRUPLOAD"
-$timestamp = [datetime]::Now
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+# Load other generic settings like process id, startup timestamp, ...
+. ".\bin\general_settings.ps1"
 
-# Allow only newer security protocols
-# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-if ( $settings.changeTLS ) {
-    $AllProtocols = @(    
-        [System.Net.SecurityProtocolType]::Tls12
-    )
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-}
+# Setup the network security like SSL and TLS
+. ".\bin\load_networksettings.ps1"
 
-# Log
-$logfile = $settings.logfile
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
 
-# append a suffix, if in debug mode
-if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
-}
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
 
-
-
-################################################
-#
-# FUNCTIONS & LIBRARIES
-#
-################################################
-
-# Load all PowerShell Code
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
-}
-
-<#
-# Load all exe files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
-$libExecutables | ForEach {
-    "... $( $_.FullName )"
-    
-}
-
-# Load dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
-$libExecutables | ForEach {
-    "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
-}
-#>
-
-Add-Type -AssemblyName System.Security
-
-################################################
-#
-# LOG INPUT PARAMETERS
-#
-################################################
-
-# Start the log
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $modulename )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
-# Check if params object exists
-if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-    $paramsExisting = $true
-} else {
-    $paramsExisting = $false
-}
-
-# Log the params, if existing
-if ( $paramsExisting ) {
-    $params.Keys | ForEach-Object {
-        $param = $_
-        Write-Log -message "    $( $param ) = '$( $params[$param] )'"
-    }
-}
-
-# Add note in log file, that the file is a converted file
-# TODO [ ] Add these notes to other scripts, too
-if ( $params.path -match "\.converted$") {
-    Write-Log -message "Be aware, that the exports are generated in Codepage 1252 and not UTF8. Please change this in the Channel Editor." -severity ( [LogSeverity]::WARNING )
-}
+# Setup the log and do the initial logging e.g. for input parameters
+. ".\bin\startup_logging.ps1"
 
 
 ################################################
@@ -348,16 +272,13 @@ $dataCsv | ForEach {
 Write-Log -message "Added '$( $recipients.Count )' receivers to the queue"
 
 
-
-
 #-----------------------------------------------
 # UPLOAD DATA
 #-----------------------------------------------
 
-
 # Should be max 100 recipients per batch
-# TODO [ ] change this back to variable 
-$batchsize = 2 #$settings.upload.rowsPerUpload
+# TODO [x] change this back to variable 
+$batchsize = $settings.upload.rowsPerUpload
 
 $results = [System.Collections.ArrayList]@()
 if ( $recipients.Count -gt 0 ) {
@@ -380,6 +301,9 @@ if ( $recipients.Count -gt 0 ) {
             # Check size of recipients object
             Write-Host "start $($start) - end $($end) - $( $body.recipients.Count ) objects"
 
+            # Write body to jsonfile
+            $body | ConvertTo-Json -Depth 20 | Set-Content -path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).json" -Encoding UTF8
+
             # Do API call
             $result = Invoke-TriggerDialog -customerId $customerId -path "recipients" -method Post -headers $headers -body $body -returnRawObject
             
@@ -398,7 +322,6 @@ Write-Log -message "Queued $( $recipients.Count ) records in $( $chunks ) chunks
 
 # Exporting the correlation IDs for later
 $results | Export-Csv -Path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).csv" -Delimiter "`t" -NoTypeInformation -Encoding UTF8
-
 
 
 #-----------------------------------------------
@@ -445,17 +368,17 @@ If ( $queued -eq 0 ) {
 $return = [Hashtable]@{
 
     # Mandatory return values
-    "Recipients"=$queued 
-    "TransactionId"=$newCustomers.correlationId
+    "Recipients"        = $queued 
+    "TransactionId"     = $result.correlationId
 
     # General return value to identify this custom channel in the broadcasts detail tables
-    "CustomProvider"=$moduleName
-    "ProcessId" = $processId
+    "CustomProvider"    = $moduleName
+    "ProcessId"         = $processId
 
     # Some more information for the broadcasts script
-    "Path"= $params.Path
-    "UrnFieldName"= $params.UrnFieldName
-    "CorrelationId"=$newCustomers.correlationId
+    "Path"              = $params.Path
+    "UrnFieldName"      = $params.UrnFieldName
+    "CorrelationId"     = $result.correlationId
 
     # More information about the different status of the import
     #"RecipientsIgnored" = $ignored

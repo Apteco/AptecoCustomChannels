@@ -61,3 +61,12 @@ id|createdOn|changedOn|version|name|sortOrder|synonyms
 - [ ] Think about usage of response data and receiver download
 - [ ] Fill debug input parameters properly
 - [ ] Think about filling campaign name from PeopleStage
+
+
+# Connecting AlphaPictures with Deutsche Post Print Mailing Automation
+
+AlphaPictures is a service, that creates personalised images to download or create links. That information can be used for emails, websites, apps and print mailings. You can try it at: https://www.myalphapicture.com/de/index/index
+
+To combine AlphaPictures with Print Mailings you need to setup an [AlphaPictures Channel](../AlphaPictures/) which then generates the pictures. At default it creates links to the jpgs, that can be picked up by Print Mailings. To achieve this, you need to make sure to
+* create a virtual variable that can contain the least recent url, but is an empty string
+* create a live data selection query that is able to pickup that url. PeopleStage will remember that url and upload it to TriggerDialog then

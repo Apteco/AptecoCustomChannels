@@ -49,56 +49,23 @@ Set-Location -Path $scriptPath
 ################################################
 
 # General settings
-$functionsSubfolder = "functions"
-$libSubfolder = "lib"
-$settingsFilename = "settings.json"
-$processId = [guid]::NewGuid()
 $modulename = "authToUI"
-$timestamp = [datetime]::Now
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+# Load other generic settings like process id, startup timestamp, ...
+. ".\bin\general_settings.ps1"
 
-# Allow only newer security protocols
-# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-if ( $settings.changeTLS ) {
-    $AllProtocols = @(    
-        [System.Net.SecurityProtocolType]::Tls12
-    )
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-}
+# Setup the network security like SSL and TLS
+. ".\bin\load_networksettings.ps1"
 
-# Log
-$logfile = $settings.logfile
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
 
-# append a suffix, if in debug mode
-if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
-}
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
 
+# Setup the log and do the initial logging e.g. for input parameters
+. ".\bin\startup_logging.ps1"
 
-################################################
-#
-# FUNCTIONS & LIBRARIES
-#
-################################################
-
-# Load all PowerShell Code
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
-}
-
-<#
-# Load all exe and dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe","*.dll") 
-$libExecutables | ForEach {
-    "... $( $_.FullName )"
-}
-#>
-
-Add-Type -AssemblyName System.Security
 
 ################################################
 #
@@ -108,33 +75,6 @@ Add-Type -AssemblyName System.Security
 
 # ...
 [uint64]$currentTimestamp = Get-Unixtime -timestamp $timestamp
-
-
-################################################
-#
-# LOG INPUT PARAMETERS
-#
-################################################
-
-# Start the log
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $modulename )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
-# Check if params object exists
-if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-    $paramsExisting = $true
-} else {
-    $paramsExisting = $false
-}
-
-# Log the params, if existing
-if ( $paramsExisting ) {
-    $params.Keys | ForEach-Object {
-        $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
-    }
-}
 
 
 ################################################
@@ -155,7 +95,7 @@ $uri = [uri]$settings.base
 $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
 # https://dm.deutschepost.de?partnersystem={YOUR-SIGNED-JWT}.
-$authUri = "https://dm-uat.deutschepost.de?partnersystem=$( $jwt )"
+$authUri = "$( $hostUri )?partnersystem=$( $jwt )"
 #$authUri = "$( $hostUri )/campaign/editLongTermCampaign/34364?partnersystem=$( $jwt )"
 $authUri
 

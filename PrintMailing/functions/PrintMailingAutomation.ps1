@@ -20,6 +20,18 @@ enum TriggerDialogTemplateType {
     Advanced = 230  # "Unique in UI" 
 }
 
+enum TriggerDialogDataTypes {
+    String = 10    # String, is always an option
+    Int = 20
+    Bool = 30
+    Date = 40
+    Image = 50
+    ImageUrl = 60
+    Float = 70
+    Postcode = 80
+    CountryCode = 90
+}
+
 
 ################################################
 #
@@ -110,7 +122,7 @@ Function Get-LoginViaCredentials {
         "authenticationSecret"= Get-SecureToPlaintext -String $settings.authentication.authenticationSecret
         "locale"= "de"
     }    
-    $bodyJson = $body | ConvertTo-Json
+    $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
     
     $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/credentialsbased" -Headers @{ "accept" = $settings.contentType } -ContentType $settings.contentType -Body $bodyJson -Verbose 
     return $cred.jwtToken
@@ -124,7 +136,7 @@ Function Get-LoginViaToken {
     $body = @{
         "jwtToken" = $jwt
     }
-    $bodyJson = $body | ConvertTo-Json
+    $bodyJson = $body | ConvertTo-Json -Depth 99
     
     $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/tokenbased" -Headers @{"accept" = $settings.contentType} -ContentType $settings.contentType -Body $bodyJson -Verbose
     return $cred.jwtToken
@@ -174,8 +186,6 @@ Function Create-VariableDefinitions {
 
     begin {
 
-        $postcodeSynonyms = @("Postleitzahl","zip","zip code","zip-code","PLZ")
-        $countrycodeSynonyms = @("iso","country","land","länderkennzeichen")
 
     }
     
@@ -228,18 +238,30 @@ Function Create-VariableDefinitions {
             # CHECKS FOR VARIABLE NAMES
 
             # Check data type - postcode
-            # TODO [ ] put this list into the settings
-            $postcodeSynonyms | ForEach {
+            # TODO [x] put this list into the settings
+            $settings.dataTypes.postcodeSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["80"] = $true
                 }
             } 
 
             # Check data type - countrycode
-            # TODO [ ] put this list into the settings
-            $countrycodeSynonyms | ForEach {
+            # TODO [x] put this list into the settings
+            $settings.dataTypes.countrycodeSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["90"] = $true
+                }
+            } 
+
+            $settings.dataTypes.picturesEmbeddedSynonyms | ForEach {
+                if ( $fieldname -like "*$( $_ )*" ) {
+                    $dataTypeCheck["50"] = $true
+                }
+            } 
+
+            $settings.dataTypes.picturesLinkSynonyms | ForEach {
+                if ( $fieldname -like "*$( $_ )*" ) {
+                    $dataTypeCheck["60"] = $true
                 }
             } 
 
@@ -383,7 +405,7 @@ Function Invoke-TriggerDialog {
                 if ( $rawBody -ne "" ) {
                     $bodyJson = $rawBody
                 } else {
-                    $bodyJson = $body | ConvertTo-Json -Depth 8
+                    $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
                 }
 
                 $params = $defaultParams + @{
@@ -398,7 +420,7 @@ Function Invoke-TriggerDialog {
 
                 $deactivatePaging = $true
 
-                $bodyJson = $body | ConvertTo-Json -Depth 8
+                $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
 
                 $params = $defaultParams + @{
                     Uri = "$( $uri )/$( $path )?customerId=$( $customerId )"
