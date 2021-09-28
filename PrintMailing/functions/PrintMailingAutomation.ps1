@@ -186,9 +186,6 @@ Function Create-VariableDefinitions {
 
     begin {
 
-        $postcodeSynonyms = $settings.dataTypes.postcodeSynonyms
-        $countrycodeSynonyms = $settings.dataTypes.countrycodeSynonyms
-        $alphaPicturesSynonyms = $settings.dataTypes.alphaPicturesSynonyms
 
     }
     
@@ -241,22 +238,28 @@ Function Create-VariableDefinitions {
             # CHECKS FOR VARIABLE NAMES
 
             # Check data type - postcode
-            # TODO [ ] put this list into the settings
-            $postcodeSynonyms | ForEach {
+            # TODO [x] put this list into the settings
+            $settings.dataTypes.postcodeSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["80"] = $true
                 }
             } 
 
             # Check data type - countrycode
-            # TODO [ ] put this list into the settings
-            $countrycodeSynonyms | ForEach {
+            # TODO [x] put this list into the settings
+            $settings.dataTypes.countrycodeSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["90"] = $true
                 }
             } 
 
-            $alphaPicturesSynonyms | ForEach {
+            $settings.dataTypes.picturesEmbeddedSynonyms | ForEach {
+                if ( $fieldname -like "*$( $_ )*" ) {
+                    $dataTypeCheck["50"] = $true
+                }
+            } 
+
+            $settings.dataTypes.picturesLinkSynonyms | ForEach {
                 if ( $fieldname -like "*$( $_ )*" ) {
                     $dataTypeCheck["60"] = $true
                 }

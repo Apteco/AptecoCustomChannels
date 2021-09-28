@@ -141,7 +141,9 @@ $auth = @{
 $dataTypeSettings = @{
     "postcodeSynonyms" = @("Postleitzahl","zip","zip code","zip-code","PLZ")
     "countrycodeSynonyms" = @("iso","country","land","länderkennzeichen")
-    "alphaPicturesSynonyms" = @("Hintergrund", "bild")
+    "picturesEmbeddedSynonyms" = @("bild")
+    "picturesLinkSynonyms" = @("Hintergrund")
+
 }
 
 

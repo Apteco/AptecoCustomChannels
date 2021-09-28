@@ -158,5 +158,5 @@ class TriggerDialogMailing : Mailing {
 }
 
 
-[TriggerDialogMailing]::new("0 | 0 | New Campaign + Mailing | New | CREATE")
+#[TriggerDialogMailing]::new("0 | 0 | New Campaign + Mailing | New | CREATE")
 #[TriggerDialogMailing]::new('0 / 0 / New Campaign + Mailing / New / CREATE')
