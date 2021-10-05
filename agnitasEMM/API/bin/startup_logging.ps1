@@ -3,7 +3,7 @@
 $logfile = $settings.logfile
 
 # append a suffix, if in debug mode
-if ( $debug ) {
+if ( $debug -and -not $configMode) {
     $logfile = "$( $logfile ).debug"
 }
 

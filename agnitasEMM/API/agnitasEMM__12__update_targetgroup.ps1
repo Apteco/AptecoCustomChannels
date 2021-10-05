@@ -69,7 +69,7 @@ Set-Location -Path $scriptPath
 ################################################
 
 # General settings
-$modulename = "EMMGETMESSAGES"
+$modulename = "EMMUPDATETARGETGROUP"
 
 # Load other generic settings like process id, startup timestamp, ...
 . ".\bin\general_settings.ps1"
@@ -96,18 +96,35 @@ $modulename = "EMMGETMESSAGES"
 #
 ################################################
 
-$mailings = Invoke-Agnitas -method "ListMailings" -verboseCall #-wsse $wsse #-verboseCall
-$mailings.item | Out-GridView
+#-----------------------------------------------
+# BUILD TARGETGROUPS OBJECTS
+#-----------------------------------------------
 
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+$str = "54368 | Zielgruppe_mit_sendID"
+$targetGroup = [TargetGroup]::new($str)
+
+$eql = @"
+`send_id` = 'def'
+"@
 
 
-################################################
-#
-# RETURN
-#
-################################################
+# Load data from Agnitas EMM
 
-# real messages
-return $messages
+$param = @{
+    targetID = [Hashtable]@{
+        type = "int"
+        value = $targetGroup.targetGroupId
+    }
 
+    description = [Hashtable]@{
+        type = "string"
+        value = "Hello World"
+    }
+
+    eql = [Hashtable]@{
+        type = "string"
+        value = $eql
+    }
+}
+
+$targetgroupsEmm = Invoke-Agnitas -method "UpdateTargetGroup" -param $param -verboseCall -noresponse -namespace "http://agnitas.com/ws/schemas" #-wsse $wsse #-verboseCall

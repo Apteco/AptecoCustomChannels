@@ -1,16 +1,18 @@
 # Load settings
-#$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+$settings = Get-Content -Path $settingsFilename -Encoding UTF8 -Raw | ConvertFrom-Json #"$( $scriptPath )\$( $settingsFilename )"
 
 #-----------------------------------------------
 # LOGIN DATA
 #-----------------------------------------------
-
+<#
 $passwordEncrypted = Get-PlaintextToSecure ([System.Management.Automation.PSCredential]::new("dummy",$password).GetNetworkCredential().Password)
 
 
 $auth = @{
-    "Username" = "apteco_ws"          # A shared secret for authentication.
-    #"Password" = $passwordEncrypted                   # A shared secret used for signing the JWT you generated.   
+    SOAP = @{
+        "Username" = "apteco_ws"          # A shared secret for authentication.
+        #"Password" = $passwordEncrypted                   # A shared secret used for signing the JWT you generated.   
+    }
 }
 
 $settings = @{
@@ -31,7 +33,7 @@ $settings = @{
     "contentType" = "application/json;charset=utf-8"
 
     # Triggerdialog settings
-    "base" = "https://ws.agnitas.de/2.0/"
+    "baseSOAP" = "https://ws.agnitas.de/2.0/"
     #"customerId" = ""
     #"createCampaignsWithDate" = $true
 
@@ -44,3 +46,4 @@ $settings = @{
     #"report" = $reportSettings
     
 }
+#>

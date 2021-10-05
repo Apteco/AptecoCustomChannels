@@ -49,7 +49,7 @@ Function Invoke-Agnitas {
         )
 
     # load url
-    $baseUri = $settings.base
+    $baseUri = $script:settings.baseSOAP
 
     # authentication
     $wsse = Create-WSSE-Token -cred $script:cred -noMilliseconds

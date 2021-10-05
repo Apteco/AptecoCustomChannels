@@ -1,34 +1,76 @@
 ﻿
 ################################################
 #
-# START
+# INPUT
 #
 ################################################
 
+
 #-----------------------------------------------
-# LOAD SCRIPTPATH
+# DEBUG SWITCH
 #-----------------------------------------------
 
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+$debug = $true
+$configMode = $true
+
+
+################################################
+#
+# NOTES
+#
+################################################
+
+<#
+
+https://ws.agnitas.de/2.0/emmservices.wsdl
+https://emm.agnitas.de/manual/de/pdf/webservice_pdf_de.pdf
+
+#>
+
+
+################################################
+#
+# SCRIPT ROOT
+#
+################################################
+
+if ( $debug ) {
+    # Load scriptpath
+    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    } else {
+        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    }
 } else {
-    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    $scriptPath = "$( $params.scriptPath )" 
 }
-
 Set-Location -Path $scriptPath
 
 
-#-----------------------------------------------
-# LOAD MORE FUNCTIONS
-#-----------------------------------------------
+################################################
+#
+# SETTINGS AND STARTUP
+#
+################################################
 
-$functionsSubfolder = ".\functions"
+# General settings
+$modulename = "EMMCREATESETTINGS"
 
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
-}
+# Load other generic settings like process id, startup timestamp, ...
+. ".\bin\general_settings.ps1"
+
+# Setup the network security like SSL and TLS
+. ".\bin\load_networksettings.ps1"
+
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
+
+
+################################################
+#
+# START
+#
+################################################
 
 
 #-----------------------------------------------
@@ -62,7 +104,7 @@ if(Test-Path -LiteralPath $settingsFile -IsValid ) {
 #-----------------------------------------------
 
 # Default file
-$logfileDefault = "$( $scriptPath )\printmailing.log"
+$logfileDefault = "$( $scriptPath )\emm.log"
 
 # Ask for another path
 $logfile = Read-Host -Prompt "Where do you want the log file to be saved? Just press Enter for this default [$( $logfileDefault )]"
@@ -84,27 +126,22 @@ if(Test-Path -LiteralPath $logfile -IsValid ) {
 
 
 #-----------------------------------------------
-# ASK FOR UPLOAD FOLDER
+# LOAD LOGGING MODULE NOW
 #-----------------------------------------------
 
-# Default file
-$uploadDefault = "$( $scriptPath )\uploads"
-
-# Ask for another path
-$upload = Read-Host -Prompt "Where do you want the files to be uploaded? Just press Enter for this default [$( $uploadDefault )]"
-
-# If prompt is empty, just use default path
-if ( $upload -eq "" -or $null -eq $upload) {
-    $upload = $uploadDefault
+$settings = @{
+    "logfile" = $logfile
 }
 
-# Check if filename is valid
-if(Test-Path -LiteralPath $upload -IsValid ) {
-    Write-Host "Upload folder '$( $upload )' is valid"
-} else {
-    Write-Host "Upload folder '$( $upload )' contains invalid characters"
-}
+# Setup the log and do the initial logging e.g. for input parameters
+. ".\bin\startup_logging.ps1"
 
+
+#-----------------------------------------------
+# LOG THE NEW SETTINGS CREATION
+#-----------------------------------------------
+
+Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WARNING )
 
 
 ################################################
@@ -117,40 +154,21 @@ if(Test-Path -LiteralPath $upload -IsValid ) {
 # LOGIN DATA
 #-----------------------------------------------
 
-$authSecret = Read-Host -AsSecureString "Please enter the authentication secret for Deutsche Post Print Mailing Automation"
-$authSecretEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$authSecret).GetNetworkCredential().Password)
-
-$ssoTokenKey = Read-Host -AsSecureString "Please enter the SSO token key for Deutsche Post Print Mailing Automation"
-$ssoTokenKeyEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$ssoTokenKey).GetNetworkCredential().Password)
-
+$soapUsername = Read-Host "Please enter your agnitas EMM SOAP username"
+$soapPassword = Read-Host -AsSecureString "Please enter your agnitas EMM SOAP password"
+$soapPasswordEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$soapPassword).GetNetworkCredential().Password)
 
 $auth = @{
-
-    "partnerSystemIdExt" = "<partnerSystemIdExt>"                           # The numeric id of your partnersystem in our system.
-    "partnerSystemCustomerIdExt" = "<partnerSystemCustomerIdExt>"                 # The alphanumeric id identifying your customer, you want to act for.
-    "authenticationSecret" = $authSecretEncrypted           # A shared secret for authentication.
-    "ssoTokenKey" = $ssoTokenKeyEncrypted                   # A shared secret used for signing the JWT you generated.    
-
+    SOAP = @{
+        username = $soapUsername
+        password = $soapPasswordEncrypted
+    }
 }
-
-
-#-----------------------------------------------
-# DATATYPE SETTINGS
-#-----------------------------------------------
-
-$dataTypeSettings = @{
-    "postcodeSynonyms" = @("Postleitzahl","zip","zip code","zip-code","PLZ")
-    "countrycodeSynonyms" = @("iso","country","land","länderkennzeichen")
-    "picturesEmbeddedSynonyms" = @("bild")
-    "picturesLinkSynonyms" = @("Hintergrund")
-
-}
-
 
 #-----------------------------------------------
 # PREVIEW SETTINGS
 #-----------------------------------------------
-
+<#
 $previewSettings = @{
     "Type" = "Email" #Email|Sms
     "FromAddress"="info@apteco.de"
@@ -158,12 +176,12 @@ $previewSettings = @{
     "ReplyTo"="info@apteco.de"
     "Subject"="Test-Subject"
 }
-
+#>
 
 #-----------------------------------------------
 # UPLOAD SETTINGS
 #-----------------------------------------------
-
+<#
 $uploadSettings = @{
     "rowsPerUpload" = 80 # should be max 100 per upload
     "uploadsFolder" = $upload #"$( $scriptPath )\uploads\"
@@ -171,21 +189,21 @@ $uploadSettings = @{
     "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
     "excludedAttributes" = @()
 }
-
+#>
 
 #-----------------------------------------------
 # REPORT SETTINGS
 #-----------------------------------------------
-
+<#
 $reportSettings = @{
     "delimiter" = ";"   # The delimiter used by TriggerDialog for report data
 }
-
+#>
 
 #-----------------------------------------------
 # MAIL NOTIFICATION SETTINGS
 #-----------------------------------------------
-
+<#
 $smtpPass = Read-Host -AsSecureString "Please enter the SMTP password"
 $smtpPassEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$smtpPass).GetNetworkCredential().Password)
 
@@ -196,7 +214,7 @@ $mail = @{
     username = "admin@example.com"
     password = $smtpPassEncrypted
 }
-
+#>
 
 
 #-----------------------------------------------
@@ -206,7 +224,7 @@ $mail = @{
 $settings = @{
 
     # General settings
-    "nameConcatChar" =   " / "
+    "nameConcatChar" =   " | "
     "logfile" = $logfile                                    # logfile
     "providername" = "agnitasEMM"                        # identifier for this custom integration, this is used for the response allocation
 
@@ -221,14 +239,13 @@ $settings = @{
     "contentType" = "application/json;charset=utf-8"
 
     # Triggerdialog settings
-    "base" = "https://dm-uat.deutschepost.de/gateway"
+    "baseSOAP" = "https://ws.agnitas.de/2.0/"
+    "base" = "xxx"
     #"customerId" = ""
     #"createCampaignsWithDate" = $true
 
     # sub settings categories
-    "authentication" = @{
-        
-    }
+    "authentication" = $auth
     #"dataTypes" = $dataTypeSettings
     #"preview" = $previewSettings
     #"upload" = $uploadSettings
@@ -238,22 +255,29 @@ $settings = @{
 }
 
 
-
-
 ################################################
 #
 # PACK TOGETHER SETTINGS AND SAVE AS JSON
 #
 ################################################
 
+# rename settings file if it already exists
+If ( Test-Path -Path $settingsFile ) {
+    $backupPath = "$( $settingsFile ).$( $timestamp.ToString("yyyyMMddHHmmss") )"
+    Write-Log -message "Moving previous settings file to $( $backupPath )" -severity ( [Logseverity]::WARNING )
+    Move-Item -Path $settingsFile -Destination $backupPath
+} else {
+    Write-Log -message "There was no settings file existing yet"
+}
+
 # create json object
-$json = $settings | ConvertTo-Json -Depth 8 # -compress
+$json = $settings | ConvertTo-Json -Depth 99 # -compress
 
 # print settings to console
 $json
 
 # save settings to file
-$json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
+$json | Set-Content -path $settingsFile -Encoding UTF8
 
 
 
@@ -263,99 +287,5 @@ $json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 #
 ################################################
 
-
-#-----------------------------------------------
-# PREPARATION
-#-----------------------------------------------
-
-$timestamp = [datetime]::Now
-
-
-#-----------------------------------------------
-# CREATE HEADERS
-#-----------------------------------------------
-
-[uint64]$currentTimestamp = Get-Unixtime -timestamp $timestamp
-
-# It is important to use the charset=utf-8 to get the correct encoding back
-$contentType = $settings.contentType
-$headers = @{
-    "accept" = $settings.contentType
-}
-
-
-#-----------------------------------------------
-# CREATE SESSION
-#-----------------------------------------------
-
-# Remove the session file to force a new session
-Remove-Item -Path $settings.sessionFile -Force
-
-# Create a new session now
-$newSessionCreated = Get-TriggerDialogSession
-
-If ( $newSessionCreated ) {
-
-    "Authentication successful. New session created."
-
-    #$jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret $settings.authentication.authenticationSecret
-    $jwtDecoded = Decode-JWT -token ( Get-SecureToPlaintext -String $Script:sessionId ) -secret ( Get-SecureToPlaintext $settings.authentication.authenticationSecret )
-
-    $headers.add("Authorization", "Bearer $( Get-SecureToPlaintext -String $Script:sessionId )")
-
-} else {
-
-    "Authentication failed. No new session created."
-    exit 1
-
-}
-
-#-----------------------------------------------
-# CHOOSE CUSTOMER ACCOUNT
-#-----------------------------------------------
-
-if ( $jwtDecoded.payload.customerIds.Count -gt 1 ) {
-    $customerId = $jwtDecoded.payload.customerIds | Out-GridView -PassThru
-} elseif ( $jwtDecoded.payload.customerIds.Count -eq 1 ) {
-    $customerId = $jwtDecoded.payload.customerIds[0]
-} else {
-    "No account chosen or available"
-    exit 1
-}
-
-$settings.customerId = $customerId
-
-
-################################################
-#
-# PACK TOGETHER SETTINGS AND SAVE AS JSON
-#
-################################################
-
-# create json object
-$json = $settings | ConvertTo-Json -Depth 8 # -compress
-
-# print settings to console
-$json
-
-# save settings to file
-$json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
-
-
-################################################
-#
-# CREATE FOLDERS IF NEEDED
-#
-################################################
-
-if ( !(Test-Path -Path $settings.upload.uploadsFolder) ) {
-    Write-Log -message "Upload $( $settings.upload.uploadsFolder ) does not exist. Creating the folder now!"
-    New-Item -Path "$( $settings.upload.uploadsFolder )" -ItemType Directory
-}
-
-<#
-if ( !(Test-Path -Path $settings.download.folder) ) {
-    Write-Log -message "Download $( $settings.download.folder ) does not exist. Creating the folder now!"
-    New-Item -Path "$( $settings.download.folder )" -ItemType Directory
-}
-#>
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
