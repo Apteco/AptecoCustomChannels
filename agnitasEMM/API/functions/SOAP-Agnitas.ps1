@@ -2,167 +2,32 @@
 Function Format-SoapParameter {
 
     param(
-         [Parameter(Mandatory=$true)]$key
-        ,[Parameter(Mandatory=$true)]$var
-        ,[Parameter(Mandatory=$false)][array]$customFields = @()
+         [Parameter(Mandatory=$true)][String]$key
+        ,[Parameter(Mandatory=$true)][Hashtable]$var
+        #,[Parameter(Mandatory=$false)][array]$customFields = @()
     )
-
+    
     # if the datatype is set manually
-    if ( $var -is "System.Collections.Hashtable") {
-        $noDimensions = Count-Dimensions -var $var.value
+    #if ( $var -is "System.Collections.Hashtable") {
+        #$noDimensions = Count-Dimensions -var $var.value
         $datatype = $var.type
         $value = $var.value
-    } else {
-        $noDimensions = Count-Dimensions -var $var
-        $value = $var
-    }
+    #} else {
+        #$noDimensions = Count-Dimensions -var $var
+#        $value = $var
+#    }
 
-    
-    $xml = Switch ( $noDimensions ) {
-        
-        # one-dimensional like a integer, string, decimal, long, ...
-        0 {
-            
-            
+    #$xmlRaw = "<ns1:$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</ns1:$( $key )>"
 
-            # is pscustomobject
-            if ($value -is [System.Management.Automation.PSCustomObject]) {
-            
-                $xmlRaw = ""
-
-                $xmlRaw += "<$( $key ) SOAP-ENC:arrayType=""xsd:$( $datatype )"" xsi:type=""$( $key )"">"
-                $value.psobject.properties.name | ForEach {        
-                    $property = $_
-                    $xmlRaw += "`n        <$( $property ) xsd:type=""xsd:$( $value.$property.type )"">$( [System.Security.SecurityElement]::Escape($value.$property.value) )</$( $property )>"
-                }    
-                $xmlRaw += "</$( $key )>"
-
-                
-
-            # is array
-            } elseif (Is-Numeric $var) {            
-                # TODO [ ] this does not work right for decimals, but they are not needed at the moment because the SOAP only uses strings and longs            
-                $datatype = "long"
-                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</$( $key )>"
-            }  else {
-                $datatype = "string"
-                $xmlRaw = "<$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</$( $key )>"
-            }
-            
-            $xmlRaw  
-
-
-
-        }
-
-        # two- or multidimensional like an text-array of pscustomobject-array
-        default {
-            
-            if ( $value -is [array] ) {
-                
-                # array of pscustomobjects
-                if ($value[0] -is [System.Management.Automation.PSCustomObject]) {
-                
-                    if ($value -is [array] -and $value[0] -is [System.Management.Automation.PSCustomObject]) {
-            
-            
-                        $xmlRaw = ""
-
-                        $xmlRaw += "<$( $key ) SOAP-ENC:arrayType=""xsd:$( $datatype )[$( $value.Count )]"" xsi:type=""$( $key )"">"
-
-                        # Go for each row (each recipient)
-                        $value  | ForEach {    
-                            $item = $_
-                            $xmlRaw += "`n    <item xsi:type=""SOAP-ENC:$( $datatype )"">"    
-
-                            # Go for each property/value of recipient and exclude custom fields
-                            $item.psobject.properties.name.Where( { $_ -notin $customFields.id } ) | ForEach {  
-                                
-                                $property = $_
-                                
-                                if ( $property -eq "custom" ) {
-                                    
-                                    # evaluate number of filled custom fields
-                                    $customFieldNames = $item.psobject.Properties | where { $_.value -ne $null -and $_.name -in $customFields.id }
-
-                                    $item | select $customFieldNames.name | ForEach {
-    
-                                        $row = $_
-                                        $i = 0
-                                        $xmlCustom = ""
-                                        $row.psobject.properties.name | ForEach {
-    
-                                            $attribute = $_
-        
-                                            if ( $row.$attribute -ne $null) {
-                                                $i+=1
-                                                $xmlCustom += "<item xsi:type=""xsd:CustomFieldType"" id=""ref$( $i )"">" # TODO add number
-                                                $xmlCustom += "  <variableName xsi:type=""xsd:string"">$( $attribute )</variableName>"
-                                                $xmlCustom += "  <value xsi:type=""xsd:$( $customFields.Where({ $_.id -eq $attribute }).type )"">$( [System.Security.SecurityElement]::Escape( $row.$attribute ) )</value>"
-                                                $xmlCustom += "</item>"
-                                                $itemValue = $xmlCustom
-                                            }
-
-                                        }
-
-                                    }
-                                    $propertyDataType = "customFieldTypeItems"
-                                    $arrayType = "SOAP-ENC:arrayType=""xsd:customFieldType[$( $customFieldNames.Count )]"""
-                                    $xsiOrXsd = "xsi"
-
-                                } else {
-                                    $arrayType = ""
-                                    $propertyDataType = "string"
-                                    $itemValue = $item.$property
-                                    $xsiOrXsd = "xsd"
-                                }
-                                  
-                                #<custom SOAP-ENC:arrayType="ns1:CustomFieldType[32]" xsi:type="ns1:customFieldTypeItems">
-
-                                $xmlRaw += "`n        <$( $property ) $( $arrayType ) $( $xsiOrXsd ):type=""xsd:$( $propertyDataType )"">$( [System.Security.SecurityElement]::Escape($itemValue) )</$( $property )>"
-                            }    
-                            $xmlRaw += "`n    </item>"        
-                        }
-                        $xmlRaw += "</$( $key )>"
-
-                        $xmlRaw
-
-
-                    }
-
-
-                # array of strings other than pscustomobjects
-                } else {
-
-@"
-<$( $key ) SOAP-ENC:arrayType="xsd:string[$( $value.Count )]" xsi:type="ArrayOf_xsd_string">$( $value | ForEach {                
-    "`n    <item xsd:type=""xsd:string"">$( [System.Security.SecurityElement]::Escape( $_ ) )</item>"                
-})
-</$( $key )>
-"@
-                
-                }
-            }
-           
-            
-        }
-        <#
-        2 {
-    
-@"
-<$( $key ) SOAP-ENC:arrayType="xsd:string[][$( $var.Count )]" xsi:type="ArrayOfArrayOf_xsd_string">$($var | ForEach {
-    "`n    <item SOAP-ENC:arrayType=""xsd:string[$( $_.Count )]"" xsi:type=""SOAP-ENC:Array"">$( $_ | ForEach {
-        "`n        <item xsd:type=""""xsd:string"""">$( $_ )</item>"
-    } )`n    </item>"
-} )
-</$( $key )>
+    $xmlRaw = @"
+            <ns1:$( $key )>$( [System.Security.SecurityElement]::Escape( $value ) )</ns1:$( $key )>
 "@
 
-        }
-        #>
-    }
-
-    return $xml
+    #$xml = @"
+    #<ns1:$( $key )>$( $var )</ns1:$( $key )>
+#
+#"@
+    return $xmlRaw
 
 }
 
@@ -174,41 +39,43 @@ Function Invoke-Agnitas {
          [Parameter(Mandatory=$true)][String]$method
         #,[Parameter(Mandatory=$true)][Hashtable]$wsse
         ,[Parameter(Mandatory=$false)][Hashtable]$param = @{}
-        ,[Parameter(Mandatory=$false)][String]$responseNode = "" # you should either define responseNode or responseType
-        ,[Parameter(Mandatory=$false)][String]$responseType = "" # you should either define responseNode or responseType
+        #,[Parameter(Mandatory=$false)][String]$responseNode = "" # you should either define responseNode or responseType
+        #,[Parameter(Mandatory=$false)][String]$responseType = "" # you should either define responseNode or responseType
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
-        ,[Parameter(Mandatory=$false)][array]$customFields = @()
-        ,[Parameter(Mandatory=$false)][switch]$returnFlat = $false
-    )
+        #,[Parameter(Mandatory=$false)][array]$customFields = @()
+        #,[Parameter(Mandatory=$false)][switch]$returnFlat = $false
+        ,[Parameter(Mandatory=$false)][String]$namespace = "http://agnitas.org/ws/schemas"
+        ,[Parameter(Mandatory=$false)][switch]$noResponse = $false
+        )
 
-    # load url and header
+    # load url
     $baseUri = $settings.base
-    $wsse = Create-WSSE-Token -cred $script:cred -noMilliseconds
 
-    <#
-    $headers = @{
-        userId=$settings.login.user     # Integer, The user id, from the account you wish to access.
-        userToken=Get-SecureToPlaintext $settings.login.token # String, your personal token
-    }
-    #>
+    # authentication
+    $wsse = Create-WSSE-Token -cred $script:cred -noMilliseconds
+    $nonceBase64 = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($wsse.nonce))
+    
 
     try {
             
         # format SOAP parameters        
-        <#
+        
         $paramXML = ""
         $param.Keys | ForEach {
             $key = $_
-            $paramXML += Format-SoapParameter -key $key -var $param[$key] -customFields $customFields
+            $paramXML += Format-SoapParameter -key $key -var $param[$key] #-customFields $customFields
         }
-        #>
 
-    $nonceBase64 = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($wsse.nonce))
+        # create headers
+        $contentType = "text/xml; charset=utf-8" #"text/xml;charset=""utf-8"""
+        $headers = @{
+            "SOAPACTION" = "" #$method
+        }
 
         # create SOAP envelope
         $soapEnvelopeXml = @"
 <?xml version="1.0" encoding="UTF-8"?>
-<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://agnitas.org/ws/schemas">
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="$( $namespace )">
     <SOAP-ENV:Header>
         <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
             <wsse:UsernameToken xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
@@ -220,73 +87,71 @@ Function Invoke-Agnitas {
         </wsse:Security>
     </SOAP-ENV:Header>
     <SOAP-ENV:Body>
-        <ns1:$( $method )Request/>
+        <ns1:$( $method )Request>
+$( $paramXml )
+        </ns1:$( $method )Request>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>
 "@        
-# <?xml version="1.0" encoding="UTF-8"?>
-# <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
-#     <SOAP-ENV:Header>
-#         $( $wsseHeader )
-#     </SOAP-ENV:Header>
-#     <SOAP-ENV:Body xmlns:ns2="http://agnitas.org/ws/schemas" xmlns:ns3="http://agnitas.com/ws/schemas">
-#     <ns2:$( $method )Request>
 
-#     </ns2:$( $method )Request>
-#     </SOAP-ENV:Body>
-# </SOAP-ENV:Envelope>
-# "@
-
+        # Write out and log the request
         if ( $verboseCall ) {
             Write-Host $soapEnvelopeXml
+            Out-File -InputObject $soapEnvelopeXml -Encoding utf8 -FilePath ".\envelope_$( ([guid]::NewGuid()).guid ).xml"
         }
 
-        $headers = @{
-            "SOAPACTION" = "" #$method
+        # Do the soap call
+        $restParams = [Hashtable]@{
+            Uri = $baseUri
+            Headers = $headers
+            ContentType = $contentType
+            Method = "Post"
+            Body = $soapEnvelopeXml
+            Verbose = $true
+            #SkipHeaderValidation = $true
+            #OutFile = "$( ([guid]::NewGuid()).Guid ).xml"
         }
-
-        #$soapEnvelopeXml | Out-File -FilePath "$( $Path )\..\log\env_out.xml"
-
-        $contentType = "text/xml; charset=utf-8" #"text/xml;charset=""utf-8"""
-        $res = Invoke-RestMethod -Uri "$( $baseUri )" -Headers $headers -ContentType $contentType -Method Post -Body $soapEnvelopeXml -Verbose #-SkipHeaderValidation #-OutFile "$( ([guid]::NewGuid()).Guid ).xml"
-        $response = $res #[xml]$res.Content
-        #write-host "Statuscode '$( $res.StatusCode )' with Statusdescription '$( $res.StatusDescription )'"
+        $response = Invoke-RestMethod @restParams
+        #$response = Invoke-RestMethod -Uri $baseUri -Headers $headers -ContentType $contentType -Method Post -Body $soapEnvelopeXml -Verbose #-SkipHeaderValidation #-OutFile "$( ([guid]::NewGuid()).Guid ).xml"
 
     } catch {
         Write-Host $_.Exception
         Write-Host $_.Exception.Response.StatusCode.value__
         Write-Host $_.Exception.Response.StatusDescription.value__
+        #write-host "Statuscode '$( $res.StatusCode )' with Statusdescription '$( $res.StatusDescription )'"
         #If ($_.Exception.Response.StatusCode.value__ -eq "500") {
         #}
     }
 
-   
-    # print response to console
-    if ( $verboseCall ) {
-        write-host $response.OuterXml
-        Out-File -InputObject $response.OuterXml -Encoding utf8 -FilePath ".\$( ([guid]::NewGuid()).guid ).xml"
-    }
+    if (-not $noResponse ) {
 
-    # load namespaces of response
-    $namespacePrefix = "xmlns:"
-    $ns = [HashTable]@{}
-    $response.Envelope.Attributes.name.where({ $_ -like "$( $namespacePrefix )*" }) | ForEach {
-        $attributeName = $_
-        $namespaceName = $attributeName.Substring($namespacePrefix.Length)
-        $nameSpaceUrl = $response.Envelope.Attributes[$attributeName].'#text'
-        $ns.Add($namespaceName,$nameSpaceUrl)
-    }
+        # print response to console and to file
+        if ( $verboseCall ) {
+            write-host $response.OuterXml
+            Out-File -InputObject $response.OuterXml -Encoding utf8 -FilePath ".\response_$( ([guid]::NewGuid()).guid ).xml"
+        }
 
-    $response.Envelope.Body."$( $method )Response".Attributes.name.where({ $_ -like "$( $namespacePrefix )*" }) | ForEach {
-        $attributeName = $_
-        $namespaceName = $attributeName.Substring($namespacePrefix.Length)
-        $nameSpaceUrl = $response.Envelope.Body."$( $method )Response".Attributes[$attributeName].'#text'
-        $ns.Add($namespaceName,$nameSpaceUrl)
-    }
+        # load namespaces of response envelope and body
+        $namespacePrefix = "xmlns:"
+        $ns = [HashTable]@{}
+        $response.Envelope.Attributes.name.where({ $_ -like "$( $namespacePrefix )*" }) | ForEach {
+            $attributeName = $_
+            $namespaceName = $attributeName.Substring($namespacePrefix.Length)
+            $nameSpaceUrl = $response.Envelope.Attributes[$attributeName].'#text'
+            $ns.Add($namespaceName,$nameSpaceUrl)
+        }
+        $response.Envelope.Body."$( $method )Response".Attributes.name.where({ $_ -like "$( $namespacePrefix )*" }) | ForEach {
+            $attributeName = $_
+            $namespaceName = $attributeName.Substring($namespacePrefix.Length)
+            $nameSpaceUrl = $response.Envelope.Body."$( $method )Response".Attributes[$attributeName].'#text'
+            $ns.Add($namespaceName,$nameSpaceUrl)
+        }
 
-    # load item of xml containing "item"
- 
-    $responseParsed = $response | Select-Xml -XPath "//SOAP-ENV:Body" -Namespace $ns | select -ExpandProperty node | Convert-XMLtoPSObject -ignoreNamespaces $ns
+        # load body as custom object
+        $responseParsed = $response | Select-Xml -XPath "//SOAP-ENV:Body" -Namespace $ns | select -ExpandProperty node | Convert-XMLtoPSObject -ignoreNamespaces $ns
+        $responseParsed."$( $method )Response"
+
+    }
 
     <#
     if ( $responseNode -eq "" -and $responseType -eq "" ) {
@@ -332,7 +197,6 @@ Function Invoke-Agnitas {
         return $items
     }
     #>
-   $responseParsed."$( $method )Response"
 
 }
 
