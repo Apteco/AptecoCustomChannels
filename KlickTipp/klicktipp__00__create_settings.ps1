@@ -54,7 +54,7 @@ Set-Location -Path $scriptPath
 ################################################
 
 # General settings
-$modulename = "EMMCREATESETTINGS"
+$modulename = "KTCREATESETTINGS"
 
 # Load other generic settings like process id, startup timestamp, ...
 . ".\bin\general_settings.ps1"
@@ -104,7 +104,7 @@ if(Test-Path -LiteralPath $settingsFile -IsValid ) {
 #-----------------------------------------------
 
 # Default file
-$logfileDefault = "$( $scriptPath )\emm.log"
+$logfileDefault = "$( $scriptPath )\klicktipp.log"
 
 # Ask for another path
 $logfile = Read-Host -Prompt "Where do you want the log file to be saved? Just press Enter for this default [$( $logfileDefault )]"
@@ -154,16 +154,13 @@ Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WAR
 # LOGIN DATA
 #-----------------------------------------------
 
-$soapUsername = Read-Host "Please enter your agnitas EMM SOAP username"
-$soapPassword = Read-Host -AsSecureString "Please enter your agnitas EMM SOAP password"
-$soapPasswordEncrypted = Get-PlaintextToSecure ((New-Object PSCredential "dummy",$soapPassword).GetNetworkCredential().Password)
+# TODO [ ] ask for a password
+$passwordEncrypted = Get-PlaintextToSecure ([System.Management.Automation.PSCredential]::new("dummy",$password).GetNetworkCredential().Password)
 
 $auth = @{
-    SOAP = @{
-        username = $soapUsername
-        password = $soapPasswordEncrypted
-    }
+    "password" = $passwordEncrypted                   # A shared secret used for signing the JWT you generated.   
 }
+
 
 #-----------------------------------------------
 # PREVIEW SETTINGS
@@ -181,15 +178,16 @@ $previewSettings = @{
 #-----------------------------------------------
 # UPLOAD SETTINGS
 #-----------------------------------------------
-<#
+
 $uploadSettings = @{
-    "rowsPerUpload" = 80 # should be max 100 per upload
-    "uploadsFolder" = $upload #"$( $scriptPath )\uploads\"
-    "delimiter" = "`t" # "`t"|","|";" usw.
-    "encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
-    "excludedAttributes" = @()
+    klickTippIdField = "subscriberId"
+    #"rowsPerUpload" = 80 # should be max 100 per upload
+    #"uploadsFolder" = $upload #"$( $scriptPath )\uploads\"
+    #"delimiter" = "`t" # "`t"|","|";" usw.
+    #"encoding" = "UTF8" # "UTF8"|"ASCII" usw. encoding for importing text file https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv?view=powershell-6
+    #"excludedAttributes" = @()
 }
-#>
+
 
 #-----------------------------------------------
 # REPORT SETTINGS
@@ -226,29 +224,23 @@ $settings = @{
     # General settings
     "nameConcatChar" =   " | "
     "logfile" = $logfile                                    # logfile
-    "providername" = "agnitasEMM"                        # identifier for this custom integration, this is used for the response allocation
+    "providername" = "klicktipp"                        # identifier for this custom integration, this is used for the response allocation
+    "sqliteDB" = "$( $scriptPath )\klicktipp.sqlite"
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
-    #"sessionFile" = "$( $scriptPath )\session.json"         # name of the session file
-    #"ttl" = 25                                              # Time to live in minutes for the current session, normally 30 minutes for TriggerDialog
-    #"encryptToken" = $true                                  # $true|$false if the session token should be encrypted
 
     # Network settings
     "changeTLS" = $true
     "contentType" = "application/json;charset=utf-8"
 
-    # Triggerdialog settings
-    "baseSOAP" = "https://ws.agnitas.de/2.0/"
-    "base" = "xxx"
-    #"customerId" = ""
-    #"createCampaignsWithDate" = $true
+    # API settings
+    "base" = "https://api.klicktipp.com"
 
     # sub settings categories
     "authentication" = $auth
-    #"dataTypes" = $dataTypeSettings
     #"preview" = $previewSettings
-    #"upload" = $uploadSettings
+    "upload" = $uploadSettings
     #"mail" = $mail
     #"report" = $reportSettings
     
@@ -287,6 +279,11 @@ $json | Set-Content -path $settingsFile -Encoding UTF8
 #
 ################################################
 
+
+#-----------------------------------------------
+# RELOAD SETTINGS
+#-----------------------------------------------
+
 # Load the settings from the local json file
 . ".\bin\load_settings.ps1"
 
@@ -295,10 +292,198 @@ $json | Set-Content -path $settingsFile -Encoding UTF8
 # CHECK LOGIN
 #-----------------------------------------------
 
+# Do the preparation
+. ".\bin\preparation.ps1"
+
+# Load fields as test of API
+try {
+
+    $restParams = $defaultRestParams + @{
+        "Method" = "Get"
+        "Uri" = "$( $settings.base )/field.json"
+    }
+    $fieldsRaw = Invoke-RestMethod @restParams
+    Write-Log -message "Looks like the API access has worked"
+
+} catch {
+
+    Write-Log -message "API access failed with this message: $( $_ )" -severity ([Logseverity]::ERROR)
+    Write-Log -message "Exiting the script now" -severity ([Logseverity]::WARNING)
+    exit 1
+
+}
 
 
 #-----------------------------------------------
-# CREATE SOME TAGS
+# CREATE SOME TAGS IF NOT EXISTING
 #-----------------------------------------------
 
-# Create AptecoOrbit Tag
+# Define tags
+$tagsToCreate = @("AptecoOrbit","TTT","ABC.DEF")
+
+# Load existing tags and transform them
+$restParams = $defaultRestParams + @{
+    "Method" = "Get"
+    "Uri" = "$( $settings.base )/tag.json"
+}
+$tagsRaw = Invoke-RestMethod @restParams
+$tags = ( $tagsRaw.psobject.members | where { $_.MemberType -eq "NoteProperty" } ).Value
+
+# Check and create tags, if they do not exist
+$tagsToCreate | ForEach {
+    $tag = $_
+    If ( $tags -notcontains $tag ) {
+        $restParams = $defaultRestParams + @{
+            "Method" = "Post"
+            "Uri" = "$( $settings.base )/tag.json"
+            "Body" = @{
+                "name" = $tag
+            } | ConvertTo-Json -Depth 99
+        }
+        $createdTag = Invoke-RestMethod @restParams        
+        Write-Log -message "Created tag '$( $tag )' with id '$( $createdTag )'"
+    }
+}
+
+
+################################################
+#
+# CREATE FOLDERS IF NEEDED
+#
+################################################
+
+# Creating the lib folder for the sqlite stuff
+$libFolder = ".\$( $libSubfolder )"
+if ( !(Test-Path -Path $libFolder) ) {
+    Write-Log -message "lib folder '$( $libFolder )' does not exist. Creating the folder now!"
+    New-Item -Path $libFolder -ItemType Directory
+}
+
+
+################################################
+#
+# DOWNLOAD AND INSTALL THE SQLITE PACKAGE
+#
+################################################
+
+$sqliteDll = "System.Data.SQLite.dll"
+
+if ( $libExecutables.Name -notcontains $sqliteDll ) {
+
+    Write-Log -message "A browser page is opening now. Please download the system.data.sqlite package from the site like 'sqlite-netFx46-binary-bundle-x64-2015-1.0.115.0.zip'"
+    Write-Log -message "Please unzip the file and put it into the lib folder"
+    
+    <#
+    http://system.data.sqlite.org/downloads/1.0.115.0/sqlite-netFx46-binary-bundle-x64-2015-1.0.115.0.zip
+    #>
+    
+    Start-Process "http://system.data.sqlite.org/index.html/doc/trunk/www/downloads.wiki"
+    
+    # Wait for key
+    Write-Host -NoNewLine 'Press any key if you have put the files there';
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
+
+}
+
+
+################################################
+#
+# PREPARE SQLITE DATABASE
+#
+################################################
+
+
+# Create database if it does not exist
+If ( -not (Test-Path -Path $settings.sqliteDB ) ) {
+
+    # Load functions and new assemblies
+    . ".\bin\load_functions.ps1"
+
+    Write-Log -message "Preparing sqlite database"
+
+    #-----------------------------------------------
+    # ESTABLISHING CONNECTION TO SQLITE
+    #-----------------------------------------------
+
+    # Load assemblies for sqlite
+    #$assemblyFileSqlite = $libExecutables.Where({$_.name -eq "System.Data.SQLite.dll"})
+    #[Reflection.Assembly]::LoadFile($assemblyFileSqlite.FullName)
+    $connection = [System.Data.SQLite.SQLiteConnection]::new()
+
+    # Create a new connection to a database (in-memory or file)
+    # If the database does not exist, it will be created automatically
+    #$connection.ConnectionString = "Data Source=:memory:;Version=3;New=True;"
+    $connection.ConnectionString = "Data Source=$( $settings.sqliteDb );Version=3;New=True;"
+    $connection.Open()
+
+    # Load more extensions for sqlite, e.g. the Interop which includes json1
+    #$connection.EnableExtensions($true)
+    #$assemblyFileInterop = Get-Item -Path ".\sqlite-netFx46-binary-x64-2015-1.0.113.0\SQLite.Interop.dll"
+    #$connection.LoadExtension($assemblyFileInterop.FullName, "sqlite3_json_init");
+
+    # Create a new command which can be reused
+    $command = [System.Data.SQLite.SQLiteCommand]::new($connection)
+
+
+    #-----------------------------------------------
+    # CREATE TABLES FOR STORING KLICKTIPP DATA
+    #-----------------------------------------------
+
+    <#
+    # Drop a table, if exists
+    $command.CommandText = "DROP TABLE IF EXISTS items";
+    [void]$command.ExecuteNonQuery();
+    #>
+
+    # Create a new table for object items, if it is not existing
+    $command.CommandText = @"
+    CREATE TABLE IF NOT EXISTS items (
+        id TEXT
+        ,object TEXT 
+        ,ExtractTimestamp TEXT
+        ,properties TEXT
+    )
+"@
+    [void]$command.ExecuteNonQuery();
+
+    $command.Dispose()
+    $connection.Dispose()
+
+} 
+
+
+
+################################################
+#
+# INITIAL LOAD OF DATA
+#
+################################################
+
+$decision = $Host.UI.PromptForChoice('Loading all klicktipp receivers now', 'Are you sure you want to proceed?', @('&Yes'; '&No'), 1)
+
+If ( $decision -eq "0" ) {
+
+    . ".\bin\load_subscribers.ps1"
+
+}
+
+
+################################################
+#
+# END STUFF
+#
+################################################
+
+# Do the end stuff
+. ".\bin\end.ps1"
+
+
+################################################
+#
+# WAIT FOR KEY
+#
+################################################
+
+Write-Host -NoNewLine 'Press any key to continue...';
+$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
+

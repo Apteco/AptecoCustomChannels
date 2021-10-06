@@ -2,7 +2,10 @@
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
+        [System.Net.SecurityProtocolType]::Ssl3
+        [System.Net.SecurityProtocolType]::Tls13
         [System.Net.SecurityProtocolType]::Tls12
+        [System.Net.SecurityProtocolType]::Tls11
     )
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }

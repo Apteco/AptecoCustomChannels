@@ -1,10 +1,10 @@
 # Load settings
-#$settings = Get-Content -Path $settingsFilename -Encoding UTF8 -Raw | ConvertFrom-Json #"$( $scriptPath )\$( $settingsFilename )"
+$settings = Get-Content -Path $settingsFilename -Encoding UTF8 -Raw | ConvertFrom-Json #"$( $scriptPath )\$( $settingsFilename )"
 
 #-----------------------------------------------
 # LOGIN DATA
 #-----------------------------------------------
-
+<#
 $passwordEncrypted = Get-PlaintextToSecure ([System.Management.Automation.PSCredential]::new("dummy",$password).GetNetworkCredential().Password)
 
 $auth = @{
@@ -17,6 +17,7 @@ $settings = @{
     "nameConcatChar" =   " | "
     "logfile" = ".\klicktipp.log"                                    # logfile
     "providername" = "klicktipp"                        # identifier for this custom integration, this is used for the response allocation
+    "sqliteDB" = "$( $scriptPath )\klicktipp.sqlite"
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
@@ -42,3 +43,4 @@ $settings = @{
     #"report" = $reportSettings
     
 }
+#>

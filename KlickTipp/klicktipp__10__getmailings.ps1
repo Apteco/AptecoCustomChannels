@@ -22,9 +22,14 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
+
+        # Integration parameters
+        scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
+        mode= "tags"
+
+
+        # PeopleStage
 	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
-        mode= "process"
 	    abc= "def"
 	    Username= "abc"
     }
@@ -106,16 +111,30 @@ $modulename = "KTGETMESSAGE"
 switch ( $params.mode ) {
 
     "tags" {
-        $restParams = @{
+        
+        $restParams = $defaultRestParams + @{
             "Method" = "Get"
             "Uri" = "$( $settings.base )/tag.json"
-            "ContentType" = $settings.contentType
-            "Headers" = $headers
-            "Verbose" = $true
         }
         $tags = Invoke-RestMethod @restParams
+
+        $tagList = [System.Collections.ArrayList]@()
+        $tags.psobject.members | where { $_.MemberType -eq "NoteProperty" } | ForEach {
+            $tag = $_
+            [void]$tagList.add([PSCustomObject]@{
+                "id" = $tag.Name
+                "name" = $tag.Value
+            })
+        }
+
+        # Add taglist twice for add and removal of tags
+        $messages = $tagList | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )+$( $_.name )" }}
+        $messages += $tagList | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )-$( $_.name )" }}
+
     }
 
+    # TODO [ ] check! This lists DOI processes
+    <#
     "lists" {
         $restParams = @{
             "Method" = "Get"
@@ -126,19 +145,13 @@ switch ( $params.mode ) {
         }
         $lists = Invoke-RestMethod @restParams
     }
+    #>
     
     # Setup if setting is not present or not tags
     default {
-        $list = [ArrayList]@(
-            @{
-                id = 1
-                name = "subscribe"
-            }
-            @{
-                id = 1
-                name = "unsubscribe"
-            }
-        )
+
+        $messages = $modeList | Select @{name="id";expression={ $_.id }}, @{name="name";expression={ "$( $_.id )$( $settings.nameConcatChar )$( $_.name )" }}
+
     }
 
 }
@@ -155,5 +168,5 @@ switch ( $params.mode ) {
 ################################################
 
 # real messages
-#return $messages
+$messages #| ft
 

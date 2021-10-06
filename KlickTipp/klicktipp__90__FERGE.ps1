@@ -39,8 +39,7 @@ if ( $debug ) {
 
 <#
 
-https://ws.agnitas.de/2.0/emmservices.wsdl
-https://emm.agnitas.de/manual/de/pdf/webservice_pdf_de.pdf
+https://support.klicktipp.com/article/388-rest-application-programming-interface-api
 
 #>
 
@@ -97,21 +96,12 @@ $modulename = "KTFERGE"
 #
 ################################################
 
-#https://support.klicktipp.com/article/388-rest-application-programming-interface-api
-
-
-$restParams = @{
-    "Method" = "Get"
-    "Uri" = "$( $settings.base )/subscriber.json"
-    "ContentType" = $settings.contentType
-    "Headers" = $headers
-    "Verbose" = $true
-}
-
-$subscriber = Invoke-RestMethod @restParams
-
-# parse through the single arrays of each subscriber
+# Load all subscribers
+. ".\bin\load_subscribers.ps1"
 
 # Do the end stuff
 . ".\bin\end.ps1"
 
+
+#Write-Host -NoNewLine 'Press any key to continue...';
+#$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');

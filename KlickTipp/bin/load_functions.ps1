@@ -13,6 +13,7 @@ $libExecutables | ForEach {
     "... $( $_.FullName )"
     
 }
+#>
 
 # Load dll files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
@@ -20,6 +21,6 @@ $libExecutables | ForEach {
     "Loading $( $_.FullName )"
     [Reflection.Assembly]::LoadFile($_.FullName) 
 }
-#>
+
 
 Add-Type -AssemblyName System.Security

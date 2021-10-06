@@ -31,3 +31,11 @@ _dev
 *.xml
 *.txt
 *.json
+*.sqlite
+
+
+*.pdb
+
+# executables and config files
+*.exe*
+*.dll*

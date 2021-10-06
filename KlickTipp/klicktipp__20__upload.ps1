@@ -22,11 +22,27 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
-        mode= "process"
-	    abc= "def"
-	    Username= "abc"
+
+        # Integration parameters
+        scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
+        mode= "tags"
+
+        # PeopleStage parameters
+        TransactionType = "Replace"
+        Password = "b"
+        MessageName = ""
+        EmailFieldName = "email"
+        SmsFieldName = ""
+        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt"
+        ReplyToEmail = "" 
+        Username = "a"
+        ReplyToSMS = ""
+        UrnFieldName = "Kunden ID"
+        ListName = "7883836 | +AptecoOrbit"
+        CommunicationKeyFieldName = "Communication Key"
+
+        # Parameters from previous script
+
     }
 }
 
@@ -39,8 +55,7 @@ if ( $debug ) {
 
 <#
 
-https://ws.agnitas.de/2.0/emmservices.wsdl
-https://emm.agnitas.de/manual/de/pdf/webservice_pdf_de.pdf
+https://support.klicktipp.com/article/388-rest-application-programming-interface-api
 
 #>
 
@@ -97,78 +112,233 @@ $modulename = "KTUPLOAD"
 #
 ################################################
 
-#https://support.klicktipp.com/article/388-rest-application-programming-interface-api
-
+#$settings.upload.klickTippIdField
+exit 0
 switch ( $params.mode ) {
 
+    #-----------------------------------------------
+    # ADD/REMOVE TAG
+    #-----------------------------------------------
+
+
     "tags" {
-        $restParams = @{
+
+        # Split the listname string
+        $listnameSplit = $params.ListName -split $settings.nameConcatChar,2,"SimpleMatch"
+        $tagId = $listnameSplit[0]
+        $tagName = $listnameSplit[1]
+
+        # Load existing tags
+        $restParams = $defaultRestParams + @{
             "Method" = "Get"
             "Uri" = "$( $settings.base )/tag.json"
-            "ContentType" = $settings.contentType
-            "Headers" = $headers
-            "Verbose" = $true
         }
         $tags = Invoke-RestMethod @restParams
 
-        #'/subscriber/tag', 'POST', email+tagids
-        #'/subscriber/untag', 'POST', email+tagid
-
-    }
-
-    "lists" {
-        $restParams = @{
-            "Method" = "Get"
-            "Uri" = "$( $settings.base )/list.json"
-            "ContentType" = $settings.contentType
-            "Headers" = $headers
-            "Verbose" = $true
+        # Transform tags
+        $tagList = [System.Collections.ArrayList]@()
+        $tags.psobject.members | where { $_.MemberType -eq "NoteProperty" } | ForEach {
+            $tag = $_
+            [void]$tagList.add([PSCustomObject]@{
+                "id" = $tag.Name
+                "name" = $tag.Value
+            })
         }
-        $lists = Invoke-RestMethod @restParams
+        
+        # Check if tag is still valid
+        if ( $taglist.id -contains $tagid ) {
+        
+            # TODO  [ ] create the loops here
+            Switch ( $tagName.Substring(0,1) ) {
+
+                "+" {
+
+                    $restParams = $defaultRestParams + @{
+                        "Method" = "Post"
+                        "Uri" = "$( $settings.base )/subscriber/tag.json"
+                        "Body" = @{
+                            "email" = ""
+                            "tagids" = $tagId
+                        } | ConvertTo-Json -Depth 99
+                    }
+                    $addTag = Invoke-RestMethod @restParams        
+            
+                }
+
+                "-" {
+
+                    $restParams = $defaultRestParams + @{
+                        "Method" = "Post"
+                        "Uri" = "$( $settings.base )/subscriber/untag.json"
+                        "Body" = @{
+                            "email" = ""
+                            "tagid" = $tagId
+                        } | ConvertTo-Json -Depth 99
+                    }
+                    $removeTag = Invoke-RestMethod @restParams
+
+                }
+
+            }
+
+        } else {
+
+            Write-Log -message "Tag '$( $params.ListName )' does not exist" -severity ( [Logseverity]::WARNING )
+            throw [System.IO.InvalidDataException] "Tag '$( $params.ListName )' does not exist"
+        
+        }
+
+        exit 0
     }
-    
+
+    #-----------------------------------------------
+    # SUBSCRIBE / UNSUBSCRIBE
+    #-----------------------------------------------   
+
     # Setup if setting is not present or not tags
     default {
+        
+        # Split the listname string
+        $listnameSplit = $params.ListName -split $settings.nameConcatChar,2,"SimpleMatch"
+        $process = $listnameSplit[0]
+
+
         $list = $modeList
 
-        #'/subscriber', 'POST', $data
-        #'/subscriber/unsubscribe', 'POST', email
-        <#
-        $subscriberdata @{
-            email = ""
-            smsnumber = ""
-            listid = 0
-            tagid = 0
-            fields = @{
-        
-            }
+        # Load fields
+        $restParams = $defaultRestParams + @{
+            "Method" = "Get"
+            "Uri" = "$( $settings.base )/field.json"
         }
-        #>
+        $fieldsRaw = Invoke-RestMethod @restParams
+
+        # Bring fields into right order
+        $fields = [ordered]@{}
+        $fieldsRaw.psobject.Properties | ForEach {
+            $field = $_
+            $fields.Add($field.name,$field.value)
+        }
+
+        switch ( $process ) {
+
+            # subscribe
+            "10" {
+
+
+                $restParams = $defaultRestParams + @{
+                    "Method" = "Post"
+                    "Uri" = "$( $settings.base )/subscriber.json"
+                    "Body" = @{
+                        email = "florian.von.bracht@apteco.de"
+                        #smsnumber = ""
+                        #listid = 0
+                        #tagid = 0
+                        fields = @{
+                            "fieldFirstName" = "Florian"
+                            "fieldLastName" = "vön Bracht"
+                            "fieldZip" = "52080"
+                        }
+                    } | ConvertTo-Json -Depth 99
+                }
+                $subscribedUser = Invoke-RestMethod @restParams
+
+                # TODO [ ] Write this user result directly to database
+
+            }
+
+            # update
+            "20" {
+
+                $restParams = $defaultRestParams + @{
+                    "Method" = "Put"
+                    "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
+                    "Body" = @{
+                        fields = @{
+                            "fieldFirstName" = "Florian"
+                            "fieldLastName" = "vön Bracht"
+                            "fieldZip" = "52080"
+                        }
+                        #newemail = ""
+                        #newsmsnumber = ""
+                    } | ConvertTo-Json -Depth 99
+                }
+                $updatedUser = Invoke-RestMethod @restParams
+
+            }
+
+            # unsubscribe
+            "30" {
+
+                $restParams = $defaultRestParams + @{
+                    "Method" = "Post"
+                    "Uri" = "$( $settings.base )/subscriber/unsubscribe.json"
+                    "Body" = @{
+                        email = "florian.von.bracht@apteco.de"
+                    } | ConvertTo-Json -Depth 99
+                }
+                $unsubscribedUser = Invoke-RestMethod @restParams
+
+            }
+
+            # delete
+            "40" {
+
+                $restParams = $defaultRestParams + @{
+                    "Method" = "Delete"
+                    "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
+                }
+                $deletedUser = Invoke-RestMethod @restParams
+
+            }
+
+        }
+
+
+
+
     }
 
 }
-
-$restParams = @{
-    "Method" = "Get"
-    "Uri" = "$( $settings.base )/field.json"
-    "ContentType" = $settings.contentType
-    "Headers" = $headers
-    "Verbose" = $true
-}
-
-$fields = Invoke-RestMethod @restParams
-
 
 # Do the end stuff
 . ".\bin\end.ps1"
 
+exit 0
 
 ################################################
 #
-# RETURN
+# RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
 
-# real messages
-#return $messages
+$queued = $dataCsv.Count
 
+If ( $queued -eq 0 ) {
+    Write-Host "Throwing Exception because of 0 records"
+    throw [System.IO.InvalidDataException] "No records were successfully uploaded"  
+}
+
+# return object
+$return = [Hashtable]@{
+
+    # Mandatory return values
+    "Recipients"        = $queued 
+    "TransactionId"     = $result.correlationId
+
+    # General return value to identify this custom channel in the broadcasts detail tables
+    "CustomProvider"    = $moduleName
+    "ProcessId"         = $processId
+
+    # Some more information for the broadcasts script
+    #"Path"              = $params.Path
+    #"UrnFieldName"      = $params.UrnFieldName
+    #"CorrelationId"     = $result.correlationId
+
+    # More information about the different status of the import
+    #"RecipientsIgnored" = $ignored
+    #"RecipientsQueued" = $queued
+
+}
+
+# return the results
+$return
