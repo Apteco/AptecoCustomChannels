@@ -155,9 +155,14 @@ Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WAR
 #-----------------------------------------------
 
 # TODO [ ] ask for a password
+#$username = Read-Host -Prompt "Please enter your klicktipp username" 
+#$password = Read-Host -Prompt "Please enter your klicktipp password" -AsSecureString
+
+
 $passwordEncrypted = Get-PlaintextToSecure ([System.Management.Automation.PSCredential]::new("dummy",$password).GetNetworkCredential().Password)
 
 $auth = @{
+    "username" = $username          # A shared secret for authentication.
     "password" = $passwordEncrypted                   # A shared secret used for signing the JWT you generated.   
 }
 
@@ -303,7 +308,16 @@ try {
         "Uri" = "$( $settings.base )/field.json"
     }
     $fieldsRaw = Invoke-RestMethod @restParams
+
     Write-Log -message "Looks like the API access has worked"
+
+    Write-Log -message "This account has the following fields:"
+
+    # Bring fields into right order
+    $fields = [ordered]@{}
+    $fieldsRaw.psobject.Properties | ForEach {
+        Write-Log -message "    $( $_.name )"
+    }
 
 } catch {
 

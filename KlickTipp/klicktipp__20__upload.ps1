@@ -25,21 +25,21 @@ if ( $debug ) {
 
         # Integration parameters
         scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
-        mode= "tags"
+        mode = 'tags'
 
         # PeopleStage parameters
-        TransactionType = "Replace"
-        Password = "b"
-        MessageName = ""
-        EmailFieldName = "email"
-        SmsFieldName = ""
-        Path = "d:\faststats\Publish\Handel\system\Deliveries\PowerShell_34362  30449  Kampagne A  Aktiv  UPLOAD_52af38bc-9af1-428e-8f1d-6988f3460f38.txt"
-        ReplyToEmail = "" 
-        Username = "a"
-        ReplyToSMS = ""
-        UrnFieldName = "Kunden ID"
-        ListName = "7883836 | +AptecoOrbit"
-        CommunicationKeyFieldName = "Communication Key"
+        TransactionType = 'Replace'
+        Password = 'b'
+        MessageName = '7883836 | +AptecoOrbit'
+        EmailFieldName = 'email'
+        SmsFieldName = ''
+        Path = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\KlickTipp\PowerShell_7883836  +AptecoOrbit_36f272d5-e72d-4bd0-83c5-d8368b96c8cd.txt"
+        ReplyToEmail = ''
+        Username = 'a'
+        ReplyToSMS = ''
+        UrnFieldName = 'Kunden ID'
+        ListName = '7883836 | +AptecoOrbit'
+        CommunicationKeyFieldName = 'Communication Key'
 
         # Parameters from previous script
 
@@ -112,14 +112,18 @@ $modulename = "KTUPLOAD"
 #
 ################################################
 
-#$settings.upload.klickTippIdField
-exit 0
+# Load the input csv
+$csv = @( import-csv -Path $params.path -Delimiter "`t" -Encoding utf8 )
+
+# The counters for logging later
+$successful = 0
+$failed = 0
+
 switch ( $params.mode ) {
 
     #-----------------------------------------------
     # ADD/REMOVE TAG
     #-----------------------------------------------
-
 
     "tags" {
 
@@ -153,29 +157,69 @@ switch ( $params.mode ) {
 
                 "+" {
 
-                    $restParams = $defaultRestParams + @{
-                        "Method" = "Post"
-                        "Uri" = "$( $settings.base )/subscriber/tag.json"
-                        "Body" = @{
-                            "email" = ""
-                            "tagids" = $tagId
-                        } | ConvertTo-Json -Depth 99
-                    }
-                    $addTag = Invoke-RestMethod @restParams        
+
+                    $csv | ForEach {
+
+                        # Read current row
+                        $row = $_
+
+                        # Prepare adding the tag
+                        $restParams = $defaultRestParams + @{
+                            "Method" = "Post"
+                            "Uri" = "$( $settings.base )/subscriber/tag.json"
+                            "Body" = @{
+                                "email" = $row.( $params.EmailFieldName )
+                                "tagids" = $tagId
+                            } | ConvertTo-Json -Depth 99
+                        }
+                        
+                        # Add the tag
+                        $addTag = $false
+                        try {
+                            $addTag = Invoke-RestMethod @restParams
+                        } catch {}
+                        
+                        # Increase counters
+                        If ( $addTag ) {
+                            $successful += 1
+                        } else {
+                            $failed += 1
+                        }
+
+                    } 
             
                 }
 
                 "-" {
 
-                    $restParams = $defaultRestParams + @{
-                        "Method" = "Post"
-                        "Uri" = "$( $settings.base )/subscriber/untag.json"
-                        "Body" = @{
-                            "email" = ""
-                            "tagid" = $tagId
-                        } | ConvertTo-Json -Depth 99
+                    $csv | ForEach {
+
+                        # Read current row
+                        $row = $_
+                    
+                        $restParams = $defaultRestParams + @{
+                            "Method" = "Post"
+                            "Uri" = "$( $settings.base )/subscriber/untag.json"
+                            "Body" = @{
+                                "email" = $row.( $params.EmailFieldName )
+                                "tagid" = $tagId
+                            } | ConvertTo-Json -Depth 99
+                        }
+
+                        # Add the tag
+                        $removeTag = $false
+                        try {
+                            $removeTag = Invoke-RestMethod @restParams
+                        } catch {}
+                        
+                        # Increase counters
+                        If ( $removeTag ) {
+                            $successful += 1
+                        } else {
+                            $failed += 1
+                        }
+
                     }
-                    $removeTag = Invoke-RestMethod @restParams
 
                 }
 
@@ -188,20 +232,19 @@ switch ( $params.mode ) {
         
         }
 
-        exit 0
     }
+
 
     #-----------------------------------------------
     # SUBSCRIBE / UNSUBSCRIBE
     #-----------------------------------------------   
 
-    # Setup if setting is not present or not tags
+    # Setup if mode parameter is not present or not "tags"
     default {
         
         # Split the listname string
         $listnameSplit = $params.ListName -split $settings.nameConcatChar,2,"SimpleMatch"
         $process = $listnameSplit[0]
-
 
         $list = $modeList
 
@@ -249,6 +292,8 @@ switch ( $params.mode ) {
             # update
             "20" {
 
+                #$settings.upload.klickTippIdField
+
                 $restParams = $defaultRestParams + @{
                     "Method" = "Put"
                     "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
@@ -283,6 +328,8 @@ switch ( $params.mode ) {
             # delete
             "40" {
 
+                #$settings.upload.klickTippIdField
+
                 $restParams = $defaultRestParams + @{
                     "Method" = "Delete"
                     "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
@@ -303,7 +350,6 @@ switch ( $params.mode ) {
 # Do the end stuff
 . ".\bin\end.ps1"
 
-exit 0
 
 ################################################
 #
@@ -311,7 +357,7 @@ exit 0
 #
 ################################################
 
-$queued = $dataCsv.Count
+$queued = $successful
 
 If ( $queued -eq 0 ) {
     Write-Host "Throwing Exception because of 0 records"
@@ -323,7 +369,7 @@ $return = [Hashtable]@{
 
     # Mandatory return values
     "Recipients"        = $queued 
-    "TransactionId"     = $result.correlationId
+    "TransactionId"     = $processId
 
     # General return value to identify this custom channel in the broadcasts detail tables
     "CustomProvider"    = $moduleName
@@ -335,8 +381,8 @@ $return = [Hashtable]@{
     #"CorrelationId"     = $result.correlationId
 
     # More information about the different status of the import
-    #"RecipientsIgnored" = $ignored
-    #"RecipientsQueued" = $queued
+    "RecipientsIgnored" = $failed
+    "RecipientsQueued" = $queued
 
 }
 
