@@ -6,27 +6,31 @@ Function Format-SoapParameter {
         ,[Parameter(Mandatory=$true)][Hashtable]$var
         #,[Parameter(Mandatory=$false)][array]$customFields = @()
     )
-    
-    # if the datatype is set manually
-    #if ( $var -is "System.Collections.Hashtable") {
-        #$noDimensions = Count-Dimensions -var $var.value
-        $datatype = $var.type
-        $value = $var.value
-    #} else {
-        #$noDimensions = Count-Dimensions -var $var
-#        $value = $var
-#    }
 
-    #$xmlRaw = "<ns1:$( $key ) xsi:type=""xsd:$( $datatype )"">$( [System.Security.SecurityElement]::Escape( $value ) )</ns1:$( $key )>"
+    $datatype = $var.type
 
-    $xmlRaw = @"
-            <ns1:$( $key )>$( [System.Security.SecurityElement]::Escape( $value ) )</ns1:$( $key )>
+    if ( $var.value -is [array]) {
+
+        $value = ""
+        $var.value | ForEach {
+            $subvar = [Hashtable]@{
+                "type" = ""
+                "value" = $_
+            }
+            $value += Format-SoapParameter -key $var.subtype -var $subvar
+        }
+
+    } else {
+
+        $value = [System.Security.SecurityElement]::Escape( $var.value )
+
+    }
+
+
+    $xmlRaw += @"
+    <ns1:$( $key )>$( $value )</ns1:$( $key )>
 "@
 
-    #$xml = @"
-    #<ns1:$( $key )>$( $var )</ns1:$( $key )>
-#
-#"@
     return $xmlRaw
 
 }
@@ -38,7 +42,7 @@ Function Invoke-Agnitas {
     param(
          [Parameter(Mandatory=$true)][String]$method
         #,[Parameter(Mandatory=$true)][Hashtable]$wsse
-        ,[Parameter(Mandatory=$false)][Hashtable]$param = @{}
+        ,[Parameter(Mandatory=$false)]$param = [Hashtable]@{}
         #,[Parameter(Mandatory=$false)][String]$responseNode = "" # you should either define responseNode or responseType
         #,[Parameter(Mandatory=$false)][String]$responseType = "" # you should either define responseNode or responseType
         ,[Parameter(Mandatory=$false)][switch]$verboseCall = $false
@@ -73,6 +77,7 @@ Function Invoke-Agnitas {
         }
 
         # create SOAP envelope
+        
         $soapEnvelopeXml = @"
 <?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="$( $namespace )">
@@ -92,7 +97,8 @@ $( $paramXml )
         </ns1:$( $method )Request>
     </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>
-"@        
+"@
+
 
         # Write out and log the request
         if ( $verboseCall ) {
