@@ -104,7 +104,7 @@ $str = "54368 | Zielgruppe_mit_sendID"
 $targetGroup = [TargetGroup]::new($str)
 
 $eql = @"
-`send_id` = 'def'
+`send_id` = '$( $processId )'
 "@
 
 
@@ -118,7 +118,7 @@ $param = @{
 
     description = [Hashtable]@{
         type = "string"
-        value = "Hello World"
+        value = "Hello World Da draussen"
     }
 
     eql = [Hashtable]@{

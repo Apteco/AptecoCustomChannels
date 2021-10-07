@@ -99,7 +99,7 @@ $modulename = "EMMGETMESSAGES"
 $mailings = Invoke-Agnitas -method "ListMailings" -verboseCall #-wsse $wsse #-verboseCall
 $mailings.item | Out-GridView
 
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
+$messages = $mailings.item | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
 
 
 ################################################
