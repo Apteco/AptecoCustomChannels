@@ -59,7 +59,7 @@ if ( $debug ) {
 } else {
     $scriptPath = "$( $params.scriptPath )" 
 }
-Set-Location -Path $scriptPath
+Set-Location -Path "$( $scriptPath )"
 
 
 ################################################

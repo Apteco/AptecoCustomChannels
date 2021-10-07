@@ -1,6 +1,3 @@
-Upload only channel, no field creation
-
-
 # Prerequisites
 
 - Premium Klicktipp Package
@@ -8,7 +5,7 @@ Upload only channel, no field creation
 - Apteco Administrator for setting up this channel
 - Remote Access to Apteco Server for initial setup
 
-- PeopleStage needs to be configured to fill the column subscriberId, if already present
+- PeopleStage needs to be configured to fill the column `subscriberId`, if already present
 
 # Notes
 
@@ -22,8 +19,10 @@ Upload only channel, no field creation
   - Datum
   - Zeit
   - Datum & Zeit
+- This is an upload only channel, no field creation supported yet
 
-# Modes
+
+# Channel Modes
 
 ## Tagging
 
@@ -36,13 +35,15 @@ Tags can be used for to filter the target groups for
 
 But also trigger Outbounds, which contacts a webhooks endpoint with the data setup in the outbound
 
-The tagging is using the email address as the identifier, so does not need the subscriber id here
+The tagging is using the email address as the identifier, so does not need the `subscriberId` here
 
 If a subscriber gets a tag that it already have, then the update is still marked as successful.
 
+To use tagging, please configure the integration parameter `mode=tags`
+
 ## Subscribing
 
-Support operations
+Supported operations
 - Subscribe
 - Update
 - Unsubscribe

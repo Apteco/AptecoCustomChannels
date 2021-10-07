@@ -92,7 +92,7 @@ if ( $settingsFile -eq "" -or $null -eq $settingsFile) {
 }
 
 # Check if filename is valid
-if(Test-Path -LiteralPath $settingsFile -IsValid ) {
+if(Test-Path -LiteralPath "$( $settingsFile )" -IsValid ) {
     Write-Host "SettingsFile '$( $settingsFile )' is valid"
 } else {
     Write-Host "SettingsFile '$( $settingsFile )' contains invalid characters"
@@ -118,7 +118,7 @@ if ( $logfile -eq "" -or $null -eq $logfile) {
 }
 
 # Check if filename is valid
-if(Test-Path -LiteralPath $logfile -IsValid ) {
+if(Test-Path -LiteralPath "$( $logfile )" -IsValid ) {
     Write-Host "Logfile '$( $logfile )' is valid"
 } else {
     Write-Host "Logfile '$( $logfile )' contains invalid characters"
@@ -259,10 +259,10 @@ $settings = @{
 ################################################
 
 # rename settings file if it already exists
-If ( Test-Path -Path $settingsFile ) {
+If ( Test-Path -Path "$( $settingsFile )" ) {
     $backupPath = "$( $settingsFile ).$( $timestamp.ToString("yyyyMMddHHmmss") )"
     Write-Log -message "Moving previous settings file to $( $backupPath )" -severity ( [Logseverity]::WARNING )
-    Move-Item -Path $settingsFile -Destination $backupPath
+    Move-Item -Path "$( $settingsFile )" -Destination "$( $backupPath )"
 } else {
     Write-Log -message "There was no settings file existing yet"
 }
@@ -274,7 +274,7 @@ $json = $settings | ConvertTo-Json -Depth 99 # -compress
 $json
 
 # save settings to file
-$json | Set-Content -path $settingsFile -Encoding UTF8
+$json | Set-Content -path "$( $settingsFile )" -Encoding UTF8
 
 
 
@@ -368,9 +368,9 @@ $tagsToCreate | ForEach {
 
 # Creating the lib folder for the sqlite stuff
 $libFolder = ".\$( $libSubfolder )"
-if ( !(Test-Path -Path $libFolder) ) {
+if ( !(Test-Path -Path "$( $libFolder )") ) {
     Write-Log -message "lib folder '$( $libFolder )' does not exist. Creating the folder now!"
-    New-Item -Path $libFolder -ItemType Directory
+    New-Item -Path "$( $libFolder )" -ItemType Directory
 }
 
 
@@ -408,7 +408,7 @@ if ( $libExecutables.Name -notcontains $sqliteDll ) {
 
 
 # Create database if it does not exist
-If ( -not (Test-Path -Path $settings.sqliteDB ) ) {
+If ( -not (Test-Path -Path "$( $settings.sqliteDB )" ) ) {
 
     # Load functions and new assemblies
     . ".\bin\load_functions.ps1"

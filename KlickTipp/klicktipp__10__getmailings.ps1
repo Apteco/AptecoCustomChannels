@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -70,7 +70,7 @@ if ( $debug ) {
 } else {
     $scriptPath = "$( $params.scriptPath )" 
 }
-Set-Location -Path $scriptPath
+Set-Location -Path "$( $scriptPath )"
 
 
 ################################################

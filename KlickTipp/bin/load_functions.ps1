@@ -2,7 +2,7 @@
 # Load all PowerShell Code
 "Loading..."
 Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
+    . "$( $_.FullName )"
     "... $( $_.FullName )"
 }
 
@@ -19,7 +19,7 @@ $libExecutables | ForEach {
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
 $libExecutables | ForEach {
     "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
+    [Reflection.Assembly]::LoadFile("$( $_.FullName )") 
 }
 
 

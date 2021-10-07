@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -24,21 +24,21 @@ if ( $debug ) {
     $params = [hashtable]@{
 
         # Integration parameters
-        scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
-        mode = 'tags'
+        scriptPath = 'D:\Scripts\KlickTipp'
+        mode = 'subscribtion'
 
         # PeopleStage parameters
         TransactionType = 'Replace'
         Password = 'b'
-        MessageName = '7883836 | +AptecoOrbit'
+        MessageName = '10 | subscribe'
         EmailFieldName = 'email'
         SmsFieldName = ''
-        Path = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\KlickTipp\PowerShell_7883836  +AptecoOrbit_36f272d5-e72d-4bd0-83c5-d8368b96c8cd.txt"
+        Path = 'd:\faststats\Publish\Handel\system\Deliveries\PowerShell_10  subscribe_5489da76-fd7d-4608-83b7-3f973de38895.txt'
         ReplyToEmail = ''
         Username = 'a'
         ReplyToSMS = ''
         UrnFieldName = 'Kunden ID'
-        ListName = '7883836 | +AptecoOrbit'
+        ListName = '10 | subscribe'
         CommunicationKeyFieldName = 'Communication Key'
 
         # Parameters from previous script
@@ -75,7 +75,7 @@ if ( $debug ) {
 } else {
     $scriptPath = "$( $params.scriptPath )" 
 }
-Set-Location -Path $scriptPath
+Set-Location -Path "$( $scriptPath )"
 
 
 ################################################
@@ -113,7 +113,9 @@ $modulename = "KTUPLOAD"
 ################################################
 
 # Load the input csv
-$csv = @( import-csv -Path $params.path -Delimiter "`t" -Encoding utf8 )
+$csv = @( import-csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding utf8 )
+
+Write-Log "Loaded the data with $( $csv.Count ) records"
 
 # The counters for logging later
 $successful = 0
@@ -177,7 +179,7 @@ switch ( $params.mode ) {
                         $addTag = $false
                         try {
                             $addTag = Invoke-RestMethod @restParams
-                        } catch {}
+                        } catch {} # Just ignore errors and count it as failed
                         
                         # Increase counters
                         If ( $addTag ) {
@@ -210,7 +212,7 @@ switch ( $params.mode ) {
                         $removeTag = $false
                         try {
                             $removeTag = Invoke-RestMethod @restParams
-                        } catch {}
+                        } catch {} # Just ignore errors and count it as failed
                         
                         # Increase counters
                         If ( $removeTag ) {
@@ -242,6 +244,24 @@ switch ( $params.mode ) {
     # Setup if mode parameter is not present or not "tags"
     default {
         
+        # Make connection to reflect changes here directly in the database
+        $connection = [System.Data.SQLite.SQLiteConnection]::new()
+        $connection.ConnectionString = "Data Source=$( $settings.sqliteDb );Version=3;New=True;"
+        $connection.Open()
+        $command = [System.Data.SQLite.SQLiteCommand]::new($connection)
+
+        # Prepare command for inserting rows
+        $insertedRows = 0
+        $insertStatementItems = @"
+        INSERT INTO
+            items(id, object, ExtractTimestamp, properties)
+        VALUES
+            (@id, @object, @ExtractTimestamp, @properties)
+"@
+
+        # Create transaction
+        $sqliteTransaction = $connection.BeginTransaction()
+
         # Split the listname string
         $listnameSplit = $params.ListName -split $settings.nameConcatChar,2,"SimpleMatch"
         $process = $listnameSplit[0]
@@ -257,92 +277,286 @@ switch ( $params.mode ) {
 
         # Bring fields into right order
         $fields = [ordered]@{}
+        $klickTippColumns = [System.Collections.ArrayList]@()
         $fieldsRaw.psobject.Properties | ForEach {
             $field = $_
             $fields.Add($field.name,$field.value)
+            [void]$klickTippColumns.add($field.Name)
         }
+
+        # Compare the columns between the CSV and KlickTipp
+        $csvColumns = ( $csv | Get-Member -MemberType NoteProperty ).Name
+        $difference = Compare -ReferenceObject $klickTippColumns -DifferenceObject $csvColumns -IncludeEqual 
+        $equalColumns = ( $difference | where { $_.SideIndicator -eq "==" } ).InputObject
+        $columnsOnlyCsv = ( $difference | where { $_.SideIndicator -eq "=>" } ).InputObject
+        $columnsOnlyKlickTipp = ( $difference | where { $_.SideIndicator -eq "<=" } ).InputObject
+
+        Write-Log -message "Equal columns: $( $equalColumns -join ", " )"
+        Write-Log -message "Columns only CSV: $( $columnsOnlyCsv -join ", " )"
+        Write-Log -message "Columns only KlickTipp: $( $columnsOnlyKlickTipp -join ", " )"
 
         switch ( $process ) {
 
             # subscribe
             "10" {
 
+                $csv | ForEach {
 
-                $restParams = $defaultRestParams + @{
-                    "Method" = "Post"
-                    "Uri" = "$( $settings.base )/subscriber.json"
-                    "Body" = @{
-                        email = "florian.von.bracht@apteco.de"
-                        #smsnumber = ""
-                        #listid = 0
-                        #tagid = 0
-                        fields = @{
-                            "fieldFirstName" = "Florian"
-                            "fieldLastName" = "vön Bracht"
-                            "fieldZip" = "52080"
-                        }
-                    } | ConvertTo-Json -Depth 99
+                    # Read current row
+                    $row = $_
+
+                    # Prepare fields object
+                    $fields = [Ordered]@{}
+                    $equalColumns | ForEach {
+                        $fields.Add($_, $row.$_)
+                    }
+
+                    # Prepare adding the subscriber
+                    $restParams = $defaultRestParams + @{
+                        "Method" = "Post"
+                        "Uri" = "$( $settings.base )/subscriber.json"
+                        "Body" = [ordered]@{
+                            email = $row.( $params.EmailFieldName )
+                            #smsnumber = ""
+                            #listid = 0
+                            #tagid = 0
+                            fields = $fields
+                        } | ConvertTo-Json -Depth 99
+                    }
+
+                    # Add the subscriber
+                    $addSubscriber = $false
+                    try {
+
+                        $subscribedUser = Invoke-RestMethod @restParams
+
+                        $addSubscriber = $true
+
+                        # Add to database
+                        $command.CommandText = $insertStatementItems
+                        [void]$command.Parameters.AddWithValue("@object", "subscriber")        
+                        [void]$command.Parameters.AddWithValue("@ExtractTimestamp", $timestamp.tostring("yyyyMMddHHmmss"))
+                        [void]$command.Parameters.AddWithValue("@id", $subscribedUser.id)
+                        [void]$command.Parameters.AddWithValue("@properties", ( $subscribedUser | ConvertTo-Json -Compress -Depth 99 ))
+                        [void]$command.Prepare()
+                        $insertedRows += $command.ExecuteNonQuery()
+
+                    } catch {}
+
+                    # Increase counters
+                    If ( $addSubscriber ) {
+                        $successful += 1
+                    } else {
+                        $failed += 1
+                    }
+
+
                 }
-                $subscribedUser = Invoke-RestMethod @restParams
-
-                # TODO [ ] Write this user result directly to database
 
             }
 
             # update
             "20" {
 
-                #$settings.upload.klickTippIdField
+                If ( $csvColumns -contains $settings.upload.klickTippIdField ) {
 
-                $restParams = $defaultRestParams + @{
-                    "Method" = "Put"
-                    "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
-                    "Body" = @{
-                        fields = @{
-                            "fieldFirstName" = "Florian"
-                            "fieldLastName" = "vön Bracht"
-                            "fieldZip" = "52080"
+                    $csv | ForEach {
+
+                        # Read current row
+                        $row = $_
+                        
+                        # Check if subscriber id is filled
+                        $subscriberId = $row.( $settings.upload.klickTippIdField )
+                        If ( $subscriberId ) {
+
+                            # Prepare fields object
+                            $fields = [Ordered]@{}
+                            $equalColumns | ForEach {
+                                $fields.Add($_, $row.$_)
+                            }
+
+                            # Prepare API call
+                            $restParams = $defaultRestParams + @{
+                                "Method" = "Put"
+                                "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
+                                "Body" = [ordered]@{
+                                    fields = $fields
+                                    #newemail = ""
+                                    #newsmsnumber = ""
+                                } | ConvertTo-Json -Depth 99
+                            }
+            
+                            # Add the subscriber
+                            $updated = $false
+                            try {
+        
+                                $updatedUser = Invoke-RestMethod @restParams
+        
+                                $updated = $true
+
+                                # The updating does not deliver the whole object, so no need to put it back to database
+                                # TODO [ ] Think about if it makes sense to reload the subscriber object and write it to the database
+                                <#
+                                $restParams = $defaultRestParams + @{
+                                    "Method" = "Get"
+                                    "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
+                                }
+                                $subscriber = Invoke-RestMethod @restParams
+
+                                # Add to database
+                                $command.CommandText = $insertStatementItems
+                                [void]$command.Parameters.AddWithValue("@object", "subscriber")        
+                                [void]$command.Parameters.AddWithValue("@ExtractTimestamp", $timestamp.tostring("yyyyMMddHHmmss"))
+                                [void]$command.Parameters.AddWithValue("@id", $subscriberId)
+                                [void]$command.Parameters.AddWithValue("@properties", ( $subscriber | ConvertTo-Json -Compress -Depth 99 ))
+                                [void]$command.Prepare()
+                                $insertedRows += $command.ExecuteNonQuery()
+
+                                #>
+        
+                            } catch {}
+        
+                            # Increase counters
+                            If ( $updated ) {
+                                $successful += 1
+                            } else {
+                                $failed += 1
+                            }
+
+
+                        } else {
+                            $msg = "Subscriber id for $( $row.( $params.EmailFieldName ) ) not filled"
+                            Write-Log -message $msg -severity ( [Logseverity]::WARNING )
                         }
-                        #newemail = ""
-                        #newsmsnumber = ""
-                    } | ConvertTo-Json -Depth 99
+                        
+                    }
+
+
+                } else {
+                    $msg = "No subscriberID column from KlickTipp is present"
+                    Write-Log -message $msg -severity ( [Logseverity]::ERROR )
+                    throw [System.IO.InvalidDataException] $msg
                 }
-                $updatedUser = Invoke-RestMethod @restParams
 
             }
 
             # unsubscribe
             "30" {
 
-                $restParams = $defaultRestParams + @{
-                    "Method" = "Post"
-                    "Uri" = "$( $settings.base )/subscriber/unsubscribe.json"
-                    "Body" = @{
-                        email = "florian.von.bracht@apteco.de"
-                    } | ConvertTo-Json -Depth 99
+                $csv | ForEach {
+
+                    # Read current row
+                    $row = $_
+
+                    $restParams = $defaultRestParams + @{
+                        "Method" = "Post"
+                        "Uri" = "$( $settings.base )/subscriber/unsubscribe.json"
+                        "Body" = @{
+                            email = $row.( $params.EmailFieldName )
+                        } | ConvertTo-Json -Depth 99
+                    }
+
+                    # Add the subscriber
+                    $unsubscribed = $false
+                    try {
+
+                        $unsubscribedUser = Invoke-RestMethod @restParams
+
+                        $unsubscribed = $true
+
+                        # Add to database
+                        $command.CommandText = $insertStatementItems
+                        [void]$command.Parameters.AddWithValue("@object", "unsubscriber")        
+                        [void]$command.Parameters.AddWithValue("@ExtractTimestamp", $timestamp.tostring("yyyyMMddHHmmss"))
+                        [void]$command.Parameters.AddWithValue("@id", $row.( $params.EmailFieldName ))
+                        [void]$command.Parameters.AddWithValue("@properties", $null)
+                        [void]$command.Prepare()
+                        $insertedRows += $command.ExecuteNonQuery()
+
+                    } catch {}
+
+                    # Increase counters
+                    If ( $unsubscribed ) {
+                        $successful += 1
+                    } else {
+                        $failed += 1
+                    }
+                    
                 }
-                $unsubscribedUser = Invoke-RestMethod @restParams
 
             }
 
             # delete
             "40" {
+                
+                If ( $csvColumns -contains $settings.upload.klickTippIdField ) {
 
-                #$settings.upload.klickTippIdField
+                    $csv | ForEach {
 
-                $restParams = $defaultRestParams + @{
-                    "Method" = "Delete"
-                    "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
+                        # Read current row
+                        $row = $_
+                        
+                        # Check if subscriber id is filled
+                        $subscriberId = $row.( $settings.upload.klickTippIdField )
+                        If ( $subscriberId ) {
+
+                            $restParams = $defaultRestParams + @{
+                                "Method" = "Delete"
+                                "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ) ).json"
+                            }
+        
+                            # Add the subscriber
+                            $deleted = $false
+                            try {
+        
+                                $deletedUser = Invoke-RestMethod @restParams
+        
+                                $deleted = $true
+                                
+                                # Add to database
+                                $command.CommandText = $insertStatementItems
+                                [void]$command.Parameters.AddWithValue("@object", "delete")        
+                                [void]$command.Parameters.AddWithValue("@ExtractTimestamp", $timestamp.tostring("yyyyMMddHHmmss"))
+                                [void]$command.Parameters.AddWithValue("@id", $subscriberId )
+                                [void]$command.Parameters.AddWithValue("@properties", $null)
+                                [void]$command.Prepare()
+                                $insertedRows += $command.ExecuteNonQuery()
+                                        
+                            } catch {}
+        
+                            # Increase counters
+                            If ( $deleted ) {
+                                $successful += 1
+                            } else {
+                                $failed += 1
+                            }
+
+
+                        } else {
+                            $msg = "Subscriber id for $( $row.( $params.EmailFieldName ) ) not filled"
+                            Write-Log -message $msg -severity ( [Logseverity]::WARNING )
+                        }
+                        
+                    }
+
+
+                } else {
+                    $msg = "No subscriberID column from KlickTipp is present"
+                    Write-Log -message $msg -severity ( [Logseverity]::ERROR )
+                    throw [System.IO.InvalidDataException] $msg
                 }
-                $deletedUser = Invoke-RestMethod @restParams
 
             }
 
         }
 
+        # Commit transaction
+        $sqliteTransaction.Commit()
 
-
-
+        # Closing connection to database
+        $command.Dispose()
+        $connection.Dispose()
+    
     }
 
 }
@@ -356,6 +570,9 @@ switch ( $params.mode ) {
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
+
+Write-Log -message "Records successfully processed: $( $successful )"
+Write-Log -message "Records failed: $( $failed )" -severity ( [Logseverity]::WARNING )
 
 $queued = $successful
 
