@@ -32,3 +32,6 @@ _dev
 *.xml
 *.txt
 KlickTipp/*
+*.exe
+*.ini
+*.dll

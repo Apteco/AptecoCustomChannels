@@ -1,16 +1,12 @@
 # https://stackoverflow.com/questions/18771424/how-to-get-powershell-invoke-restmethod-to-return-body-of-http-500-code-response
 
 <#
-
 Use like 
 try {
-
     Invoke-Restmethod ...
-
 } catch {
     ParseErrorForResponseBody -err $_
 }
-
 #>
 function ParseErrorForResponseBody($err) {
     if ($PSVersionTable.PSVersion.Major -lt 6) {
