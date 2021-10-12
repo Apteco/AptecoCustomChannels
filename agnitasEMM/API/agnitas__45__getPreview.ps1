@@ -14,6 +14,7 @@ Param(
 
 $debug = $false
 
+
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
@@ -64,7 +65,7 @@ Set-Location -Path $scriptPath
 #
 ################################################
 
-$script:moduleName = "AGNITAS-GET-MAILING-LISTS"
+$script:moduleName = "AGNITAS-GET-MAILINGS"
 
 try {
 
@@ -93,7 +94,7 @@ try {
     Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
     Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
     
-    throw $_.exception
+    throw $_.exception  
 
     exit 1
 
@@ -106,79 +107,61 @@ try {
 #
 ################################################
 
-$lists = [System.Collections.ArrayList]@()
+#-----------------------------------------------
+# GET MAILINGS
+#-----------------------------------------------
+
+# Beginning the log
+Write-Log -message "Downloading all mailings"
+
+# Load the data from Agnitas EMM
 try {
 
-    ################################################
-    #
-    # TRY
-    #
-    ################################################
-
-    #-----------------------------------------------
-    # GET MAILING LISTS
-    #-----------------------------------------------
-
-    # Load the data from Agnitas EMM
-    try {
-
-        <#
-            https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailinglist-getMailinglist
-        #>
-        $mailinglists = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailinglist" -Headers $header -ContentType $contentType -Verbose
-        #$invoke = $invoke.mailinglist_id
-
-    } catch {
-
-        Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
-        Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
-
-        throw $_.Exception
-
-    }
-
-    Write-Log "Loaded '$( $mailinglists.Count )' mailing lists"
-
-
-    #$NumberOfMailingLists = $invoke.count
-
-    # TODO [ ] Transform this into an object rather than a string
-    $columns = @(
-        @{
-            name="id"
-            expression={ $_.mailinglist_id }
-        }
-        @{
-            name="description"
-            expression={ "$( $_.mailinglist_id )$( $settings.nameConcatChar )$( $_.name )" }
-        }
-    )
-    $lists = $mailingLists | Select $columns
-
+    <#
+    https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
+    #>
+    $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
 
 } catch {
 
-    ################################################
-    #
-    # ERROR HANDLING
-    #
-    ################################################
-
-    Write-Log -message "Got exception during execution phase" -severity ( [LogSeverity]::ERROR )
-    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
-    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
-    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
-    
-    throw $_.exception
-
-} finally {
-
-    ################################################
-    #
-    # RETURN
-    #
-    ################################################
-
-    $lists
+    Write-Host "ERROR - StatusCode:" $_.Exception.Response.StatusCode.value__ 
+    Write-Host "ERROR - StatusDescription:" $_.Exception.Response.StatusDescription
 
 }
+
+Write-Log "Loaded '$( $mailings.Count )' mailings"
+
+# Load and filter list into array of mailings
+$mailingsList = [System.Collections.ArrayList]@()
+$mailings | where { $_.type -eq "NORMAL" } | ForEach {
+    $mailing = $_
+    [void]$mailingsList.add(
+        [Mailing]@{
+            mailingId=$mailing.mailing_id
+            mailingName=$mailing.name
+        }
+    )
+}
+
+# Transform the mailings array into the needed output format
+$columns = @(
+    @{
+        name="id"
+        expression={ $_.mailingId }
+    }
+    @{
+        name="description"
+        expression={ $_.toString() }
+    }
+)
+$messages = $mailingsList | Select $columns
+
+
+################################################
+#
+# RETURN
+#
+################################################
+
+$messages
+

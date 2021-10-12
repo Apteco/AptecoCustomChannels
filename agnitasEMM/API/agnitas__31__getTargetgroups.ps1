@@ -73,67 +73,99 @@ Set-Location -Path $scriptPath
 # General settings
 $modulename = "AGNITAS-GET-TARGETGROUPS"
 
-# Load other generic settings like process id, startup timestamp, ...
-. ".\bin\general_settings.ps1"
+try {
 
-# Setup the network security like SSL and TLS
-. ".\bin\load_networksettings.ps1"
+    # Load general settings
+    . ".\bin\general_settings.ps1"
 
-# Load functions and assemblies
-. ".\bin\load_functions.ps1"
+    # Load settings
+    . ".\bin\load_settings.ps1"
 
-# Load the settings from the local json file
-. ".\bin\load_settings.ps1"
+    # Load network settings
+    . ".\bin\load_networksettings.ps1"
 
-# Setup the log and do the initial logging e.g. for input parameters
-. ".\bin\startup_logging.ps1"
+    # Load functions
+    . ".\bin\load_functions.ps1"
 
-# Do the preparation
-. ".\bin\preparation.ps1"
+    # Start logging
+    . ".\bin\startup_logging.ps1"
 
+    # Load preparation ($cred)
+    . ".\bin\preparation.ps1"
 
-################################################
-#
-# PROCESS
-#
-################################################
+} catch {
 
-#-----------------------------------------------
-# BUILD TARGETGROUPS OBJECTS
-#-----------------------------------------------
+    Write-Log -message "Got exception during start phase" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+    
+    throw $_.exception  
 
-# Load data from Agnitas EMM
-$targetgroupsEmm = Invoke-Agnitas -method "ListTargetgroups" #-wsse $wsse #-verboseCall
+    exit 1
 
-# Transform the target groups into an array of targetgroup objects
-$targetGroups = [System.Collections.ArrayList]@()
-$targetgroupsEmm.item | ForEach {
-    [void]$targetGroups.Add([TargetGroup]@{
-        targetGroupId=$_.id
-        targetGroupName=$_.name
-    })
 }
 
-# Transform the objects into the PeopleStage format
-$columns = @(
-    @{
-        name="id"
-        expression={ $_.targetGroupId }
-    }
-    @{
-        name="description"
-        expression={ $_.toString() }
-    }
-)
-$messages = $targetGroups | Select $columns #@{name="id";expression={ $_.targetGroupId }}, @{name="name";expression={ $_.toString() }}
-
 
 ################################################
 #
-# RETURN
+# PROGRAM
 #
 ################################################
 
-# real messages
-$messages
+$messages = [System.Collections.ArrayList]@()
+try {
+
+    ################################################
+    #
+    # TRY
+    #
+    ################################################
+
+    #-----------------------------------------------
+    # BUILD TARGETGROUPS OBJECTS
+    #-----------------------------------------------
+
+    . ".\bin\load_targetGroups.ps1"
+
+    # Transform the objects into the PeopleStage format
+    $columns = @(
+        @{
+            name="id"
+            expression={ $_.targetGroupId }
+        }
+        @{
+            name="description"
+            expression={ $_.toString() }
+        }
+    )
+    $messages = $targetGroups | Select $columns #@{name="id";expression={ $_.targetGroupId }}, @{name="name";expression={ $_.toString() }}
+
+
+} catch {
+
+    ################################################
+    #
+    # ERROR HANDLING
+    #
+    ################################################
+
+    Write-Log -message "Got exception during execution phase" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+    
+    throw $_.exception
+
+} finally {
+
+    ################################################
+    #
+    # RETURN
+    #
+    ################################################
+
+    $messages
+
+}
 

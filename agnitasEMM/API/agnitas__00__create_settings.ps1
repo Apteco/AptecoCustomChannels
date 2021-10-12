@@ -175,7 +175,6 @@ $login = @{
     "authenticationHeader" = $credentialsEncrypted
 }
 
-
 # Soap Password
 $soapUsername = Read-Host "Please enter the username for Agnitas SOAP API"
 $soapPassword = Read-Host -AsSecureString "Please enter the password for Agnitas SOAP API"
@@ -186,6 +185,7 @@ $soapAuth =@{
     password = $soapPasswordEncrypted
 }
 
+
 #-----------------------------------------------
 # LOGIN DATA SFTP
 #-----------------------------------------------
@@ -194,11 +194,17 @@ $soapAuth =@{
 $sftpHostname = Read-Host "Please enter the hostname for sftp"
 $sftpUsername = Read-Host "Please enter the username for sftp"
 $sftpPassword = Read-Host -AsSecureString "Please enter the password for sftp"
-#$sftpKeyfingerprint = Read-Host "Please enter the Ssh Host Key Fingerprint"
 $sftpPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$sftpPassword).GetNetworkCredential().Password)"
 
-# TODO [ ] Calculate the Fingerprint by the script
 
+#-----------------------------------------------
+# UPLOAD SETTINGS
+#-----------------------------------------------
+
+$upload = @{
+    rotatingTargetGroups = 15  # Number of targetGroups, that are re-used for Mailings sends
+    targetGroupPrefix = "Apteco Campaign Target Group: "
+}
 
 #-----------------------------------------------
 # SETTINGS OBJECT
@@ -235,6 +241,9 @@ $settings = @{
         "Password" = $sftpPasswordEncrypted
         "SshHostKeyFingerprint" = $sftpKeyfingerprint
     }
+
+    # Detail settings
+    "upload" = $upload
 
 }
 
@@ -313,25 +322,93 @@ if ( $libExecutables.Name -notcontains $sqliteDll ) {
 # Load the settings from the local json file
 . ".\bin\load_settings.ps1"
 
+# Load the preparation file to prepare the connections
+. ".\bin\preparation.ps1"
+
+
 #-----------------------------------------------
 # CALCULATE FINGERPRINT FOR SFTP
 #-----------------------------------------------
 
 # TODO [ ] Fill this with code
+<#
+# Setup session options
+$sessionOptions = [WinSCP.SessionOptions]::new()
+-Property @{
+    Protocol = [WinSCP.Protocol]::Sftp
+    HostName = $settings.sftpSession.HostName
+    UserName = $settings.sftpSession.Username
+    #Password = $settings.sftpSession.Password
+    #SshHostKeyFingerprint = "ssh-rsa 2048 xxxxxxxxxxx...="
+}
+
+$sessionOptions.Protocol = [WinSCP.Protocol]::Sftp
+$sessionOptions.HostName = $settings.sftpSession.HostName
+$sessionOptions.UserName = $settings.sftpSession.Username
+$session = [WinSCP.Session]::new()
+
+# This does not work on PS7 anymore
+#$fingerprint = $session.ScanFingerprint($sessionOptions,"SHA-256") # Helper, to find out server fingerprint
+$settings.sftpSession.Add("SshHostKeyFingerprint",$fingerprint)
+#>
 
 
 #-----------------------------------------------
 # CHECK LOGIN FOR AGNITAS REST
 #-----------------------------------------------
 
-# TODO [ ] Fill this with code
+# Load the data from Agnitas EMM
+try {
+
+    <#
+    https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
+    #>
+    $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+
+} catch {
+
+    Write-Log -message "Got exception during REST connection test" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+
+}
+
 
 #-----------------------------------------------
 # CHECK LOGIN FOR AGNITAS SOAP
 #-----------------------------------------------
 
-# TODO [ ] Fill this with code
+# Load targetgroups as a test
+try {
 
+    . ".\bin\load_targetGroups.ps1"
+
+} catch {
+
+    Write-Log -message "Got exception during SOAP connection test" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+    
+    throw $_.exception
+
+}
+
+
+
+################################################
+#
+# DO MORE PREPARATION VIA API
+#
+################################################
+
+# TODO [ ] Check and create the prepared Apteco targetgroups
+
+. ".\bin\load_targetGroups.ps1"
+# use $targetGroups now
 
 
 ################################################
