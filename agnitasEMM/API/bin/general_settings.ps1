@@ -2,5 +2,9 @@
 $functionsSubfolder = "functions"
 $libSubfolder = "lib"
 $settingsFilename = "settings.json"
-$processId = [guid]::NewGuid()
+if ( $params.ProcessId ) {
+    $processId = $params.ProcessId
+} else {    
+    $processId = [guid]::NewGuid()
+}
 $timestamp = [datetime]::Now

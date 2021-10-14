@@ -1,3 +1,4 @@
+
 # Load data from Agnitas EMM
 $targetgroupsEmm = Invoke-Agnitas -method "ListTargetgroups" #-wsse $wsse #-verboseCall
 
@@ -9,3 +10,6 @@ $targetgroupsEmm.item | ForEach {
         targetGroupName=$_.name
     })
 }
+
+# Filter the target groups
+$aptecoTargetgroups = @( $targetGroups | where { $_.targetGroupName -like "$( $settings.upload.targetGroupPrefix )*" } )

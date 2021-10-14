@@ -107,55 +107,12 @@ try {
 #
 ################################################
 
-#-----------------------------------------------
-# GET MAILINGS
-#-----------------------------------------------
+# CREATE OR UPDATE TEST RECIPIENT
 
-# Beginning the log
-Write-Log -message "Downloading all mailings"
+# Create fullview URL
+# https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Url-urlFullviewPost
 
-# Load the data from Agnitas EMM
-try {
-
-    <#
-    https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
-    #>
-    $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
-
-} catch {
-
-    Write-Host "ERROR - StatusCode:" $_.Exception.Response.StatusCode.value__ 
-    Write-Host "ERROR - StatusDescription:" $_.Exception.Response.StatusDescription
-
-}
-
-Write-Log "Loaded '$( $mailings.Count )' mailings"
-
-# Load and filter list into array of mailings
-$mailingsList = [System.Collections.ArrayList]@()
-$mailings | where { $_.type -eq "NORMAL" } | ForEach {
-    $mailing = $_
-    [void]$mailingsList.add(
-        [Mailing]@{
-            mailingId=$mailing.mailing_id
-            mailingName=$mailing.name
-        }
-    )
-}
-
-# Transform the mailings array into the needed output format
-$columns = @(
-    @{
-        name="id"
-        expression={ $_.mailingId }
-    }
-    @{
-        name="description"
-        expression={ $_.toString() }
-    }
-)
-$messages = $mailingsList | Select $columns
-
+# PARSE URL AND OUTPUT
 
 ################################################
 #

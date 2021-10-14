@@ -194,16 +194,47 @@ $soapAuth =@{
 $sftpHostname = Read-Host "Please enter the hostname for sftp"
 $sftpUsername = Read-Host "Please enter the username for sftp"
 $sftpPassword = Read-Host -AsSecureString "Please enter the password for sftp"
+$sftpKeyfingerprint = Read-Host "Please enter the Ssh Host Key Fingerprint, something like ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS..."
+#ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS18adptcEBuDbszghxyfJut/RY=
 $sftpPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$sftpPassword).GetNetworkCredential().Password)"
+
+#-----------------------------------------------
+# MESSAGE SETTINGS
+#-----------------------------------------------
+
+$messages = @{
+    copyString = "#COPY#"
+}
 
 
 #-----------------------------------------------
 # UPLOAD SETTINGS
 #-----------------------------------------------
 
+$autoImport = Read-Host "Please enter your Agnitas EMM Auto Import ID you have created to import files automatically, e.g. like 847" #847
+
 $upload = @{
     rotatingTargetGroups = 15  # Number of targetGroups, that are re-used for Mailings sends
     targetGroupPrefix = "Apteco Campaign Target Group: "
+    standardMailingList = 0
+    autoImportId = $autoImport
+    archiveImportFile = $true
+    sleepTime = 3               # seconds to wait between the status checks of import
+    maxSecondsWaiting = 240     # seconds to wait at maximum for the import
+}
+
+
+#-----------------------------------------------
+# BROADCAST SETTINGS
+#-----------------------------------------------
+
+$broadcast = @{
+    lockfile = "$( $scriptPath )\sending.lock"     # file that is being used to make sure there is only one broadcast at a time
+    maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
+    lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
+    lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
+    #sleepTime = 3                                   # seconds to wait between the status checks of import
+    #maxSecondsWaiting = 240                         # seconds to wait at maximum for the import
 }
 
 #-----------------------------------------------
@@ -220,6 +251,8 @@ $settings = @{
     "nameConcatChar" =   " | "
     "providername" = "agnitasEMM"                        # identifier for this custom integration, this is used for the response allocation
     "logfile" = $logfile
+    "winscplogfile" = "$( $scriptPath )\winscp.log"
+    "timestampFormat" = "yyyy-MM-dd--HH-mm-ss"
 
     # Detail settings
     "login" = $login
@@ -239,11 +272,13 @@ $settings = @{
         "HostName" = $sftpHostname
         "Username" = $sftpUsername
         "Password" = $sftpPasswordEncrypted
-        "SshHostKeyFingerprint" = $sftpKeyfingerprint
+        "SshHostKeyFingerprint" = $sftpKeyfingerprint        
     }
 
     # Detail settings
+    "messages" = $messages
     "upload" = $upload
+    "broadcast" = $broadcast
 
 }
 
@@ -293,11 +328,11 @@ if ( !(Test-Path -Path "$( $libFolder )") ) {
 #
 ################################################
 
-$sqliteDll = "WinSCPnet.dll"
+$winscpDll = "WinSCPnet.dll"
 
-if ( $libExecutables.Name -notcontains $sqliteDll ) {
+if ( $libDlls.Name -notcontains $winscpDll ) {
 
-    Write-Log -message "A browser page is opening now. Please download the .NET assembly / COM library zip file"
+    Write-Log -message "A browser page is opening now. Please download the .NET assembly library zip file"
     Write-Log -message "Please unzip the file and put it into the lib folder"
         
     Start-Process "https://winscp.net/download/WinSCP-5.19.2-Automation.zip"
@@ -305,6 +340,20 @@ if ( $libExecutables.Name -notcontains $sqliteDll ) {
     # Wait for key
     Write-Host -NoNewLine 'Press any key if you have put the files there';
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
+
+    # Confirm you read the licence details
+    $decision = $Host.UI.PromptForChoice("Confirmation", "Can you confirm you read 'license-dotnet.txt' and 'license-winscp.txt'", @('&Yes'; '&No'), 1)
+
+    If ( $decision -eq "0" ) {
+
+        # Means yes and proceed
+
+    } else {
+        
+        # Leave the process here
+        exit 0
+
+    }
 
 }
 
@@ -321,6 +370,9 @@ if ( $libExecutables.Name -notcontains $sqliteDll ) {
 
 # Load the settings from the local json file
 . ".\bin\load_settings.ps1"
+
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
 
 # Load the preparation file to prepare the connections
 . ".\bin\preparation.ps1"
@@ -354,8 +406,10 @@ $settings.sftpSession.Add("SshHostKeyFingerprint",$fingerprint)
 
 
 #-----------------------------------------------
-# CHECK LOGIN FOR AGNITAS REST
+# CHECK LOGIN FOR AGNITAS REST AND CHOOSE DEFAULT LIST
 #-----------------------------------------------
+
+# The default list will be used to load some receivers and to find out the valid fields
 
 # Load the data from Agnitas EMM
 try {
@@ -363,7 +417,10 @@ try {
     <#
     https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
     #>
-    $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+    $mailinglists = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailinglist" -Headers $header -ContentType $contentType -Verbose
+    Write-Log -message "Please choose your default import mailing list, that you are using in your auto import job"
+    $standardMailingList = $mailinglists | Out-GridView -PassThru
+    $settings.upload.standardMailingList = $standardMailingList.mailinglist_id
 
 } catch {
 
@@ -378,13 +435,41 @@ try {
 
 
 #-----------------------------------------------
-# CHECK LOGIN FOR AGNITAS SOAP
+# CHECK LOGIN FOR AGNITAS SOAP AND CREATE TARGETGROUPS
 #-----------------------------------------------
 
 # Load targetgroups as a test
 try {
 
     . ".\bin\load_targetGroups.ps1"
+
+    # If the targetgroups are not enough, create them
+    If ( $aptecoTargetgroups.count -lt $settings.upload.rotatingTargetGroups ) {
+        $targetgroupsToCreate = $settings.upload.rotatingTargetGroups - $aptecoTargetgroups.Count
+        for ( $i = 0 ; $i -lt $targetgroupsToCreate ; $i++) {
+
+            # Prepare parameters
+            $param = @{
+                name = [Hashtable]@{
+                    type = "string"
+                    value = "$( $settings.upload.targetGroupPrefix )$( $timestamp.toString( $settings.timestampFormat ) )"
+                }
+                description = [Hashtable]@{
+                    type = "string"
+                    value = "Targetgroup for a rotating system so for each new mailing the oldest targetgroup will be recycled"
+                }
+                eql = [Hashtable]@{
+                    type = "string"
+                    value = "send_id = '$( [guid]::NewGuid() )'"
+                }
+            }
+
+            # Create the target group now
+            $newTargetgroup = Invoke-Agnitas -method "AddTargetGroup" -param $param -verboseCall -namespace "http://agnitas.com/ws/schemas" #-wsse $wsse #-verboseCall        
+            Write-Log -message "Created new target group with ID '$( $newTargetgroup.targetId )'"
+
+        }
+    }
 
 } catch {
 
@@ -398,17 +483,20 @@ try {
 }
 
 
-
 ################################################
 #
-# DO MORE PREPARATION VIA API
+# PACK TOGETHER SETTINGS AND SAVE AS JSON
 #
 ################################################
 
-# TODO [ ] Check and create the prepared Apteco targetgroups
+# create json object
+$json = $settings | ConvertTo-Json -Depth 99 # -compress
 
-. ".\bin\load_targetGroups.ps1"
-# use $targetGroups now
+# print settings to console
+$json
+
+# save settings to file
+$json | Set-Content -path $settingsFile -Encoding UTF8
 
 
 ################################################

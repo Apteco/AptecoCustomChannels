@@ -149,11 +149,11 @@ try {
             expression={ $_.mailinglist_id }
         }
         @{
-            name="description"
+            name="name"
             expression={ "$( $_.mailinglist_id )$( $settings.nameConcatChar )$( $_.name )" }
         }
     )
-    $lists = $mailingLists | Select $columns
+    [void]$lists.AddRange(( $mailingLists | Select $columns ))
 
 
 } catch {

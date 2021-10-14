@@ -23,7 +23,7 @@ $debug = $true
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
+	    scriptPath= "D:\Scripts\AgnitasEMM"
 	    abc= "def"
 	    Username= "abc"
     }
@@ -69,25 +69,40 @@ Set-Location -Path $scriptPath
 ################################################
 
 # General settings
-$modulename = "EMMGETMESSAGES"
+$script:modulename = "LOADRESPONSE"
 
-# Load other generic settings like process id, startup timestamp, ...
-. ".\bin\general_settings.ps1"
+try {
 
-# Setup the network security like SSL and TLS
-. ".\bin\load_networksettings.ps1"
+    # Load general settings
+    . ".\bin\general_settings.ps1"
 
-# Load the settings from the local json file
-. ".\bin\load_settings.ps1"
+    # Load settings
+    . ".\bin\load_settings.ps1"
 
-# Load functions and assemblies
-. ".\bin\load_functions.ps1"
+    # Load network settings
+    . ".\bin\load_networksettings.ps1"
 
-# Setup the log and do the initial logging e.g. for input parameters
-. ".\bin\startup_logging.ps1"
+    # Load functions
+    . ".\bin\load_functions.ps1"
 
-# Do the preparation
-. ".\bin\preparation.ps1"
+    # Start logging
+    . ".\bin\startup_logging.ps1"
+
+    # Load preparation ($cred)
+    . ".\bin\preparation.ps1"
+
+} catch {
+
+    Write-Log -message "Got exception during start phase" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+    
+    throw $_.exception  
+
+    exit 1
+
+}
 
 
 ################################################
@@ -96,9 +111,145 @@ $modulename = "EMMGETMESSAGES"
 #
 ################################################
 
+try {
 
-<#
+    ################################################
+    #
+    # TRY
+    #
+    ################################################
 
-DELETE MAILINGS AFTER X DAYS
+    #-----------------------------------------------
+    # GET MAILINGS AND DELETE OLDER ONES AFTER X DAYS
+    #-----------------------------------------------
 
-#>
+    try {
+
+        <#
+        https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
+        #>
+        $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+
+    } catch {
+
+        Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+        Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+
+        throw $_.Exception
+
+    }
+
+    #-----------------------------------------------
+    # LOOK AT SFTP ARCHIVE AND DELETE OLDER ONES AFTER X DAYS
+    #-----------------------------------------------
+
+    
+
+    # Load the Assembly and setup the session properties
+    try {
+
+        # Load WinSCP .NET assembly
+        # Setup session options
+        $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+            Protocol = [winSCP.Protocol]::Sftp
+            HostName = $settings.sftpSession.HostName
+            Username = $settings.sftpSession.Username
+            Password = Get-SecureToPlaintext -String $settings.sftpSession.Password
+            SshHostKeyFingerprint = $settings.sftpSession.SshHostKeyFingerprint
+        }
+
+        # This Object will connect to the SFTP Server
+        $session = [WinSCP.Session]::new()
+        $session.ExecutablePath = ( $libExecutables | where { $_.Name -eq "WinSCP.exe" } | select -first 1 ).fullname
+
+        # Connect and send files, then close session
+        try {
+
+            # Connect
+            $session.DebugLogPath = "$( $settings.winscplogfile )"
+            $session.Open($sessionOptions)
+
+            If ( $session.Opened ) {
+
+                Write-Log -message "Session to SFTP openend successfully"
+
+                # TransferOptions set to Binary
+                $transferOptions = [WinSCP.TransferOptions]::new()
+                $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
+    
+                # Put the file using PutFiles Method accross to SFTP Server with the $transferOptions: binary
+                $transferResult = $session.PutFiles($newPath, "/import/", $false, $transferOptions)
+                $transferResult.Check()
+                If ( $transferResult.IsSuccess ) {
+                    Write-Log -message "File for import uploaded successfully to SFTP"
+                }
+
+                # Put the same file also in the archive
+                If ( $settings.upload.archiveImportFile ) {
+                    $transferResult = $session.PutFiles($newPath, "/archive/", $false, $transferOptions)
+                    $transferResult.Check()
+                    If ( $transferResult.IsSuccess ) {
+                        Write-Log -message "File for archive uploaded successfully to SFTP"
+                    }
+                }
+    
+                # Write to the console and the log whether the file transfer was successful    
+                Write-Log -message "Upload of $( $transferResult.Transfers.FileName ) to $( $transferResult.Transfers.Destination ) succeeded"
+
+            } else {
+
+                $msg = "Connection to SFTP failed"
+                Write-Log -message $msg -severity ( [Logseverity]::ERROR )
+                throw [System.IO.InvalidDataException] $msg
+                
+            }
+        
+        } catch {
+
+            Write-Log -message "There was a problem during the upload to SFTP" -severity ([LogSeverity]::ERROR)
+            throw $_.exception
+          
+        } finally {
+            # Disconnect, clean up
+            $session.Dispose()
+        }
+        
+    # Catch em errors
+    } catch {
+        #Write-Host "Error: $( $_ )" #.Exception.Message )"
+        throw $_.exception
+    }
+
+
+} catch {
+
+    ################################################
+    #
+    # ERROR HANDLING
+    #
+    ################################################
+
+    Write-Log -message "Got exception during execution phase" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+    
+    throw $_.exception
+
+} finally {
+
+    ################################################
+    #
+    # RETURN
+    #
+    ################################################
+
+    $messages
+
+}
+
+
+
+
+
+

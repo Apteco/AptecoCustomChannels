@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -135,11 +135,11 @@ try {
             expression={ $_.targetGroupId }
         }
         @{
-            name="description"
+            name="name"
             expression={ $_.toString() }
         }
     )
-    $messages = $targetGroups | Select $columns #@{name="id";expression={ $_.targetGroupId }}, @{name="name";expression={ $_.toString() }}
+    [void]$messages.AddRange(( $targetGroups | Select $columns )) #@{name="id";expression={ $_.targetGroupId }}, @{name="name";expression={ $_.toString() }}
 
 
 } catch {

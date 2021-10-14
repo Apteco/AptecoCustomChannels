@@ -133,8 +133,10 @@ try {
 
     } catch {
 
-        Write-Host "ERROR - StatusCode:" $_.Exception.Response.StatusCode.value__ 
-        Write-Host "ERROR - StatusDescription:" $_.Exception.Response.StatusDescription
+        Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+        Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+
+        throw $_.Exception
 
     }
 
@@ -142,7 +144,7 @@ try {
 
     # Load and filter list into array of mailings
     $mailingsList = [System.Collections.ArrayList]@()
-    $mailings | where { $_.type -eq "NORMAL" } | ForEach {
+    $mailings | where { $_.type -eq "NORMAL" -and $_.name -notlike "*$( $settings.messages.copyString )*"} | ForEach {
         $mailing = $_
         [void]$mailingsList.add(
             [Mailing]@{
@@ -159,7 +161,7 @@ try {
             expression={ $_.mailingId }
         }
         @{
-            name="description"
+            name="name"
             expression={ $_.toString() }
         }
     )

@@ -6,18 +6,26 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     "... $( $_.FullName )"
 }
 
-# Load all exe files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
-$libExecutables | ForEach {
-    "... $( $_.FullName )"
-    
-}
+If ( $configMode -and -not $settings) {
 
-# Load dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
-$libExecutables | ForEach {
-    "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
+    # Don't load yet, when in config mode and settings object not yet available
+
+} else {
+    
+    # Load all exe files in subfolder
+    $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
+    $libExecutables | ForEach {
+        "... $( $_.FullName )"
+    
+    }
+
+    # Load dll files in subfolder
+    $libDlls = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
+    $libDlls | ForEach {
+        "Loading $( $_.FullName )"
+        [Reflection.Assembly]::LoadFile($_.FullName) 
+    }
+
 }
 
 
