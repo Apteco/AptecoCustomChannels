@@ -230,7 +230,7 @@ try {
 
         $invokeParams = [hashtable]@{
             method = "UpdateMailing"
-            verboseCall = $true
+            verboseCall = $false
             namespace = "http://agnitas.org/ws/schemas"
             noresponse = $true
             param = [ordered]@{

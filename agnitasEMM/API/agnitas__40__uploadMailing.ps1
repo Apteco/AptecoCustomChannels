@@ -184,7 +184,7 @@ try {
                 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
     
                 # Put the file using PutFiles Method accross to SFTP Server with the $transferOptions: binary
-                $transferResult = $session.PutFiles($newPath, "$( $settings.upload.uploadFolder )", $false, $transferOptions)
+                $transferResult = $session.PutFiles($newPath, "$( $settings.upload.uploadFolder )/", $false, $transferOptions)
                 $transferResult.Check()
                 If ( $transferResult.IsSuccess ) {
                     Write-Log -message "File for import uploaded successfully to SFTP"
@@ -192,7 +192,7 @@ try {
 
                 # Put the same file also in the archive
                 If ( $settings.upload.archiveImportFile ) {
-                    $transferResult = $session.PutFiles($newPath, "$( $settings.upload.archiveFolder )", $false, $transferOptions)
+                    $transferResult = $session.PutFiles($newPath, "$( $settings.upload.archiveFolder )/", $false, $transferOptions)
                     $transferResult.Check()
                     If ( $transferResult.IsSuccess ) {
                         Write-Log -message "File for archive uploaded successfully to SFTP"
