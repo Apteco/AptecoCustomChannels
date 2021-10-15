@@ -122,28 +122,51 @@ try {
     #-----------------------------------------------
     # GET MAILINGS AND DELETE OLDER ONES AFTER X DAYS
     #-----------------------------------------------
+<#
+    If ( $settings.response.cleanupMailings ) {
 
-    try {
+        Write-Log -message "Starting with mailings cleanup older than $( $settings.response.maxAgeMailings ) days"
 
-        <#
-        https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
-        #>
-        $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+        try {
 
-    } catch {
-
-        Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
-        Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
-
-        throw $_.Exception
+            $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+    
+        } catch {
+    
+            Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+            Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+    
+            throw $_.Exception
+    
+        }
+    
+        # Filtering the mailings by a string
+        $copyString = $settings.messages.copyString
+        $mailings | where { $_.name -like "*$( $copyString )*" } | ForEach {
+    
+            $mailing = $_
+    
+            # Extracting the date of the name
+            $mailingNameParts = $mailing.name -split $copyString,2,"simplematch"
+            $mailingCreationDate = [Datetime]::ParseExact($mailingNameParts[1],$settings.timestampFormat,$null)
+            $age = New-TimeSpan -Start $timestamp -End $mailingCreationDate
+    
+            # Delete if older than
+            If ( $age.TotalDays -lt $settings.response.maxAgeMailings ) {
+                Write-Log -message "Deleting mailing '$( $mailing.mailing_id )' - '$( $mailing.name )'"
+                $mailings = Invoke-RestMethod -Method Delete -Uri "$( $apiRoot )/mailing/$( $mailing.mailing_id )" -Headers $header -Verbose -ContentType $contentType
+            }
+    
+        }
 
     }
+#>
 
     #-----------------------------------------------
-    # LOOK AT SFTP ARCHIVE AND DELETE OLDER ONES AFTER X DAYS
+    # CLEANUP AND DOWNLOAD ON SFTP
     #-----------------------------------------------
 
-    
+    #LOOK AT SFTP ARCHIVE AND DELETE OLDER ONES AFTER X DAYS
 
     # Load the Assembly and setup the session properties
     try {
@@ -176,25 +199,65 @@ try {
                 # TransferOptions set to Binary
                 $transferOptions = [WinSCP.TransferOptions]::new()
                 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
-    
-                # Put the file using PutFiles Method accross to SFTP Server with the $transferOptions: binary
-                $transferResult = $session.PutFiles($newPath, "/import/", $false, $transferOptions)
-                $transferResult.Check()
-                If ( $transferResult.IsSuccess ) {
-                    Write-Log -message "File for import uploaded successfully to SFTP"
+                
+                If ( $settings.response.cleanupSFTPArchive ) {
+
+                    Write-Log -message "Cleaning up archive folder $( $settings.upload.archiveFolder )"
+
+                    # Check if archive folder exists
+                    $rootDir = $session.ListDirectory("/")
+                    $archiveFolder = $rootDir.Files | where { $_.IsDirectory -eq $true -and $_.FullName -eq $settings.upload.archiveFolder }
+                    
+                    If ( $archiveFolder.count -eq 1 ) {
+
+                        # Load content of archive folder
+                        $archiveFiles = $session.ListDirectory( $archiveFolder.FullName )
+
+                        # Check date and delete it if older than n days
+                        $archiveFiles.Files | where { $_.IsDirectory -eq $false } | ForEach {
+
+                            $file = $_
+                            $age = New-TimeSpan -Start $timestamp -End $file.LastWriteTime
+
+                            # Delete if older than
+                            If ( $age.TotalDays -lt -7 ) {
+                                Write-Log -message "Deleting archived file '$( $file.FullName )'"
+                                $filename = [WinSCP.RemotePath]::EscapeFileMask($file.FullName)
+                                $removalResult = $session.RemoveFile($filename)
+                                #$session.RemoveFile($file.FullName)
+                            }
+
+                        }
+                            
+                    }
+
                 }
 
-                # Put the same file also in the archive
-                If ( $settings.upload.archiveImportFile ) {
-                    $transferResult = $session.PutFiles($newPath, "/archive/", $false, $transferOptions)
-                    $transferResult.Check()
-                    If ( $transferResult.IsSuccess ) {
-                        Write-Log -message "File for archive uploaded successfully to SFTP"
+                Write-Log -message "Synching of reponse files"
+
+                # TODO [ ] put the path and foldername to settings
+                $synchronizationResult = $session.SynchronizeDirectories([WinSCP.SynchronizationMode]::Local, "$( $settings.response.exportDirectory )", $settings.response.exportFolder, $False)
+
+                # Example part of https://winscp.net/eng/docs/library_example_delete_after_successful_download
+                foreach ($download in $synchronizationResult.Downloads) {
+
+                    # Success or error?
+                    if ($download.Error -eq $Null) {
+                        Write-Host "Download of $($download.FileName) succeeded, removing from source"
+                        # Download succeeded, remove file from source
+                        $filename = [WinSCP.RemotePath]::EscapeFileMask($download.FileName)
+                        $removalResult = $session.RemoveFiles($filename)
+         
+                        if ($removalResult.IsSuccess) {
+                            Write-Log "Removing of file $($download.FileName) succeeded"
+                        } else {
+                            Write-Log -message "Removing of file $($download.FileName) failed" -severity ( [Logseverity]::WARNING )
+                        }
+                    } else {
+                        Write-Log -message ("Download of $($download.FileName) failed: $($download.Error.Message)") -severity ( [Logseverity]::WARNING )
                     }
+
                 }
-    
-                # Write to the console and the log whether the file transfer was successful    
-                Write-Log -message "Upload of $( $transferResult.Transfers.FileName ) to $( $transferResult.Transfers.Destination ) succeeded"
 
             } else {
 
@@ -220,6 +283,11 @@ try {
         throw $_.exception
     }
 
+    #-----------------------------------------------
+    # NEXT STEP - TRIGGER FERGE TO IMPORT RESPONSES
+    #-----------------------------------------------
+
+    #Start-Process -FilePath "C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
 
 } catch {
 

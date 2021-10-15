@@ -195,7 +195,6 @@ $sftpHostname = Read-Host "Please enter the hostname for sftp"
 $sftpUsername = Read-Host "Please enter the username for sftp"
 $sftpPassword = Read-Host -AsSecureString "Please enter the password for sftp"
 $sftpKeyfingerprint = Read-Host "Please enter the Ssh Host Key Fingerprint, something like ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS..."
-#ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS18adptcEBuDbszghxyfJut/RY=
 $sftpPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$sftpPassword).GetNetworkCredential().Password)"
 
 #-----------------------------------------------
@@ -221,6 +220,8 @@ $upload = @{
     archiveImportFile = $true
     sleepTime = 3               # seconds to wait between the status checks of import
     maxSecondsWaiting = 240     # seconds to wait at maximum for the import
+    archiveFolder = "/archive"
+    uploadFolder = "/import"
 }
 
 
@@ -233,6 +234,25 @@ $broadcast = @{
     maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
     lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
     lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
+    #sleepTime = 3                                   # seconds to wait between the status checks of import
+    #maxSecondsWaiting = 240                         # seconds to wait at maximum for the import
+}
+
+
+#-----------------------------------------------
+# RESPONSE / CLEANUP SETTINGS
+#-----------------------------------------------
+
+$response = @{
+    cleanupMailings = $true                     # Should older mailings be automatically cleaned up
+    maxAgeMailings = -14                        # Mailings will be automatically deleted after n days if the response job is running and cleanupMailings is true
+    cleanupSFTPArchive = $true                  # Should older upload files automatically cleaned up
+    maxAgeArchiveFiles = -7                     # Max age for files on the sftp archive folder
+    exportFolder = "/export"
+    exportDirectory = "$( $scriptPath )\export"
+    #maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
+    #lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
+    #lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
     #sleepTime = 3                                   # seconds to wait between the status checks of import
     #maxSecondsWaiting = 240                         # seconds to wait at maximum for the import
 }
@@ -279,7 +299,7 @@ $settings = @{
     "messages" = $messages
     "upload" = $upload
     "broadcast" = $broadcast
-
+    "response" = $response
 }
 
 
@@ -319,6 +339,12 @@ $libFolder = ".\$( $libSubfolder )"
 if ( !(Test-Path -Path "$( $libFolder )") ) {
     Write-Log -message "lib folder '$( $libFolder )' does not exist. Creating the folder now!"
     New-Item -Path "$( $libFolder )" -ItemType Directory
+}
+
+$exportDir = $settings.response.exportDirectory
+if ( !(Test-Path -Path "$( $exportDir )") ) {
+    Write-Log -message "export folder '$( $exportDir )' does not exist. Creating the folder now!"
+    New-Item -Path "$( $exportDir )" -ItemType Directory
 }
 
 

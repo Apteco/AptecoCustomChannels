@@ -26,7 +26,7 @@ Response-Matching|
 
 ## Voraussetzungen
 
-- Apteco-Server (einer oder mehrere)
+- Apteco-Server (einer oder mehrere) mit Apteco Response Gatherer
 - RDP- oder PowerShell-Zugriff zum Apteco-Server mit FastStats Service
 - SFTP-Server zum Austausch der Dateien. Zugriff via Benutzername/Password oder Benutzername/PrivateKey unterstützt. Bitte den Host-Fingerprint vom SFTP-Server bereithalten. Dies kann z.B. mit WinSCP oder FileZilla ausgelesen werden und hat z.B. ein Format wie `ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS...` oder `ssh-rsa 2048 xxxxxxxxxxx...`
   - Auf dem SFTP-Server sollten zwei Verzeichnisse in der root liegen: `import` und `archive`
