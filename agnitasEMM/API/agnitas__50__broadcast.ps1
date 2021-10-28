@@ -220,8 +220,7 @@ try {
                 }
             }
         }
-
-        $getMailing = Invoke-Agnitas @invokeParams #-method "GetMailing" -param $param -verboseCall -namespace $namespace #-wsse $wsse -noresponse 
+        $getMailing = Invoke-Agnitas @invokeParams
 
 
         #--------------------------------------------------------------------------
@@ -341,7 +340,32 @@ try {
                 #>
                 $sendMailing = Invoke-RestMethod @invokeParams #-Method Post -Uri $endpoint -Headers $header -ContentType $contentType -Body $bodyjson -Verbose
                 Write-Log -message "Broadcast done"
-        
+                
+                # TODO [ ] Check status of mailing via SOAP
+                $invokeParams = [Hashtable]@{
+                    method = "GetMailingStatus"
+                    verboseCall = $false
+                    namespace = "http://agnitas.org/ws/schemas"
+                    param = [Hashtable]@{
+                        mailingID = [Hashtable]@{
+                            type = "int"
+                            value = $mailingId
+                        }
+                    }
+                }
+                $sleepTime = $settings.upload.sleepTime
+                $maxWaitTimeTotal = $settings.upload.maxSecondsWaiting
+                $startTime = Get-Date
+                Do {
+                    Start-Sleep -Seconds $sleepTime
+                    Write-Log -message "Looking for the status of mailing $( $mailingId ) - last status: '$( $statusMailing.status )' - waiting already for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
+                    $statusMailing = Invoke-Agnitas @invokeParams # mailing.status.edit | mailing.status.sent | mailing.status.new
+                    $timespan = New-TimeSpan -Start $startTime
+                } while ( $statusMailing.status -in @("mailing.status.sent") -and $timespan.TotalSeconds -lt $maxWaitTimeTotal)
+                
+                Write-Log -message "Mailing status check completed"
+                Write-Log -message "Status of mailing $( $mailingId ) - last status: '$( $statusMailing.status )' - waited for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
+                                    
             }
         }
 
