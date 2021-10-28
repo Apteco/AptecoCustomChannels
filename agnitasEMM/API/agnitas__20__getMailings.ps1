@@ -142,6 +142,24 @@ try {
 
     Write-Log "Loaded '$( $mailings.Count )' mailings"
 
+    <#
+    NOTE: The following status are possible and could be important for filtering (see manual)
+    mailing.status.active Mailing ist aktiviert
+    mailing.status.admin Testversand an Empfängertyp „Admin“
+    mailing.status.canceled Versand wurde abgebrochen
+    mailing.status.disable Mailing ist deaktiviert
+    mailing.status.edit Mailing wurde bearbeitet
+    mailing.status.new Mailing wurde neu erstellt
+    mailing.status.norecipients Mailing hat keine Empfänger
+    mailing.status.ready Mailing wurde zum Versand freigegeben
+    mailing.status.scheduled Mailing ist zum Versand eingestellt
+    mailing.status.in-generation Die Daten der zu versendenden Emails werden gerade erzeugt
+    mailing.status.generated Die Daten der zu versendenden Emails wurden erzeugt
+    mailing.status.sending Mailing wird gerade versendet
+    mailing.status.sent Mailing wurde versendet
+    mailing.status.test Testversand an Empfängertyp „Test“
+    #>
+
     # Load and filter list into array of mailings
     $mailingsList = [System.Collections.ArrayList]@()
     $mailings | where { $_.type -eq "NORMAL" -and $_.name -notlike "*$( $settings.messages.copyString )*"} | ForEach {
