@@ -248,8 +248,10 @@ $response = @{
     maxAgeMailings = -14                        # Mailings will be automatically deleted after n days if the response job is running and cleanupMailings is true
     cleanupSFTPArchive = $true                  # Should older upload files automatically cleaned up
     maxAgeArchiveFiles = -7                     # Max age for files on the sftp archive folder
-    exportFolder = "/export"
-    exportDirectory = "$( $scriptPath )\export"
+    exportFolder = "/export"                    # Remote export folder on sftp
+    exportDirectory = "$( $scriptPath )\export" # Local folder for downloading export files from sftp
+    taskDefaultName = "Response Gathering for Agnitas EMM"
+    triggerFerge = $true                            # Should FERGE be triggered to download response data
     #maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
     #lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
     #lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
@@ -273,6 +275,7 @@ $settings = @{
     "logfile" = $logfile
     "winscplogfile" = "$( $scriptPath )\winscp.log"
     "timestampFormat" = "yyyy-MM-dd--HH-mm-ss"
+    "powershellExePath" = "powershell.exe"    # Define other powershell path, e.g if you want to use pwsh for powershell7
 
     # Detail settings
     "login" = $login

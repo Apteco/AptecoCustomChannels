@@ -32,6 +32,7 @@ Response-Matching|
   - Auf dem SFTP-Server sollten zwei Verzeichnisse in der root liegen: `import` und `archive`
 - Zugriff auf Agnitas EMM via **UI**, aber auch **REST** und **SOAP**. Dies sind in der Regel unterschiedliche Benutzer.
 - Ein fertig konfigurierter Auto-Import in Agnitas (siehe `Konfiguration Agnitas EMM`)
+- In der Windows PATH Variable den Pfad zum Response Gatherer hinterlegen, z.B. `C:\Program Files\Apteco\FastStats Email Response Gatherer x64`. Optimalerweise wird der Pfad für das System eingetragen und nicht nur für den aktuellen Benutzer, wenn der Response-Gatherer unter einem anderen Benutzer läuft.
 
 ## Konfiguration Agnitas EMM
 
@@ -61,9 +62,9 @@ Die Konfiguration der Kanäle ist hier in PeopleStage gezeigt, wird aber zukünf
 Notwendige Premium Features:
 
 - Automation Package
-- Auto-Import
+- Auto-Import/-Export
 - Reaktionen
-- REST
+- REST/SOAP
 
 
 # Schritte
@@ -75,3 +76,8 @@ Datumsgesteuertes Mailing (jeder Tag zur gleichen Uhrzeit) oder Intervallgesteue
 
 Auto-Export anlegen
 
+# FAQ
+
+## Response Gathering soll mehrmals am Tag laufen
+
+Bitte in der Datei `create_scheduled_task.ps1` für die Aufgabenerstellung das Array anpassen, zu welchen Zeiten der Prozess gestartet werden soll oder in den Geplanten Aufgaben von Windows die Anpassungen direkt vornehmen.

@@ -163,33 +163,40 @@ try {
 #>
 
     #-----------------------------------------------
-    # CLEANUP AND DOWNLOAD ON SFTP
+    # PREPARE SFTP SESSION
     #-----------------------------------------------
 
     #LOOK AT SFTP ARCHIVE AND DELETE OLDER ONES AFTER X DAYS
 
+    # Load WinSCP .NET assembly
+    # Setup session options
+    $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
+        Protocol = [winSCP.Protocol]::Sftp
+        HostName = $settings.sftpSession.HostName
+        Username = $settings.sftpSession.Username
+        Password = Get-SecureToPlaintext -String $settings.sftpSession.Password
+        SshHostKeyFingerprint = $settings.sftpSession.SshHostKeyFingerprint
+    }
+
+    $winscpExe = ( $libExecutables | where { $_.Name -eq "WinSCP.exe" } | select -first 1 ).fullname
+
+
+    #-----------------------------------------------
+    # CLEANUP AND DOWNLOAD ON SFTP
+    #-----------------------------------------------
+
     # Load the Assembly and setup the session properties
     try {
 
-        # Load WinSCP .NET assembly
-        # Setup session options
-        $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
-            Protocol = [winSCP.Protocol]::Sftp
-            HostName = $settings.sftpSession.HostName
-            Username = $settings.sftpSession.Username
-            Password = Get-SecureToPlaintext -String $settings.sftpSession.Password
-            SshHostKeyFingerprint = $settings.sftpSession.SshHostKeyFingerprint
-        }
-
         # This Object will connect to the SFTP Server
         $session = [WinSCP.Session]::new()
-        $session.ExecutablePath = ( $libExecutables | where { $_.Name -eq "WinSCP.exe" } | select -first 1 ).fullname
+        $session.ExecutablePath = $winscpExe
+        $session.DebugLogPath = "$( $settings.winscplogfile )"
 
         # Connect and send files, then close session
         try {
 
             # Connect
-            $session.DebugLogPath = "$( $settings.winscplogfile )"
             $session.Open($sessionOptions)
 
             If ( $session.Opened ) {
@@ -239,6 +246,7 @@ try {
                 $synchronizationResult = $session.SynchronizeDirectories([WinSCP.SynchronizationMode]::Local, "$( $settings.response.exportDirectory )", $settings.response.exportFolder, $False)
 
                 # Example part of https://winscp.net/eng/docs/library_example_delete_after_successful_download
+                $archiveFolder = "$( $settings.upload.archiveFolder )/"
                 foreach ($download in $synchronizationResult.Downloads) {
 
                     # Success or error?
@@ -246,12 +254,13 @@ try {
                         Write-Host "Download of $($download.FileName) succeeded, removing from source"
                         # Download succeeded, remove file from source
                         $filename = [WinSCP.RemotePath]::EscapeFileMask($download.FileName)
-                        $removalResult = $session.RemoveFiles($filename)
+                        $moveResult = $session.MoveFile($filename, $archiveFolder)
+                        #$removalResult = $session.RemoveFiles($filename)
          
-                        if ($removalResult.IsSuccess) {
-                            Write-Log "Removing of file $($download.FileName) succeeded"
+                        if ($moveResult.IsSuccess) {
+                            Write-Log "Moving of file '$($download.FileName)'' to '$( $archiveFolder )'' succeeded"
                         } else {
-                            Write-Log -message "Removing of file $($download.FileName) failed" -severity ( [Logseverity]::WARNING )
+                            Write-Log -message "Moving of file '$($download.FileName)'' failed" -severity ( [Logseverity]::WARNING )
                         }
                     } else {
                         Write-Log -message ("Download of $($download.FileName) failed: $($download.Error.Message)") -severity ( [Logseverity]::WARNING )
@@ -279,15 +288,162 @@ try {
         
     # Catch em errors
     } catch {
+
         #Write-Host "Error: $( $_ )" #.Exception.Message )"
         throw $_.exception
+
     }
 
+
     #-----------------------------------------------
-    # NEXT STEP - TRIGGER FERGE TO IMPORT RESPONSES
+    # TRANSFORM FILES
     #-----------------------------------------------
 
+    $csvFiles = @( Get-Childitem -path "$( $settings.response.exportDirectory )" -Filter "*.csv" )
+    Write-Log "$( $csvFiles.count ) csv files to process"
+
+    $sentsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_sents.csv"
+    $opensFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_opens.csv"
+    $clicksFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_clicks.csv"
+    $bouncesFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_bounces.csv"
+    $unsubsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_unsubscribes.csv" 
+
+    $csvFiles | ForEach {
+
+        $csvFile = $_
+        Write-Log "Parsing '$( $csvFile.Name )'"
+
+        $csv = @( Import-Csv -path $csvFile.FullName -delimiter ";" -Encoding UTF8 )
+
+        Write-Log "  $( $csv.count ) records"
+
+        If ( $csv.count -eq 0 ) {
+            
+            Write-Log "  Removing file directly" # TODO [ ] maybe put this to the end
+            Remove-Item -path $csvFile.FullName -force
+
+        } else {
+
+            # 4 = SENT
+            $sents = @( $csv | where { $_.EVENT -eq 4 } )
+            $sents | select *, @{name="MessageType"; expression={ "Send" }} | Export-Csv -Path $sentsFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $sents.count ) sents"
+
+            # 2 = OPEN
+            $opens = @( $csv | where { $_.EVENT -eq 2 } )
+            $opens | select *, @{name="MessageType"; expression={ "Open" }} | Export-Csv -Path $opensFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $opens.count ) opens"
+<#
+            # X = CLICK
+            $clicks = @( $csv | where { $_.EVENT -eq 0 } )
+            $clicks | select *, @{name="MessageType"; expression={ "Click" }} | Export-Csv -Path $clicksFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $clicks.count ) clicks"
+
+            # X = BOUNCE
+            $bounces = @( $csv | where { $_.EVENT -eq 0 } )
+            $bounces | select *, @{name="MessageType"; expression={ "Bounce" }} | Export-Csv -Path $bouncesFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $bounces.count ) bounces"
+
+            # X = UNSUBSCRIPTION
+            $unsubs = @( $csv | where { $_.EVENT -eq 0 } )
+            $unsubs | select *, @{name="MessageType"; expression={ "Unsubscription" }} | Export-Csv -Path $unsubsFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $unsubs.count ) unsubscribes"
+            #>
+
+        }
+
+    }
+
+    exit 0
+    
+    #-----------------------------------------------
+    # UPDATE BROADCASTS IN RESPONSE DATABASE
+    #-----------------------------------------------
+
+    #CustomProvider=AGNITAS-BROADCAST
+    
+    #-----------------------------------------------
+    # LOAD BROADCAST DETAILS
+    #----------------------------------------------- 
+
+    # prepare query
+    # TODO [ ] put this file maybe into settings
+    $selectBroadcastsSQL = Get-Content -Path ".\sql\update_broadcast_details_provider.sql" -Encoding UTF8
+    $selectBroadcastsSQL = $selectBroadcastsSQL -replace "#PROVIDER#", $settings.providername
+
+    # load data
+    $broadcastsDetailDataTable = Query-SQLServer -connectionString "$( $mssqlConnectionString )" -query "$( $selectBroadcastsSQL )"
+
+
+    
+                #-----------------------------------------------
+                # UPDATE BROADCAST DETAILS
+                #----------------------------------------------- 
+
+                # prepare query
+                $updateBroadcastsSQL = Get-Content -Path "$( $updateBroadcastsSQLFile )" -Encoding UTF8
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#MAILINGID#", $mailingId
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCASTID#", $broadcastId
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#UPLOADED#", $overallRecipientCount
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#REJECTED#", $failedRecipientCount
+                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCAST#", $sentRecipientCount
+
+                # execute query
+                $result += NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcastsSQL )"
+
+                #-----------------------------------------------
+                # UPDATE BROADCAST - this allows FERGE to load the response data automatically
+                #----------------------------------------------- 
+
+                # prepare query
+                $updateBroadcasts2SQL = Get-Content -Path "$( $updateBroadcasts2SQLFile )" -Encoding UTF8
+                $updateBroadcasts2SQL = $updateBroadcasts2SQL -replace "#BROADCASTID#", $broadcastId
+
+                # execute query
+                NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcasts2SQL )"
+
+    #-----------------------------------------------
+    # NEXT STEP - TRIGGER FERGE LOCALLY
+    #-----------------------------------------------
+    
+    # Possibly change the broadcaster to GenericFTP
+    #"C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseConfig.exe"
+    #"C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
     #Start-Process -FilePath "C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
+
+
+    if ( $settings.response.triggerFerge ) {
+
+        # Find FERGE with PATH
+        try {
+            $ferge = Get-Command -Name "EmailResponseGatherer64"
+    
+        } catch {
+            Write-Log -message "EmailResponseGatherer64.exe is not added to PATH yet. Please make sure it can be used" -severity ( [LogSeverity]::ERROR )
+            throw $_.exception
+        }
+    
+        # Trigger FERGE and wait for completion
+        Write-Log -message "Trigger FERGE"
+        $timeForImport = Measure-Command {
+            # TODO [ ] put the xml path into settings
+            Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml")
+        }
+        Write-Log -message "FERGE done in $( $timeForImport.TotalSeconds ) seconds"
+    
+    }
+    
+
+    #-----------------------------------------------
+    # ASK TO CREATE A SCHEDULED TASK
+    #-----------------------------------------------
+
+    If ( $debug ) {
+        # TODO [ ] Check this one
+        #. ".\bin\create_scheduled_task.ps1"
+    }
+
+
 
 } catch {
 

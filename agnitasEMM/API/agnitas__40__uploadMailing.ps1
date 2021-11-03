@@ -133,6 +133,7 @@ try {
     #-------------------------------------------------------------------
 
     $dataCsv = @( Import-Csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
+    Write-Log -message "Got a file with $( $dataCsv.count ) records"
 
     # Add send_id column to recipient csv file
     $send_id = $processId
