@@ -143,6 +143,7 @@ $settings = @{
 
 Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WARNING )
 
+
 ################################################
 #
 # SETTINGS
@@ -187,15 +188,116 @@ $soapAuth =@{
 
 
 #-----------------------------------------------
+# ASK IF THERE IS A PROXY USED
+#-----------------------------------------------
+
+# ask for credentials if e.g. a proxy is used (normally without the prefixed domain)
+#$cred = Get-Credential
+#$proxyUrl = "http://proxy:8080"
+
+# TODO [ ] sometimes the proxy wants an additional content type or header -> do if this comes up
+
+# More useful links
+# https://stackoverflow.com/questions/13552227/using-proxy-automatic-configuration-from-ie-settings-in-net
+# https://stackoverflow.com/questions/20471486/how-can-i-make-invoke-restmethod-use-the-default-web-proxy/20472024  
+
+$proxyDecision = $Host.UI.PromptForChoice("Proxy usage", "Do you use a proxy for network authentication?", @('&Yes'; '&No'), 1)
+
+If ( $proxyDecision -eq "0" ) {
+
+    # Means yes and proceed
+
+    # Try a figure out the uri
+    $proxyUriSuggest = [System.Net.WebRequest]::GetSystemWebProxy().GetProxy("http://www.apteco.de")
+
+    # Ask for the uri
+    $proxyUriDecision = $Host.UI.PromptForChoice("Proxy uri", "I have figured out the url '$( $proxyUriSuggest.ToString() )'. Is that correct?", @('&Yes'; '&No'), 1)
+    If ( $proxyUriDecision -eq "0" ) {
+
+        # yes, correct
+        $proxyUri = $proxyUriSuggest.toString()
+
+    } else {
+
+        # no, not correct
+        $proxyUri = Read-Host "Please enter the proxy url like 'http://proxyurl:8080'"
+
+    }
+
+    # Next step, figure out credentials
+    $proxyCredentialsDecision = $Host.UI.PromptForChoice("Proxy credentials", "Remember the FastStats Service is normally running with another windows user. So do you want to use the current account user login?", @('&Yes'; '&No'), 1)
+    If ( $proxyCredentialsDecision -eq "0" ) {
+        
+        # yes, use default credentials
+        $proxyUseDefaultCredentials = $true
+        $proxyCredentials = @{}
+
+    } else {
+
+        # no, use other credentials
+        $proxyUseDefaultCredentials = $false
+
+        # Soap Password
+        $proxyUsername = Read-Host "Please enter the username for proxy authentication"
+        $proxyPassword = Read-Host -AsSecureString "Please enter the password for proxy authentication"
+        $proxyPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$proxyPassword).GetNetworkCredential().Password)"
+
+        $proxyCredentials = @{
+            "username" = $proxyUsername
+            "password" = $proxyPasswordEncrypted
+        }
+
+    }
+
+    $proxy = @{
+        "proxyUrl" = $proxyUri # ""|"http://proxyurl:8080"
+        #"useDefaultCredentials" = $false   # Do this by default if a proxy is used
+        "proxyUseDefaultCredentials" = $proxyUseDefaultCredentials
+        "credentials" = $proxyCredentials
+    }
+
+} else {
+    
+    # Leave the process here
+    
+    $proxy = @{}
+
+}
+
+#-----------------------------------------------
 # LOGIN DATA SFTP
 #-----------------------------------------------
 
-# SFTP Password
+# ask for sftp sessions
 $sftpHostname = Read-Host "Please enter the hostname for sftp"
 $sftpUsername = Read-Host "Please enter the username for sftp"
 $sftpPassword = Read-Host -AsSecureString "Please enter the password for sftp"
 $sftpKeyfingerprint = Read-Host "Please enter the Ssh Host Key Fingerprint, something like ssh-ed25519 255 yrt1ZYQO/YULXZ/IXS..."
 $sftpPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$sftpPassword).GetNetworkCredential().Password)"
+
+# bring sftp settings together
+$sftpSettings = @{
+    "HostName" = $sftpHostname
+    "Username" = $sftpUsername
+    "Password" = $sftpPasswordEncrypted
+    "SshHostKeyFingerprint" = $sftpKeyfingerprint
+    "Raw" = [Hashtable]@{}
+}
+
+# Add sftp proxy settings
+# https://winscp.net/eng/docs/rawsettings
+$proxySFTPDecision = $Host.UI.PromptForChoice("Proxy usage", "Do you want to add the same proxy settings for SFTP?", @('&Yes'; '&No'), 1)
+If ( $proxySFTPDecision -eq "0" ) {
+
+    $sftpSettings.Raw.Add("ProxyMethod", "3") # 0 = None, 1 = SOCKS4, 2 = SOCKS5, 3 = HTTP, 4 = Telnet (SFTP/SCP protocols only), 5 = Local (SFTP/SCP), For additional options with FTP protocol, see FtpProxyLogonType
+    $sftpSettings.Raw.Add("ProxyHost", $proxyUri)
+
+    If ( $proxyCredentials ) {
+        $sftpSettings.Raw.Add("ProxyUsername", $proxyCredentials.username)
+        $sftpSettings.Raw.Add("ProxyPassword", $proxyCredentials.password)
+    }
+}
+
 
 #-----------------------------------------------
 # MESSAGE SETTINGS
@@ -251,13 +353,15 @@ $response = @{
     exportFolder = "/export"                    # Remote export folder on sftp
     exportDirectory = "$( $scriptPath )\export" # Local folder for downloading export files from sftp
     taskDefaultName = "Response Gathering for Agnitas EMM"
-    triggerFerge = $true                            # Should FERGE be triggered to download response data
+    triggerFerge = $true                        # Should FERGE be triggered to download response data
+    bulkDirectory = "$( $scriptPath )\bulk"     # FERGE bulk folder - path needs to be reachable via SQLServer
     #maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
     #lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
     #lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
     #sleepTime = 3                                   # seconds to wait between the status checks of import
     #maxSecondsWaiting = 240                         # seconds to wait at maximum for the import
 }
+
 
 #-----------------------------------------------
 # SETTINGS OBJECT
@@ -277,9 +381,10 @@ $settings = @{
     "timestampFormat" = "yyyy-MM-dd--HH-mm-ss"
     "powershellExePath" = "powershell.exe"    # Define other powershell path, e.g if you want to use pwsh for powershell7
 
-    # Detail settings
-    "login" = $login
-
+    # Network settings
+    "changeTLS" = $true
+    "proxy" = $proxy # Proxy settings, if needed - will be automatically used
+    
     # SOAP settings
     "soap" = @{
         "base" = "https://ws.agnitas.de/2.0/"
@@ -288,21 +393,16 @@ $settings = @{
         "contentType" = "application/json;charset=utf-8"
         "authentication" = $soapAuth
     }
-    "baseSOAP" = "https://ws.agnitas.de/2.0/"
-
-    # SFTP settings
-    "sftpSession" = @{
-        "HostName" = $sftpHostname
-        "Username" = $sftpUsername
-        "Password" = $sftpPasswordEncrypted
-        "SshHostKeyFingerprint" = $sftpKeyfingerprint        
-    }
+    #"baseSOAP" = "https://ws.agnitas.de/2.0/"   # TODO [x] check which url is used
 
     # Detail settings
+    "login" = $login
+    "sftpSession" = $sftpSettings
     "messages" = $messages
     "upload" = $upload
     "broadcast" = $broadcast
     "response" = $response
+
 }
 
 
@@ -344,11 +444,38 @@ if ( !(Test-Path -Path "$( $libFolder )") ) {
     New-Item -Path "$( $libFolder )" -ItemType Directory
 }
 
+# Export folder to put exported files from Agnitas
 $exportDir = $settings.response.exportDirectory
 if ( !(Test-Path -Path "$( $exportDir )") ) {
     Write-Log -message "export folder '$( $exportDir )' does not exist. Creating the folder now!"
     New-Item -Path "$( $exportDir )" -ItemType Directory
 }
+
+# Bulk folder for FERGE - needs to be reachable from SQLServer
+$bulkDir = $settings.response.bulkDirectory
+if ( !(Test-Path -Path "$( $bulkDir )") ) {
+    Write-Log -message "bulk folder '$( $bulkDir )' does not exist. Creating the folder now! Make sure the path is reachable from SQLServer"
+    New-Item -Path "$( $bulkDir )" -ItemType Directory
+}
+
+################################################
+#
+# RELOAD EVERYTHING
+#
+################################################
+
+#-----------------------------------------------
+# RELOAD SETTINGS
+#-----------------------------------------------
+
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
+
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
+
+# Load the preparation file to prepare the connections
+. ".\bin\preparation.ps1"
 
 
 ################################################
@@ -394,20 +521,6 @@ if ( $libDlls.Name -notcontains $winscpDll ) {
 ################################################
 
 #-----------------------------------------------
-# RELOAD SETTINGS
-#-----------------------------------------------
-
-# Load the settings from the local json file
-. ".\bin\load_settings.ps1"
-
-# Load functions and assemblies
-. ".\bin\load_functions.ps1"
-
-# Load the preparation file to prepare the connections
-. ".\bin\preparation.ps1"
-
-
-#-----------------------------------------------
 # CALCULATE FINGERPRINT FOR SFTP
 #-----------------------------------------------
 
@@ -446,7 +559,15 @@ try {
     <#
     https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
     #>
-    $mailinglists = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailinglist" -Headers $header -ContentType $contentType -Verbose
+    $restParams = @{
+        Method = "Get"
+        Uri = "$( $apiRoot )/mailinglist"
+        Headers = $header
+        Verbose = $true
+        ContentType = $contentType
+    }
+    Check-Proxy -invokeParams $restParams
+    $mailinglists = Invoke-RestMethod @restParams
     Write-Log -message "Please choose your default import mailing list, that you are using in your auto import job"
     $standardMailingList = $mailinglists | Out-GridView -PassThru
     $settings.upload.standardMailingList = $standardMailingList.mailinglist_id

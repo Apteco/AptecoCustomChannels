@@ -118,15 +118,21 @@ try {
 # STEP 2: Check if Mailing is valid
 #-----------------------------------------------
 
+# Parse mailing input
 $mailingParsed = [Mailing]::new($params.MessageName)
-$invokeParams = [Hashtable]@{
+
+# Request mailings
+$restParams = @{
     Method = "Get"
     Uri = "$( $apiRoot )/mailing/$( [int]$mailingParsed.mailingId )"
     Headers = $header
     Verbose = $true
     ContentType = $contentType
 }
-$mailing = Invoke-RestMethod @invokeParams
+Check-Proxy -invokeParams $restParams
+$mailing = Invoke-RestMethod @restParams
+
+# Filter mailings
 $mailingMediatypes = $mailing.mediatypes | where { $_.type -eq "EMAIL" }
 
 <#
@@ -168,7 +174,15 @@ $recipientFields = @( ( $testRecipient.Personalisation | Get-Member -MemberType 
 #>
 
 # Get fields from EMM
-$mailinglistRecipients = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailinglist/$( $settings.upload.standardMailingList )/recipients" -Headers $header -ContentType $contentType -Verbose
+$restParams = @{
+    Method = "Get"
+    Uri = "$( $apiRoot )/mailinglist/$( $settings.upload.standardMailingList )/recipients"
+    Headers = $header
+    Verbose = $true
+    ContentType = $contentType
+}
+Check-Proxy -invokeParams $restParams
+$mailinglistRecipients = Invoke-RestMethod @restParams
 
 # Reading the columns of Agnitas EMM only works if you have one receiver as minimum
 if ( $mailinglistRecipients.recipients.count -gt 0 ) {
@@ -225,7 +239,7 @@ $equalColumns | ForEach {
     #creation_date = ""
 }#>
 
-$invokeParams = [Hashtable]@{
+$restParams = @{
     Method = "Put"
     Uri = "$( $apiRoot )/recipient?mailinglist=$( $settings.upload.standardMailingList )&status=1&mediaType=0"
     Headers = $header
@@ -233,7 +247,8 @@ $invokeParams = [Hashtable]@{
     ContentType = $contentType
     Body =  ConvertTo-Json -InputObject $body -Depth 99 -Compress
 }
-$putRecipient = Invoke-RestMethod @invokeParams
+Check-Proxy -invokeParams $restParams
+$putRecipient = Invoke-RestMethod @restParams
 
 # Logging for test recipient
 Write-Log -message "Created a test receiver with following data:"
@@ -248,7 +263,7 @@ $putRecipient | Get-Member -MemberType NoteProperty | ForEach {
 #-----------------------------------------------
 
 # Adding binding as a test receiver
-$invokeParams = [Hashtable]@{
+$restParams = @{
     Method = "Put"
     Uri = "$( $apiRoot )/binding/$( $putRecipient.customer_id )"
     Headers = $header
@@ -261,7 +276,8 @@ $invokeParams = [Hashtable]@{
         #creation_date = ""
     } | ConvertTo-Json -Depth 99 -Compress
 }
-$putBinding = Invoke-RestMethod @invokeParams
+Check-Proxy -invokeParams $restParams
+$putBinding = Invoke-RestMethod @restParams
 
 Write-Log -message "Result of put binding on test receiver: '$( $putBinding )'"
 
@@ -284,11 +300,10 @@ $getRecipient = Invoke-RestMethod @invokeParams
 # CREATE PREVIEW
 #-----------------------------------------------
 
-
 # Create fullview URL
 # https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Url-urlFullviewPost
 
-$invokeParams = [Hashtable]@{
+$restParams = [Hashtable]@{
     Method = "Post"
     Uri = "$( $apiRoot )/url/fullview"
     Headers = $header
@@ -301,9 +316,20 @@ $invokeParams = [Hashtable]@{
         #other_values = ""
     } | ConvertTo-Json -Depth 99 #-Compress
 }
-$putPreview = Invoke-RestMethod @invokeParams
+Check-Proxy -invokeParams $restParams
+$putPreview = Invoke-RestMethod @restParams
 
-$previewContent = Invoke-RestMethod -uri $putPreview -Method get -Verbose
+# Load preview html
+
+$restParams = @{
+    Method = "Get"
+    Uri = $putPreview
+    #Headers = $header
+    Verbose = $true
+    #ContentType = $contentType
+}
+Check-Proxy -invokeParams $restParams
+$previewContent = Invoke-RestMethod @restParams
 
 # PARSE URL AND OUTPUT
 
@@ -311,14 +337,15 @@ $previewContent = Invoke-RestMethod -uri $putPreview -Method get -Verbose
 # DELETE RECIPIENT
 #-----------------------------------------------
 
-$invokeParams = [Hashtable]@{
+$restParams = @{
     Method = "Delete"
     Uri = "$( $apiRoot )/recipient/$( $putRecipient.customer_id )"
     Headers = $header
     Verbose = $true
     ContentType = $contentType
 }
-$deleteRecipient = Invoke-RestMethod @invokeParams
+Check-Proxy -invokeParams $restParams
+$deleteRecipient = Invoke-RestMethod @restParams
 
 Write-Log -message "Result of deleting test receiver: '$( $deleteRecipient )'"
 

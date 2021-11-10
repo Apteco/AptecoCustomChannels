@@ -164,15 +164,18 @@ try {
         # STEP 2: Check if Mailing is valid
         #-----------------------------------------------
         
+        # Parse mailing string
         $mailingParsed = [Mailing]::new($params.MessageName)
-        $invokeParams = [Hashtable]@{
+
+        $restParams = [Hashtable]@{
             Method = "Get"
             Uri = "$( $apiRoot )/mailing/$( [int]$mailingParsed.mailingId )"
             Headers = $header
             Verbose = $true
             ContentType = $contentType
         }
-        $mailing = Invoke-RestMethod @invokeParams
+        Check-Proxy -invokeParams $restParams
+        $mailing = Invoke-RestMethod @restParams
 
 
         #-----------------------------------------------
@@ -311,7 +314,7 @@ try {
         $mailingId = $getMailing.mailingID
         #$send_date = (Get-Date).AddSeconds(10).ToString("yyyy-MM-ddTHH:mm:ssZ")  #example Format = 2017-07-21T17:32:28Z
 
-        $invokeParams = [Hashtable]@{
+        $restParams = [Hashtable]@{
             Method = "Post"
             Uri = "$( $apiRoot )/send/$( $mailingId )"
             Headers = $header
@@ -322,6 +325,7 @@ try {
                 #send_date = $send_date
             } | ConvertTo-Json -Depth 99
         }
+        Check-Proxy -invokeParams $restParams
 
         # Do the sending only if the mode is not prepare
         If ( $params.mode ) {
@@ -338,11 +342,12 @@ try {
                 <#
                     https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Send-sendMailingIdPost
                 #>
-                $sendMailing = Invoke-RestMethod @invokeParams #-Method Post -Uri $endpoint -Headers $header -ContentType $contentType -Body $bodyjson -Verbose
+
+                $sendMailing = Invoke-RestMethod @restParams #-Method Post -Uri $endpoint -Headers $header -ContentType $contentType -Body $bodyjson -Verbose
                 Write-Log -message "Broadcast done"
                 
-                # TODO [ ] Check status of mailing via SOAP
-                $invokeParams = [Hashtable]@{
+                # TODO [x] Check status of mailing via SOAP
+                $soapParams = [Hashtable]@{
                     method = "GetMailingStatus"
                     verboseCall = $false
                     namespace = "http://agnitas.org/ws/schemas"
@@ -359,7 +364,7 @@ try {
                 Do {
                     Start-Sleep -Seconds $sleepTime
                     Write-Log -message "Looking for the status of mailing $( $mailingId ) - last status: '$( $statusMailing.status )' - waiting already for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
-                    $statusMailing = Invoke-Agnitas @invokeParams # mailing.status.edit | mailing.status.sent | mailing.status.new
+                    $statusMailing = Invoke-Agnitas @soapParams # mailing.status.edit | mailing.status.sent | mailing.status.new
                     $timespan = New-TimeSpan -Start $startTime
                 } while ( $statusMailing.status -in @("mailing.status.sent") -and $timespan.TotalSeconds -lt $maxWaitTimeTotal)
                 

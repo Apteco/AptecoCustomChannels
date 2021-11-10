@@ -51,7 +51,7 @@ Function Invoke-Agnitas {
         )
 
     # load url
-    $baseUri = $script:settings.baseSOAP
+    $baseUri = $script:settings.soap.base
 
     # authentication
     $wsse = Create-WSSE-Token -cred $script:cred -noMilliseconds
@@ -113,7 +113,9 @@ $( $paramXml )
             #SkipHeaderValidation = $true
             #OutFile = "$( ([guid]::NewGuid()).Guid ).xml"
         }
+        Check-Proxy -invokeParams $restParams
         $response = Invoke-RestMethod @restParams
+
         #$response = Invoke-RestMethod -Uri $baseUri -Headers $headers -ContentType $contentType -Method Post -Body $soapEnvelopeXml -Verbose #-SkipHeaderValidation #-OutFile "$( ([guid]::NewGuid()).Guid ).xml"
 
     } catch {

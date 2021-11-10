@@ -122,15 +122,23 @@ try {
     #-----------------------------------------------
     # GET MAILINGS AND DELETE OLDER ONES AFTER X DAYS
     #-----------------------------------------------
-<#
+
     If ( $settings.response.cleanupMailings ) {
 
         Write-Log -message "Starting with mailings cleanup older than $( $settings.response.maxAgeMailings ) days"
 
         try {
 
-            $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
-    
+            $restParams = @{
+                Method = "Get"
+                Uri = "$( $apiRoot )/mailing"
+                Headers = $header
+                Verbose = $true
+                ContentType = $contentType
+            }
+            Check-Proxy -invokeParams $restParams
+            $mailings = Invoke-RestMethod @restParams
+
         } catch {
     
             Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
@@ -145,22 +153,34 @@ try {
         $mailings | where { $_.name -like "*$( $copyString )*" } | ForEach {
     
             $mailing = $_
-    
+            
+            Write-Log -message "Checking mailing '$( $mailing.mailing_id )' - '$( $mailing.name )'"
+
             # Extracting the date of the name
             $mailingNameParts = $mailing.name -split $copyString,2,"simplematch"
-            $mailingCreationDate = [Datetime]::ParseExact($mailingNameParts[1],$settings.timestampFormat,$null)
+            $mailingCreationDate = [Datetime]::ParseExact($mailingNameParts[1].Trim(),$settings.timestampFormat,$null)
             $age = New-TimeSpan -Start $timestamp -End $mailingCreationDate
     
             # Delete if older than
             If ( $age.TotalDays -lt $settings.response.maxAgeMailings ) {
+                
                 Write-Log -message "Deleting mailing '$( $mailing.mailing_id )' - '$( $mailing.name )'"
-                $mailings = Invoke-RestMethod -Method Delete -Uri "$( $apiRoot )/mailing/$( $mailing.mailing_id )" -Headers $header -Verbose -ContentType $contentType
+                $restParams = @{
+                    Method = "Delete"
+                    Uri = "$( $apiRoot )/mailing/$( $mailing.mailing_id )"
+                    Headers = $header
+                    Verbose = $true
+                    ContentType = $contentType
+                }
+                Check-Proxy -invokeParams $restParams
+                $mailing = Invoke-RestMethod @restParams
+
             }
     
         }
 
     }
-#>
+
 
     #-----------------------------------------------
     # PREPARE SFTP SESSION
@@ -176,6 +196,13 @@ try {
         Username = $settings.sftpSession.Username
         Password = Get-SecureToPlaintext -String $settings.sftpSession.Password
         SshHostKeyFingerprint = $settings.sftpSession.SshHostKeyFingerprint
+    }
+
+    # Add raw settings, e.g. for proxy
+    $settings.sftpSession.raw.Keys | ForEach {
+        $key = $_
+        $value = $settings.sftpSession.raw.$key
+        $sessionOptions.AddRawSettings($key, $value)
     }
 
     $winscpExe = ( $libExecutables | where { $_.Name -eq "WinSCP.exe" } | select -first 1 ).fullname
@@ -302,11 +329,11 @@ try {
     $csvFiles = @( Get-Childitem -path "$( $settings.response.exportDirectory )" -Filter "*.csv" )
     Write-Log "$( $csvFiles.count ) csv files to process"
 
-    $sentsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_sents.csv"
-    $opensFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_opens.csv"
-    $clicksFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_clicks.csv"
-    $bouncesFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_bounces.csv"
-    $unsubsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_unsubscribes.csv" 
+    $sentsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_sents.csv"
+    $opensFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_opens.csv"
+    $clicksFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_clicks.csv"
+    $bouncesFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_bounces.csv"
+    $unsubsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_unsubscribes.csv" 
 
     $csvFiles | ForEach {
 
@@ -350,11 +377,14 @@ try {
             Write-Log "  $( $unsubs.count ) unsubscribes"
             #>
 
+            Write-Log "  Removing file after parsing" # TODO [ ] maybe put this to the end
+            Remove-Item -path $csvFile.FullName -force
+
         }
 
     }
 
-    exit 0
+    #exit 0
     
     #-----------------------------------------------
     # UPDATE BROADCASTS IN RESPONSE DATABASE
@@ -365,7 +395,7 @@ try {
     #-----------------------------------------------
     # LOAD BROADCAST DETAILS
     #----------------------------------------------- 
-
+<#
     # prepare query
     # TODO [ ] put this file maybe into settings
     $selectBroadcastsSQL = Get-Content -Path ".\sql\update_broadcast_details_provider.sql" -Encoding UTF8
@@ -401,7 +431,7 @@ try {
 
                 # execute query
                 NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcasts2SQL )"
-
+#>
     #-----------------------------------------------
     # NEXT STEP - TRIGGER FERGE LOCALLY
     #-----------------------------------------------
@@ -411,8 +441,11 @@ try {
     #"C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
     #Start-Process -FilePath "C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
 
+    $fergeCsvFiles = @( Get-Childitem -path "$( $settings.response.exportDirectory )" -Filter "*_FERGE_*.csv" )
 
-    if ( $settings.response.triggerFerge ) {
+    Write-Log -message "Found '$( $fergeCsvFiles.count )' files to process with FERGE"
+
+    if ( $settings.response.triggerFerge -and $fergeCsvFiles.count -gt 0 ) {
 
         # Find FERGE with PATH
         try {
@@ -427,7 +460,7 @@ try {
         Write-Log -message "Trigger FERGE"
         $timeForImport = Measure-Command {
             # TODO [ ] put the xml path into settings
-            Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml")
+            Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml") -nonewwindow
         }
         Write-Log -message "FERGE done in $( $timeForImport.TotalSeconds ) seconds"
     
@@ -468,7 +501,7 @@ try {
     #
     ################################################
 
-    $messages
+    #$messages
 
 }
 

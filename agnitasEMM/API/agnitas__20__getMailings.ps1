@@ -129,7 +129,15 @@ try {
         <#
         https://emm.agnitas.de/manual/en/pdf/EMM_Restful_Documentation.html#api-Mailing-getMailings
         #>
-        $mailings = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailing" -Headers $header -Verbose -ContentType $contentType
+        $restParams = @{
+            Method = "Get"
+            Uri = "$( $apiRoot )/mailing"
+            Headers = $header
+            Verbose = $true
+            ContentType = $contentType
+        }
+        Check-Proxy -invokeParams $restParams
+        $mailings = Invoke-RestMethod @restParams
 
     } catch {
 

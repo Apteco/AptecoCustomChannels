@@ -165,6 +165,13 @@ try {
             SshHostKeyFingerprint = $settings.sftpSession.SshHostKeyFingerprint
         }
 
+        # Add raw settings, e.g. for proxy
+        $settings.sftpSession.raw.Keys | ForEach {
+            $key = $_
+            $value = $settings.sftpSession.raw.$key
+            $sessionOptions.AddRawSettings($key, $value)
+        }
+
         # This Object will connect to the SFTP Server
         $session = [WinSCP.Session]::new()
         $session.ExecutablePath = ( $libExecutables | where { $_.Name -eq "WinSCP.exe" } | select -first 1 ).fullname
@@ -236,7 +243,15 @@ try {
     #>
 
     # Get fields from EMM
-    $mailinglistRecipients = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )/mailinglist/$( $settings.upload.standardMailingList )/recipients" -Headers $header -ContentType $contentType -Verbose
+    $restParams = @{
+        Method = "Get"
+        Uri = "$( $apiRoot )/mailinglist/$( $settings.upload.standardMailingList )/recipients"
+        Headers = $header
+        Verbose = $true
+        ContentType = $contentType
+    }
+    Check-Proxy -invokeParams $restParams
+    $mailinglistRecipients = Invoke-RestMethod @restParams
     
     # Reading the columns of Agnitas EMM only works if you have one receiver as minimum
     if ( $mailinglistRecipients.recipients.count -gt 0 ) {
@@ -296,8 +311,20 @@ try {
     $autoimport_id = $settings.upload.autoImportId # API-Auto-Import Id in Agnitas EMM
     $c = 0 # time counter
 
+    # Trigger auto import
     $endpoint = "$( $apiRoot )/autoimport/$( $autoimport_id )"
-    $invokePost = Invoke-RestMethod -Method Post -Uri $endpoint -Headers $header -ContentType $contentType -Verbose
+    $restParams = @{
+        Method = "Post"
+        Uri = $endpoint
+        Headers = $header
+        Verbose = $true
+        ContentType = $contentType
+    }
+    Check-Proxy -invokeParams $restParams
+    $invokePost = Invoke-RestMethod @restParams
+
+    # Prepare call and only change http method verb
+    $restParams.Method = "Get"
 
     # Checking whether the Autoimport has finished uploading the recipients into Agnitas
     # TODO [ ] Implement timeout mechanism
@@ -307,7 +334,7 @@ try {
     Do {
         Start-Sleep -Seconds $sleepTime
         Write-Log -message "Looking for the status of auto import $( $autoimport_id ) - last status: '$( $status.status )' - waiting already for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
-        $status = Invoke-RestMethod -Uri $endpoint -Method Get -Headers $header -Verbose -ContentType $contentType
+        $status = Invoke-RestMethod @restParams
         $timespan = New-TimeSpan -Start $startTime
     } while ( $status.status -in @("running") -and $timespan.TotalSeconds -lt $maxWaitTimeTotal)
 
