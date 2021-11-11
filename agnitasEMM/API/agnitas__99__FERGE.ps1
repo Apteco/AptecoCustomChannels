@@ -13,7 +13,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 
 #-----------------------------------------------
@@ -273,7 +273,7 @@ try {
                 $synchronizationResult = $session.SynchronizeDirectories([WinSCP.SynchronizationMode]::Local, "$( $settings.response.exportDirectory )", $settings.response.exportFolder, $False)
 
                 # Example part of https://winscp.net/eng/docs/library_example_delete_after_successful_download
-                $archiveFolder = "$( $settings.upload.archiveFolder )/"
+                $archiveFolder = "$( $settings.upload.archiveFolder )/*.*"
                 foreach ($download in $synchronizationResult.Downloads) {
 
                     # Success or error?
@@ -281,14 +281,22 @@ try {
                         Write-Host "Download of $($download.FileName) succeeded, removing from source"
                         # Download succeeded, remove file from source
                         $filename = [WinSCP.RemotePath]::EscapeFileMask($download.FileName)
-                        $moveResult = $session.MoveFile($filename, $archiveFolder)
+                        
+                        try {
+                            $moveResult = $session.MoveFile($filename, $archiveFolder)
+                            #Write-Host "$( $moveResult )"
+                            Write-Log -message "Moving of file '$($download.FileName)' to '$( $archiveFolder )' succeeded"
+                        } catch {
+                            Write-Log -message "Moving of file '$($download.FileName)' failed" -severity ( [Logseverity]::WARNING )
+                        }
+                        
                         #$removalResult = $session.RemoveFiles($filename)
          
-                        if ($moveResult.IsSuccess) {
-                            Write-Log "Moving of file '$($download.FileName)'' to '$( $archiveFolder )'' succeeded"
-                        } else {
-                            Write-Log -message "Moving of file '$($download.FileName)'' failed" -severity ( [Logseverity]::WARNING )
-                        }
+                        #if ($moveResult.IsSuccess) {
+                            
+                        #} else {
+                            
+                        #}
                     } else {
                         Write-Log -message ("Download of $($download.FileName) failed: $($download.Error.Message)") -severity ( [Logseverity]::WARNING )
                     }
@@ -362,6 +370,7 @@ try {
             Write-Log "  $( $opens.count ) opens"
 <#
             # X = CLICK
+            # TODO [ ] PUT CLICKS INTO ANOTHER COLUMN "CLICKDATE"
             $clicks = @( $csv | where { $_.EVENT -eq 0 } )
             $clicks | select *, @{name="MessageType"; expression={ "Click" }} | Export-Csv -Path $clicksFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
             Write-Log "  $( $clicks.count ) clicks"
@@ -460,7 +469,7 @@ try {
         Write-Log -message "Trigger FERGE"
         $timeForImport = Measure-Command {
             # TODO [ ] put the xml path into settings
-            Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml") -nonewwindow
+            Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml") -nonewwindow -Wait
         }
         Write-Log -message "FERGE done in $( $timeForImport.TotalSeconds ) seconds"
     
@@ -471,11 +480,97 @@ try {
     # ASK TO CREATE A SCHEDULED TASK
     #-----------------------------------------------
 
+    # Only ask for task creation if in debug mode
     If ( $debug ) {
+
+        $scheduledTaskDecision = $Host.UI.PromptForChoice("Create scheduled task", "Do you want to create a scheduled task for response gathering?", @('&Yes'; '&No'), 1)
+        If ( $scheduledTaskDecision -eq "0" ) {
+
+            # Means yes and proceed
+            Write-Log -message "Creating a scheduled task for housekeeping Agnitas EMM and gather responses"
+
+            # Default file
+            $taskNameDefault = $settings.response.taskDefaultName
+
+            # Replace task?
+            $replaceTask = $Host.UI.PromptForChoice("Replace Task", "Do you want to replace the existing task if it exists?", @('&Yes'; '&No'), 0)
+
+            If ( $replaceTask -eq 0 ) {
+                
+                # Check if the task already exists
+                $matchingTasks = Get-ScheduledTask | where { $_.TaskName -eq $taskName }
+
+                If ( $matchingTasks.count -ge 1 ) {
+                    Write-Log -message "Removing the previous scheduled task for recreation"
+                    # To replace the task, remove it without confirmation
+                    Unregister-ScheduledTask -TaskName $taskNameDefault -Confirm:$false
+                }
+                
+                # Set the task name to default
+                $taskName = $taskNameDefault
+
+            } else {
+
+                # Ask for task name or use default value
+                $taskName  = Read-Host -Prompt "Which name should the task have? [$( $taskNameDefault )]"
+                if ( $taskName -eq "" -or $null -eq $taskName) {
+                    $taskName = $taskNameDefault
+                }
+
+            }
+
+            Write-Log -message "Using name '$( $taskName )' for the task"
+
+
+            # TODO [ ] Find a reliable method for credentials testing
+            # TODO [ ] Check if a user has BatchJobrights ##[System.Security.Principal.WindowsIdentity]::GrantUserLogonAsBatchJob
+
+            # Enter username and password
+            $taskCred = Get-Credential
+
+            # Define time schedules
+            $triggerSchedules = [System.Collections.ArrayList]@()
+            For ($i = 0; $i -lt 24 ; $i+=1) {
+                [void]$triggerSchedules.Add(
+                    ( New-ScheduledTaskTrigger -Daily -at ([Datetime]::Today.AddDays(1).AddHours($i).AddMinutes(5)) )
+                )
+            }
+
+            # Parameters for scheduled task
+            $taskParams = [Hashtable]@{
+                TaskPath = "\Apteco\"
+                TaskName = $taskname
+                Description = "Removing older files from SFTP, deleting older mailings from Agnitas EMM, gather responses from SFTP and trigger FERGE"
+                Action = New-ScheduledTaskAction -Execute "$( $settings.powershellExePath )" -Argument "-ExecutionPolicy Bypass -File ""$( $MyInvocation.MyCommand.Definition )"""
+                #Principal = New-ScheduledTaskPrincipal -UserId $taskCred.Name -LogonType "ServiceAccount" # Using this one is always interactive mode and NOT running in the background
+                Trigger = $triggerSchedules
+                Settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -MultipleInstances "Parallel" # Max runtime of 3 minutes
+                User = $taskCred.UserName
+                Password = $taskCred.GetNetworkCredential().Password
+                #AsJob = $true
+            }
+
+            # Create the scheduled task
+            try {
+                Write-Log -message "Creating the scheduled task now"
+                $newTask = Register-ScheduledTask @taskParams #T1 -InputObject $task
+            } catch {
+                Write-Log -message "Creation of task failed or is not completed, please check your scheduled tasks and try again"
+                throw $_.Exception
+            }
+
+            # Check the scheduled task
+            $task = $newTask #Get-ScheduledTask | where { $_.TaskName -eq $taskName }
+            $taskInfo = $task | Get-ScheduledTaskInfo
+            Write-Host "Task with name '$( $task.TaskName )' in '$( $task.TaskPath )' was created"
+            Write-Host "Next run '$( $taskInfo.NextRunTime.ToLocalTime().ToString() )' local time"
+            # The task will only be created if valid. Make sure it was created successfully
+
+        }
+
         # TODO [ ] Check this one
         #. ".\bin\create_scheduled_task.ps1"
     }
-
 
 
 } catch {

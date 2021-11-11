@@ -283,7 +283,6 @@ try {
     # STEP 4: Check if slot for auto import is free
     #---------------------------------------------------------
 
-
     If ( Test-Path -Path $settings.broadcast.lockfile ) {
 
         $lockfile = Get-Item -Path "$( $settings.broadcast.lockfile )"

@@ -352,14 +352,9 @@ $response = @{
     maxAgeArchiveFiles = -7                     # Max age for files on the sftp archive folder
     exportFolder = "/export"                    # Remote export folder on sftp
     exportDirectory = "$( $scriptPath )\export" # Local folder for downloading export files from sftp
-    taskDefaultName = "Response Gathering for Agnitas EMM"
     triggerFerge = $true                        # Should FERGE be triggered to download response data
     bulkDirectory = "$( $scriptPath )\bulk"     # FERGE bulk folder - path needs to be reachable via SQLServer
-    #maxLockfileAge = 600                            # max seconds to exist for a lockfile - after that it will be deleted and will proceed with the next broadcast
-    #lockfileRetries = 30                            # How often do you want to request the existence of the lockfile 
-    #lockfileDelayWhileWaiting = 10000               # Millieseconds delay between retries
-    #sleepTime = 3                                   # seconds to wait between the status checks of import
-    #maxSecondsWaiting = 240                         # seconds to wait at maximum for the import
+    taskDefaultName = "Response Gathering for Agnitas EMM"
 }
 
 
