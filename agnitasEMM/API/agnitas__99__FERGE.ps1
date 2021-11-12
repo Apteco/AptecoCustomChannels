@@ -4,9 +4,9 @@
 #
 ################################################
 
-Param(
-    [hashtable] $params
-)
+# Param(
+#     [hashtable] $params
+# )
 
 
 #-----------------------------------------------
@@ -20,14 +20,14 @@ $debug = $false
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
 
-if ( $debug ) {
-    $params = [hashtable]@{
-	    Password= "def"
-	    scriptPath= "D:\Scripts\AgnitasEMM"
-	    abc= "def"
-	    Username= "abc"
-    }
-}
+# if ( $debug ) {
+#     $params = [hashtable]@{
+# 	    Password= "def"
+# 	    scriptPath= "D:\Scripts\AgnitasEMM"
+# 	    abc= "def"
+# 	    Username= "abc"
+#     }
+# }
 
 
 ################################################
@@ -57,7 +57,8 @@ if ( $debug ) {
         $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
     }
 } else {
-    $scriptPath = "$( $params.scriptPath )" 
+    #$scriptPath = "$( $params.scriptPath )" 
+    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 }
 Set-Location -Path $scriptPath
 
@@ -588,6 +589,8 @@ try {
     
     throw $_.exception
 
+    exit 1
+
 } finally {
 
     ################################################
@@ -600,7 +603,7 @@ try {
 
 }
 
-
+exit 0
 
 
 
