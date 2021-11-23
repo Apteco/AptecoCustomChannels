@@ -22,8 +22,7 @@ $configMode = $true
 
 <#
 
-https://ws.agnitas.de/2.0/emmservices.wsdl
-https://emm.agnitas.de/manual/de/pdf/webservice_pdf_de.pdf
+
 
 #>
 
@@ -154,10 +153,9 @@ Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WAR
 # LOGIN DATA
 #-----------------------------------------------
 
-# TODO [ ] ask for a password
-#$username = Read-Host -Prompt "Please enter your klicktipp username" 
-#$password = Read-Host -Prompt "Please enter your klicktipp password" -AsSecureString
-
+# TODO [x] ask for a password
+$username = Read-Host -Prompt "Please enter your klicktipp username" 
+$password = Read-Host -Prompt "Please enter your klicktipp password" -AsSecureString
 
 $passwordEncrypted = Get-PlaintextToSecure ([System.Management.Automation.PSCredential]::new("dummy",$password).GetNetworkCredential().Password)
 
@@ -231,6 +229,7 @@ $settings = @{
     "logfile" = $logfile                                    # logfile
     "providername" = "klicktipp"                        # identifier for this custom integration, this is used for the response allocation
     "sqliteDB" = "$( $scriptPath )\klicktipp.sqlite"
+    "sqliteDll" = "System.Data.SQLite.dll"
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
@@ -402,6 +401,78 @@ if ( $libExecutables.Name -notcontains $sqliteDll ) {
 
 ################################################
 #
+# DOWNLOAD AND INSTALL THE SQLITE PACKAGE
+#
+################################################
+# TODO [ ] add some hints here on sqlite code
+
+$sqliteDll = $settings.sqliteDll
+
+# Temporary destination for download
+$tempfolderDestination = "$( $env:TEMP )/$( [guid]::NewGuid().toString() )"
+$tempfileDestination = "$( $tempfolderDestination ).nupkg"
+
+if ( $libDlls.Name -notcontains $sqliteDll ) {
+
+    Write-Log -message "The sqlite package will be downloaded now"
+    
+    # Download and unzip the latest package
+    Invoke-RestMethod -Uri "https://www.nuget.org/api/v2/package/Stub.System.Data.SQLite.Core.NetFramework" -OutFile $tempfileDestination
+    Expand-Archive -Path $tempfileDestination -DestinationPath $tempfolderDestination
+
+    # Load nuspec
+    $nuspecFile = Get-ChildItem -Path $tempfolderDestination -Filter  "*.nuspec" | Select -first 1 | Get-Content -Encoding utf8
+    $nuspec = [xml]$nuspecFile
+    $metadata = $nuspec.package.metadata
+
+    # Confirm you read the licence details
+    Start-Process $metadata.licenseUrl
+    $decision = $Host.UI.PromptForChoice("Confirmation", "Can you confirm you read '$( $metadata.licenseUrl )' that just opened?", @('&Yes'; '&No'), 1)
+
+    If ( $decision -eq "0" ) {
+
+        # Means yes and proceed
+        
+        # Destination
+        $libDestination = "$( $libFolder )/$( $metadata.id )_$( $metadata.version )"
+        New-Item -Path $libDestination -ItemType Directory
+
+        # Choose the .net archive
+        $nugetLib = "$( $tempfolderDestination )\lib"
+        $nugetBuild = "$( $tempfolderDestination )\build"
+        $netVersion = Get-ChildItem -Path $nugetLib | Select Name | Out-GridView -PassThru
+        Write-Log -message "Using .net version '$( $netVersion.Name )'"
+
+        # Copy files over
+        Copy-Item -Path "$( $nugetLib )/$( $netVersion.Name )/*.*" -Destination $libDestination 
+        If ( [System.Environment]::Is64BitOperatingSystem ) {
+            $architecture = "x64"
+        } else {
+            $architecture = "x86"
+        }
+        Copy-Item -Path "$( $nugetBuild )/$( $netVersion.Name )/$( $architecture )/*.*" -Destination $libDestination
+
+        # Remove temporary files
+        Remove-Item -Path $tempfolderDestination -Force -Recurse
+        Remove-Item -Path $tempfileDestination -Force
+
+    } else {
+        
+        # Remove temporary files
+        Remove-Item -Path $tempfolderDestination -Force -Recurse
+        Remove-Item -Path $tempfileDestination -Force
+
+        # Leave the process here
+        exit 0
+
+    }
+
+
+}
+
+
+################################################
+#
 # PREPARE SQLITE DATABASE
 #
 ################################################
@@ -464,7 +535,6 @@ If ( -not (Test-Path -Path "$( $settings.sqliteDB )" ) ) {
     $connection.Dispose()
 
 } 
-
 
 
 ################################################

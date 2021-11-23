@@ -48,7 +48,7 @@ $defaultRestParams = @{
     "Websession" = $WebSession
     "ContentType" = $settings.contentType
     "Headers" = $headers
-    "Verbose" = $true
+    #"Verbose" = $true
 }
 
 

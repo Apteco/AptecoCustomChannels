@@ -3,7 +3,7 @@
 if ( $settings.changeTLS ) {
     $AllProtocols = @(    
         #[System.Net.SecurityProtocolType]::Ssl3
-        [System.Net.SecurityProtocolType]::Tls13
+        #[System.Net.SecurityProtocolType]::Tls13
         [System.Net.SecurityProtocolType]::Tls12
         #[System.Net.SecurityProtocolType]::Tls11
     )

@@ -39,3 +39,4 @@ _dev
 # executables and config files
 *.exe*
 *.dll*
+*.db
