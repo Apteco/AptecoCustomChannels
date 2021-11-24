@@ -24,15 +24,16 @@ if ( $debug ) {
         # From Upload Script
         #TargetGroupId = "12345"
 
-        ProcessId = '05679889-78ad-4d02-aa81-badedc44cdc6'
+        ListName = '773320 | Skate'
         MessageName = '773320 | Skate'
         Username = 'ko'
         RecipientsQueued = '5'
-        TransactionId = '54464'
+        TransactionId = '54462'
         CustomProvider = 'AGNITAS-UPLOAD-MAILING'
         Password = 'ko'
-        ListName = '773320 | Skate'
-        TargetGroupId = '54464'
+        mode = 'send'
+        ProcessId = '1eb0b819-fde4-4c5e-8d77-f926f2903e2b'
+        TargetGroupId = '54462'
         scriptPath = 'D:\Scripts\AgnitasEMM'
                 
 
@@ -181,7 +182,7 @@ try {
         #-----------------------------------------------
         # STEP 3: Copy Mailing - SOAP
         #-----------------------------------------------
-
+        <#
         $invokeParams = [Hashtable]@{
             method = "CopyMailing"
             verboseCall = $false
@@ -204,12 +205,53 @@ try {
 
         # ! CopyMailing returns the mailingId of the copied mailing
         $copyMailing = Invoke-Agnitas @invokeParams #-method "CopyMailing" -param $param -verboseCall -namespace $namespace #-wsse $wsse -noresponse 
+#>
+        try {
 
+            $restParams = [Hashtable]@{
+                Method = "Post"
+                Uri = "$( $apiRoot )/mailing/$( $mailing.id )/copy"
+                Headers = $header
+                ContentType = $contentType
+                Verbose = $true
+                Body = @{
+                    send_type = "W"
+                    #send_date = $send_date
+                } | ConvertTo-Json -Depth 99
+            }
+            Check-Proxy -invokeParams $restParams
+            $copyMailing = Invoke-RestMethod @restParams
+
+            # Change name of mailing and targetgroup
+            $restParams = @{
+                Method = "Put"
+                Uri = "$( $apiRoot )/mailing/$( $copyMailing.mailing_id )"
+                Headers = $header
+                Verbose = $true
+                ContentType = $contentType
+                Body = @{
+                    "shortname" = "$( $mailing.shortname ) $( $settings.messages.copyString ) $( $timestamp.toString($settings.timestampFormat) )"
+                    "mailinglist_id" = [int]$settings.upload.standardMailingList
+                    "target_expression" = $params.TargetGroupId
+                    #"description" = ""
+                } | ConvertTo-Json -Depth 99 -Compress
+            }
+            Check-Proxy -invokeParams $restParams
+            $updatedMailing = Invoke-RestMethod @restParams
+
+        } catch {
+
+            Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+            Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+
+            throw $_.Exception
+
+        }
 
         #---------------------------------------------------------------------
         # STEP 4: Get copied Mailing Details - SOAP
         #---------------------------------------------------------------------
-
+        <#
         $mailingId = [int]$copyMailing.copyId.value
 
         $invokeParams = [Hashtable]@{
@@ -224,12 +266,13 @@ try {
             }
         }
         $getMailing = Invoke-Agnitas @invokeParams
-
+        #>
 
         #--------------------------------------------------------------------------
         # STEP 5: Update Mailing - Connect TargetList with copied mailing - SOAP
         #--------------------------------------------------------------------------
 
+        <#
         $invokeParams = [hashtable]@{
             method = "UpdateMailing"
             verboseCall = $false
@@ -305,13 +348,13 @@ try {
         }
 
         Invoke-Agnitas @invokeParams #-method "UpdateMailing" -param $param -namespace "http://agnitas.org/ws/schemas" -noresponse  #-wsse $wsse 
-
+        #>
 
         #-----------------------------------------------
         # STEP 6: Send Mailing - REST
         #-----------------------------------------------
 
-        $mailingId = $getMailing.mailingID
+        $mailingId = $copyMailing.mailing_id
         #$send_date = (Get-Date).AddSeconds(10).ToString("yyyy-MM-ddTHH:mm:ssZ")  #example Format = 2017-07-21T17:32:28Z
 
         $restParams = [Hashtable]@{
@@ -347,6 +390,7 @@ try {
                 Write-Log -message "Broadcast done"
                 
                 # TODO [x] Check status of mailing via SOAP
+                <#
                 $soapParams = [Hashtable]@{
                     method = "GetMailingStatus"
                     verboseCall = $false
@@ -358,19 +402,36 @@ try {
                         }
                     }
                 }
+                #>
+                $restParams = [Hashtable]@{
+                    Method = "Get"
+                    Uri = "$( $apiRoot )/mailing/$( $mailingId )/status"
+                    Headers = $header
+                    ContentType = $contentType
+                    Verbose = $true
+                }
+                Check-Proxy -invokeParams $restParams
+
                 $sleepTime = $settings.upload.sleepTime
                 $maxWaitTimeTotal = $settings.upload.maxSecondsWaiting
                 $startTime = Get-Date
                 Do {
                     Start-Sleep -Seconds $sleepTime
-                    Write-Log -message "Looking for the status of mailing $( $mailingId ) - last status: '$( $statusMailing.status )' - waiting already for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
-                    $statusMailing = Invoke-Agnitas @soapParams # mailing.status.edit | mailing.status.sent | mailing.status.new
+                    #$statusMailing = Invoke-Agnitas @soapParams # mailing.status.edit | mailing.status.sent | mailing.status.new
+                    $statusMailing = Invoke-RestMethod @restParams
+                    Write-Log -message "Looking for the status of mailing $( $mailingId ) - current status: '$( $statusMailing )' - waiting already for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
+                    #status could be NEW|GENERATION_FINISHED|SENT
                     $timespan = New-TimeSpan -Start $startTime
-                } while ( $statusMailing.status -in @("mailing.status.sent") -and $timespan.TotalSeconds -lt $maxWaitTimeTotal)
+                } while ( $statusMailing -notin @("SENT") -and $timespan.TotalSeconds -lt $maxWaitTimeTotal)
                 
                 Write-Log -message "Mailing status check completed"
-                Write-Log -message "Status of mailing $( $mailingId ) - last status: '$( $statusMailing.status )' - waited for '$( $timespan.TotalSeconds + $sleepTime )' seconds"
-                                    
+                Write-Log -message "Status of mailing $( $mailingId ) - last status: '$( $statusMailing )' - waited for '$( $timespan.TotalSeconds )' seconds"
+
+                # This means it wasn't sent off in time
+                if ( $statusMailing -notin @("SENT") ) {                    
+                    throw [System.IO.InvalidDataException] "Mailing was not in status 'SENT' after completion of timeout"
+                }
+
             }
         }
 

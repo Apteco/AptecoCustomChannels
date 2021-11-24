@@ -175,7 +175,7 @@ $credentialsEncrypted = Get-PlaintextToSecure $auth
 $login = @{
     "authenticationHeader" = $credentialsEncrypted
 }
-
+<#
 # Soap Password
 $soapUsername = Read-Host "Please enter the username for Agnitas SOAP API"
 $soapPassword = Read-Host -AsSecureString "Please enter the password for Agnitas SOAP API"
@@ -185,7 +185,7 @@ $soapAuth =@{
     username = $soapUsername
     password = $soapPasswordEncrypted
 }
-
+#>
 
 #-----------------------------------------------
 # ASK IF THERE IS A PROXY USED
@@ -320,8 +320,8 @@ $upload = @{
     standardMailingList = 0
     autoImportId = $autoImport
     archiveImportFile = $true
-    sleepTime = 3               # seconds to wait between the status checks of import
-    maxSecondsWaiting = 240     # seconds to wait at maximum for the import
+    sleepTime = 8               # seconds to wait between the status checks of import
+    maxSecondsWaiting = 300     # seconds to wait at maximum for the import
     archiveFolder = "/archive"
     uploadFolder = "/import"
 }
@@ -381,13 +381,13 @@ $settings = @{
     "proxy" = $proxy # Proxy settings, if needed - will be automatically used
     
     # SOAP settings
-    "soap" = @{
-        "base" = "https://ws.agnitas.de/2.0/"
-        "Username" = $soapUsername
-        "Password" = $soapPasswordEncrypted
-        "contentType" = "application/json;charset=utf-8"
-        "authentication" = $soapAuth
-    }
+    # "soap" = @{
+    #     "base" = "https://ws.agnitas.de/2.0/"
+    #     "Username" = $soapUsername
+    #     "Password" = $soapPasswordEncrypted
+    #     "contentType" = "application/json;charset=utf-8"
+    #     "authentication" = $soapAuth
+    # }
     #"baseSOAP" = "https://ws.agnitas.de/2.0/"   # TODO [x] check which url is used
 
     # Detail settings
@@ -592,12 +592,12 @@ try {
     If ( $aptecoTargetgroups.count -lt $settings.upload.rotatingTargetGroups ) {
         $targetgroupsToCreate = $settings.upload.rotatingTargetGroups - $aptecoTargetgroups.Count
         for ( $i = 0 ; $i -lt $targetgroupsToCreate ; $i++) {
-
+            <#
             # Prepare parameters
             $param = @{
                 name = [Hashtable]@{
                     type = "string"
-                    value = "$( $settings.upload.targetGroupPrefix )$( $timestamp.toString( $settings.timestampFormat ) )"
+                    value = "$( $settings.upload.targetGroupPrefix )$( $timestamp.toString( $settings.timestampFormat ) ) "
                 }
                 description = [Hashtable]@{
                     type = "string"
@@ -611,14 +611,31 @@ try {
 
             # Create the target group now
             $newTargetgroup = Invoke-Agnitas -method "AddTargetGroup" -param $param -verboseCall -namespace "http://agnitas.com/ws/schemas" #-wsse $wsse #-verboseCall        
-            Write-Log -message "Created new target group with ID '$( $newTargetgroup.targetId )'"
+#>
+            # Create the target group now
+            $restParams = @{
+                Method = "Post"
+                Uri = "$( $apiRoot )/target"
+                Headers = $header
+                Verbose = $true
+                ContentType = $contentType
+                Body = @{
+                    "name" = "$( $settings.upload.targetGroupPrefix )$( $timestamp.toString( $settings.timestampFormat ) ) #$( $i )" # Adding i because it does not accept multiple targetgroups with the same name
+                    "description" = "Targetgroup for a rotating system so for each new mailing the oldest targetgroup will be recycled"
+                    "eql" = "send_id = '$( [guid]::NewGuid().toString() )'"
+                } | ConvertTo-Json -Depth 99 -Compress
+            }
+            Check-Proxy -invokeParams $restParams
+            $newTargetgroup = Invoke-RestMethod @restParams
+
+            Write-Log -message "Created new target group with ID '$( $newTargetgroup.target_id )'"
 
         }
     }
 
 } catch {
 
-    Write-Log -message "Got exception during SOAP connection test" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "Got exception during target group creation" -severity ( [LogSeverity]::ERROR )
     Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
     Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
     Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )

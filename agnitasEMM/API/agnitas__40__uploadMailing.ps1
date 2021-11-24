@@ -23,15 +23,16 @@ if ( $debug ) {
         TransactionType = 'Replace'
         Password = 'ko'
         scriptPath = 'D:\Scripts\AgnitasEMM'
-        MessageName = ''
+        MessageName = '773320 | Skate'
         EmailFieldName = 'email'
         SmsFieldName = ''
-        Path = 'd:\faststats\Publish\Handel\system\Deliveries\PowerShell_772923  Sushi_134e9c15-724b-439b-8a53-b71af92b4fe2.txt'
+        Path = 'd:\faststats\Publish\Handel\system\Deliveries\PowerShell_773320  Skate_2d910e5c-642d-4d17-a71b-709b264bba19.txt'
         ReplyToEmail = ''
         Username = 'ko'
         ReplyToSMS = ''
+        mode = 'send'
         UrnFieldName = 'Kunden ID'
-        ListName = '772923 | Sushi'
+        ListName = '773320 | Skate'
         CommunicationKeyFieldName = 'Communication Key'
     }
 }
@@ -400,9 +401,11 @@ try {
 
     Write-Log -message "Using targetgroup '$( $targetGroup.targetGroupId )'"
 
+    
     # Update target groups name and definition
     $targetGroupname = "$( $settings.upload.targetGroupPrefix )$( $timestamp.toString( $settings.timestampFormat ) )"
     Write-Log -message "Updating targetgroup to name '$( $targetGroupname )' and change definition to use the send id '$( $send_id.guid )'"
+    <#
     $params = [Hashtable]@{
         method = "UpdateTargetGroup"
         param = [Hashtable]@{
@@ -424,6 +427,42 @@ try {
         #verboseCall = $true
     }
     Invoke-Agnitas @params
+    #>
+
+    # Load the data from Agnitas EMM
+    try {
+
+        $restParams = @{
+            Method = "Put"
+            Uri = "$( $apiRoot )/target/$( $targetGroup.targetGroupId )"
+            Headers = $header
+            Verbose = $true
+            ContentType = $contentType
+            Body = @{
+                "name" = $targetGroupname
+                #"description" = ""
+                "eql" = "send_id = '$( $send_id.guid )'"
+            } | ConvertTo-Json -Depth 99 -Compress
+        }
+        Check-Proxy -invokeParams $restParams
+        $updatedTargetGroup = Invoke-RestMethod @restParams
+        #$invoke = $invoke.mailinglist_id
+
+        if ( $updatedTargetGroup.valid -eq "True" ) {
+            Write-Log -message "Updated targetgroup is valid. Proceed..."
+        } else {
+            Write-Log -message "New targetgroup is not valid. Please check!" -severity ( [Logseverity]::ERROR )
+            throw [System.IO.InvalidDataException] "New targetgroup is not valid. Please check!"
+        }
+
+    } catch {
+
+        Write-Log -message "StatusCode: $( $_.Exception.Response.StatusCode.value__ )" -severity ( [LogSeverity]::ERROR )
+        Write-Log -message "StatusDescription: $( $_.Exception.Response.StatusDescription )" -severity ( [LogSeverity]::ERROR )
+
+        throw $_.Exception
+
+    }
     
 } catch {
 
