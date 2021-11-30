@@ -88,11 +88,11 @@ $modulename = "KTGETMESSAGE"
 # Setup the network security like SSL and TLS
 . ".\bin\load_networksettings.ps1"
 
-# Load functions and assemblies
-. ".\bin\load_functions.ps1"
-
 # Load the settings from the local json file
 . ".\bin\load_settings.ps1"
+
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
 
 # Setup the log and do the initial logging e.g. for input parameters
 . ".\bin\startup_logging.ps1"

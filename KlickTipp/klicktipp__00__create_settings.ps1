@@ -143,6 +143,15 @@ $settings = @{
 Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WARNING )
 
 
+#-----------------------------------------------
+# ASK FOR DATABASE
+#-----------------------------------------------
+
+Write-Log -message "Which database do you want to use?"
+$dbType = [psdb].GetEnumNames() | Out-GridView -PassThru
+Write-log -message "Using '$( $dbType )'"
+
+
 ################################################
 #
 # SETTINGS
@@ -222,14 +231,13 @@ $mail = @{
 # ALL SETTINGS
 #-----------------------------------------------
 
-$settings = @{
+$settings = [Hashtable]@{
 
     # General settings
     "nameConcatChar" =   " | "
     "logfile" = $logfile                                    # logfile
     "providername" = "klicktipp"                        # identifier for this custom integration, this is used for the response allocation
-    "sqliteDB" = "$( $scriptPath )\klicktipp.sqlite"
-    "sqliteDll" = "System.Data.SQLite.dll"
+    "dbType" = $dbType
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
@@ -248,6 +256,34 @@ $settings = @{
     #"mail" = $mail
     #"report" = $reportSettings
     
+}
+
+#-----------------------------------------------
+# ADD DB SETTINGS
+#-----------------------------------------------
+
+switch ($dbtype) {
+
+    [psdb]::POSTGRES { 
+
+        $postgresConnString = Read-Host -Prompt "Please enter the connection string similar like 'Host=localhost;Port=5432;Username=postgres;Password=xxx;Database=postgres'" 
+        $postgresConnStringEncrypted = Get-PlaintextToSecure $postgresConnString
+
+        $settings.add("postgresDll","Npgsql.dll")
+        $settings.add("postgresSchema","apt")
+        $settings.add("postgresTypename","myrowtype")
+        $settings.add("postgresConnString",$postgresConnStringEncrypted)
+
+     }
+
+    # Otherwise just use sqlite
+    Default {
+
+        $settings.add("sqliteDB", "$( $scriptPath )\klicktipp.sqlite")
+        $settings.add("sqliteDll", "System.Data.SQLite.dll")
+
+    }
+
 }
 
 
@@ -332,7 +368,7 @@ try {
 #-----------------------------------------------
 
 # Define tags
-$tagsToCreate = @("AptecoOrbit","TTT","ABC.DEF")
+$tagsToCreate = @("AptecoOrbit") #,"TTT","ABC.DEF")
 
 # Load existing tags and transform them
 $restParams = $defaultRestParams + @{
@@ -375,100 +411,118 @@ if ( !(Test-Path -Path "$( $libFolder )") ) {
 
 ################################################
 #
-# DOWNLOAD AND INSTALL THE SQLITE PACKAGE
+# DOWNLOAD AND INSTALL THE DLL FILES
 #
 ################################################
 
-$sqliteDll = "System.Data.SQLite.dll"
+#-----------------------------------------------
+# ADD DB SETTINGS
+#-----------------------------------------------
 
-if ( $libExecutables.Name -notcontains $sqliteDll ) {
+switch ($dbtype) {
 
-    Write-Log -message "A browser page is opening now. Please download the system.data.sqlite package from the site like 'sqlite-netFx46-binary-bundle-x64-2015-1.0.115.0.zip'"
-    Write-Log -message "Please unzip the file and put it into the lib folder"
-    
-    <#
-    http://system.data.sqlite.org/downloads/1.0.115.0/sqlite-netFx46-binary-bundle-x64-2015-1.0.115.0.zip
-    #>
-    
-    Start-Process "http://system.data.sqlite.org/index.html/doc/trunk/www/downloads.wiki"
-    
-    # Wait for key
-    Write-Host -NoNewLine 'Press any key if you have put the files there';
-    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
+    [psdb]::POSTGRES { 
 
-}
+        $postgresDll = $settings.postgresDll
 
+        # TODO [ ] needs to be filled with postgres step by step download from nuget
 
-################################################
-#
-# DOWNLOAD AND INSTALL THE SQLITE PACKAGE
-#
-################################################
-# TODO [ ] add some hints here on sqlite code
+        <#
 
-$sqliteDll = $settings.sqliteDll
+        These files from nuget worked
 
-# Temporary destination for download
-$tempfolderDestination = "$( $env:TEMP )/$( [guid]::NewGuid().toString() )"
-$tempfileDestination = "$( $tempfolderDestination ).nupkg"
+        FileDescription                        CompanyName           FileVersionRaw
+        ---------------                        -----------           --------------
+        Microsoft.Bcl.AsyncInterfaces          Microsoft Corporation 4.700.20.21406
+        Npgsql                                 Npgsql                4.0.12.0
+        System.Buffers                         Microsoft Corporation 4.6.28619.1
+        System.Memory                          Microsoft Corporation 4.6.28619.1
+        System.Numerics.Vectors                Microsoft Corporation 4.6.26515.6
+        System.Runtime.CompilerServices.Unsafe Microsoft Corporation 4.700.20.12001
+        System.Text.Encodings.Web              Microsoft Corporation 4.700.21.11602
+        System.Text.Json                       Microsoft Corporation 4.700.19.46214
+        System.Threading.Tasks.Extensions      Microsoft Corporation 4.6.28619.1
+        System.ValueTuple                      Microsoft Corporation 4.6.26515.6
 
-if ( $libDlls.Name -notcontains $sqliteDll ) {
+        #>
 
-    Write-Log -message "The sqlite package will be downloaded now"
-    
-    # Download and unzip the latest package
-    Invoke-RestMethod -Uri "https://www.nuget.org/api/v2/package/Stub.System.Data.SQLite.Core.NetFramework" -OutFile $tempfileDestination
-    Expand-Archive -Path $tempfileDestination -DestinationPath $tempfolderDestination
+     }
 
-    # Load nuspec
-    $nuspecFile = Get-ChildItem -Path $tempfolderDestination -Filter  "*.nuspec" | Select -first 1 | Get-Content -Encoding utf8
-    $nuspec = [xml]$nuspecFile
-    $metadata = $nuspec.package.metadata
+    # Otherwise just use sqlite
+    Default {
 
-    # Confirm you read the licence details
-    Start-Process $metadata.licenseUrl
-    $decision = $Host.UI.PromptForChoice("Confirmation", "Can you confirm you read '$( $metadata.licenseUrl )' that just opened?", @('&Yes'; '&No'), 1)
+        $sqliteDll = $settings.sqliteDll
 
-    If ( $decision -eq "0" ) {
+        if ( $libExecutables.Name -notcontains $sqliteDll ) {
 
-        # Means yes and proceed
-        
-        # Destination
-        $libDestination = "$( $libFolder )/$( $metadata.id )_$( $metadata.version )"
-        New-Item -Path $libDestination -ItemType Directory
-
-        # Choose the .net archive
-        $nugetLib = "$( $tempfolderDestination )\lib"
-        $nugetBuild = "$( $tempfolderDestination )\build"
-        $netVersion = Get-ChildItem -Path $nugetLib | Select Name | Out-GridView -PassThru
-        Write-Log -message "Using .net version '$( $netVersion.Name )'"
-
-        # Copy files over
-        Copy-Item -Path "$( $nugetLib )/$( $netVersion.Name )/*.*" -Destination $libDestination 
-        If ( [System.Environment]::Is64BitOperatingSystem ) {
-            $architecture = "x64"
-        } else {
-            $architecture = "x86"
+            # Temporary destination for download
+            $tempfolderDestination = "$( $env:TEMP )/$( [guid]::NewGuid().toString() )"
+            $tempfileDestination = "$( $tempfolderDestination ).nupkg"
+            
+            if ( $libDlls.Name -notcontains $sqliteDll ) {
+            
+                Write-Log -message "The sqlite package will be downloaded now"
+                
+                # Download and unzip the latest package
+                Invoke-RestMethod -Uri "https://www.nuget.org/api/v2/package/Stub.System.Data.SQLite.Core.NetFramework" -OutFile $tempfileDestination
+                Expand-Archive -Path $tempfileDestination -DestinationPath $tempfolderDestination
+            
+                # Load nuspec
+                $nuspecFile = Get-ChildItem -Path $tempfolderDestination -Filter  "*.nuspec" | Select -first 1 | Get-Content -Encoding utf8
+                $nuspec = [xml]$nuspecFile
+                $metadata = $nuspec.package.metadata
+            
+                # Confirm you read the licence details
+                Start-Process $metadata.licenseUrl
+                $decision = $Host.UI.PromptForChoice("Confirmation", "Can you confirm you read '$( $metadata.licenseUrl )' that just opened?", @('&Yes'; '&No'), 1)
+            
+                If ( $decision -eq "0" ) {
+            
+                    # Means yes and proceed
+                    
+                    # Destination
+                    $libDestination = "$( $libFolder )/$( $metadata.id )_$( $metadata.version )"
+                    New-Item -Path $libDestination -ItemType Directory
+            
+                    # Choose the .net archive
+                    $nugetLib = "$( $tempfolderDestination )\lib"
+                    $nugetBuild = "$( $tempfolderDestination )\build"
+                    $netVersion = Get-ChildItem -Path $nugetLib | Select Name | Out-GridView -PassThru
+                    Write-Log -message "Using .net version '$( $netVersion.Name )'"
+            
+                    # Copy files over
+                    Copy-Item -Path "$( $nugetLib )/$( $netVersion.Name )/*.*" -Destination $libDestination 
+                    If ( [System.Environment]::Is64BitOperatingSystem ) {
+                        $architecture = "x64"
+                    } else {
+                        $architecture = "x86"
+                    }
+                    Copy-Item -Path "$( $nugetBuild )/$( $netVersion.Name )/$( $architecture )/*.*" -Destination $libDestination
+            
+                    # Remove temporary files
+                    Remove-Item -Path $tempfolderDestination -Force -Recurse
+                    Remove-Item -Path $tempfileDestination -Force
+            
+                } else {
+                    
+                    # Remove temporary files
+                    Remove-Item -Path $tempfolderDestination -Force -Recurse
+                    Remove-Item -Path $tempfileDestination -Force
+            
+                    # Leave the process here
+                    exit 0
+            
+                }
+            
+            
+            }        
         }
-        Copy-Item -Path "$( $nugetBuild )/$( $netVersion.Name )/$( $architecture )/*.*" -Destination $libDestination
-
-        # Remove temporary files
-        Remove-Item -Path $tempfolderDestination -Force -Recurse
-        Remove-Item -Path $tempfileDestination -Force
-
-    } else {
-        
-        # Remove temporary files
-        Remove-Item -Path $tempfolderDestination -Force -Recurse
-        Remove-Item -Path $tempfileDestination -Force
-
-        # Leave the process here
-        exit 0
 
     }
 
-
 }
+
+
 
 
 ################################################
@@ -478,63 +532,101 @@ if ( $libDlls.Name -notcontains $sqliteDll ) {
 ################################################
 
 
-# Create database if it does not exist
-If ( -not (Test-Path -Path "$( $settings.sqliteDB )" ) ) {
+switch ($dbtype) {
 
-    # Load functions and new assemblies
-    . ".\bin\load_functions.ps1"
+    [psdb]::POSTGRES { 
 
-    Write-Log -message "Preparing sqlite database"
+        # TODO [ ] fill this with the right script
 
-    #-----------------------------------------------
-    # ESTABLISHING CONNECTION TO SQLITE
-    #-----------------------------------------------
+        <#
+        
+        -- Table: apt.Test
 
-    # Load assemblies for sqlite
-    #$assemblyFileSqlite = $libExecutables.Where({$_.name -eq "System.Data.SQLite.dll"})
-    #[Reflection.Assembly]::LoadFile($assemblyFileSqlite.FullName)
-    $connection = [System.Data.SQLite.SQLiteConnection]::new()
+        -- DROP TABLE IF EXISTS apt."Test";
 
-    # Create a new connection to a database (in-memory or file)
-    # If the database does not exist, it will be created automatically
-    #$connection.ConnectionString = "Data Source=:memory:;Version=3;New=True;"
-    $connection.ConnectionString = "Data Source=$( $settings.sqliteDb );Version=3;New=True;"
-    $connection.Open()
+        CREATE TABLE IF NOT EXISTS apt."Test"
+        (
+            id text COLLATE pg_catalog."default" NOT NULL,
+            object text COLLATE pg_catalog."default",
+            "ExtractTimestamp" bigint,
+            properties json
+        )
 
-    # Load more extensions for sqlite, e.g. the Interop which includes json1
-    #$connection.EnableExtensions($true)
-    #$assemblyFileInterop = Get-Item -Path ".\sqlite-netFx46-binary-x64-2015-1.0.113.0\SQLite.Interop.dll"
-    #$connection.LoadExtension($assemblyFileInterop.FullName, "sqlite3_json_init");
+        TABLESPACE pg_default;
 
-    # Create a new command which can be reused
-    $command = [System.Data.SQLite.SQLiteCommand]::new($connection)
+        ALTER TABLE IF EXISTS apt."Test"
+            OWNER to postgres;
+        
+        #>
+
+     }
+
+    # Otherwise just use sqlite
+    Default {
 
 
-    #-----------------------------------------------
-    # CREATE TABLES FOR STORING KLICKTIPP DATA
-    #-----------------------------------------------
+        # Create database if it does not exist
+        If ( -not (Test-Path -Path "$( $settings.sqliteDB )" ) ) {
 
-    <#
-    # Drop a table, if exists
-    $command.CommandText = "DROP TABLE IF EXISTS items";
-    [void]$command.ExecuteNonQuery();
-    #>
+            # Load functions and new assemblies
+            . ".\bin\load_functions.ps1"
 
-    # Create a new table for object items, if it is not existing
-    $command.CommandText = @"
-    CREATE TABLE IF NOT EXISTS items (
-        id TEXT
-        ,object TEXT 
-        ,ExtractTimestamp TEXT
-        ,properties TEXT
-    )
+            Write-Log -message "Preparing sqlite database"
+
+            #-----------------------------------------------
+            # ESTABLISHING CONNECTION TO SQLITE
+            #-----------------------------------------------
+
+            # Load assemblies for sqlite
+            #$assemblyFileSqlite = $libExecutables.Where({$_.name -eq "System.Data.SQLite.dll"})
+            #[Reflection.Assembly]::LoadFile($assemblyFileSqlite.FullName)
+            $connection = [System.Data.SQLite.SQLiteConnection]::new()
+
+            # Create a new connection to a database (in-memory or file)
+            # If the database does not exist, it will be created automatically
+            #$connection.ConnectionString = "Data Source=:memory:;Version=3;New=True;"
+            $connection.ConnectionString = "Data Source=$( $settings.sqliteDb );Version=3;New=True;"
+            $connection.Open()
+
+            # Load more extensions for sqlite, e.g. the Interop which includes json1
+            #$connection.EnableExtensions($true)
+            #$assemblyFileInterop = Get-Item -Path ".\sqlite-netFx46-binary-x64-2015-1.0.113.0\SQLite.Interop.dll"
+            #$connection.LoadExtension($assemblyFileInterop.FullName, "sqlite3_json_init");
+
+            # Create a new command which can be reused
+            $command = [System.Data.SQLite.SQLiteCommand]::new($connection)
+
+
+            #-----------------------------------------------
+            # CREATE TABLES FOR STORING KLICKTIPP DATA
+            #-----------------------------------------------
+
+            <#
+            # Drop a table, if exists
+            $command.CommandText = "DROP TABLE IF EXISTS items";
+            [void]$command.ExecuteNonQuery();
+            #>
+
+            # Create a new table for object items, if it is not existing
+            $command.CommandText = @"
+            CREATE TABLE IF NOT EXISTS items (
+                id TEXT
+                ,object TEXT 
+                ,ExtractTimestamp TEXT
+                ,properties TEXT
+            )
 "@
-    [void]$command.ExecuteNonQuery();
+            [void]$command.ExecuteNonQuery();
 
-    $command.Dispose()
-    $connection.Dispose()
+            $command.Dispose()
+            $connection.Dispose()
 
-} 
+        } 
+    }
+
+}
+
+
 
 
 ################################################
@@ -543,13 +635,13 @@ If ( -not (Test-Path -Path "$( $settings.sqliteDB )" ) ) {
 #
 ################################################
 
-$decision = $Host.UI.PromptForChoice('Loading all klicktipp receivers now', 'Are you sure you want to proceed?', @('&Yes'; '&No'), 1)
+# $decision = $Host.UI.PromptForChoice('Loading all klicktipp receivers now', 'Are you sure you want to proceed?', @('&Yes'; '&No'), 1)
 
-If ( $decision -eq "0" ) {
+# If ( $decision -eq "0" ) {
 
-    . ".\bin\load_subscribers.ps1"
+#     . ".\bin\load_subscribers.ps1"
 
-}
+# }
 
 
 ################################################
