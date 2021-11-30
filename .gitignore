@@ -24,3 +24,4 @@ _dev
 *.part*
 *.txt
 *.xml
+*.db
