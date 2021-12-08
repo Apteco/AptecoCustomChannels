@@ -44,6 +44,8 @@ MSSQL / SQL Server|Local<br/>Domain<br/>PrivateCloud|PowerShell/.NET<br/>Bulk|:h
 sqlite|Local<br/>Network<br/>In-Memory|PowerShell/.NET/sqliteCLI|
 <br/>**File Transfer**|
 WinSCP|SFTP<br/>FTP<br/>S3<br/>WebDAV<br/>SCP (SSH)|WinSCP .NET assembly|:x:/:x:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:o:/:o: Data Results Download|[WinSCP Integration Guideline](WinSCP)
+<br/>**Picture Personalisation**|
+AlphaPicture||REST|:heavy_check_mark:/:heavy_check_mark: Choose Picture<br/>:heavy_check_mark:/:heavy_check_mark: Personalised Preview<br/>:heavy_check_mark:/:heavy_check_mark: Download personalised links<br/>:heavy_check_mark:/:heavy_check_mark: Single generation<br/>:heavy_check_mark:/:heavy_check_mark: Batch generation<br/>:heavy_check_mark:/:heavy_check_mark: Change width/height
 
 
 ## Requirements
