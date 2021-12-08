@@ -19,43 +19,30 @@ Legend:
 
 Integration|API|Type|Functionalities|Link
 -|-|-|-|-
+<br/>**Email**|
+Agnitas EMM||REST/SFTP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:heavy_check_mark:/:o:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:heavy_check_mark:Trigger FERGE|Currently in the dev-branch
 Bertelsmann eLettershop||REST/SFTP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:heavy_check_mark:Trigger FERGE|Code is private
+CleverReach|Mailings<br/>Tags<br/>THEA|REST API v3|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:o:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:o:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[CleverReach Mailing Integration Guideline](CleverReach/Mailing)<br/>[CleverReach Tagging Integration Guideline](CleverReach/Tagging)
 ELAINE|Transactional|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:o:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:heavy_check_mark:/:o:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:o:Trigger FERGE|[ELAINE Transactional Mailing Integration Guideline](ELAINE/Transactional)
 Flexmail|ImportRecipients|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Flexmail Integration Guideline](Flexmail)
-CleverReach|Mailings<br/>Tags<br/>THEA|REST API v3|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:o:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:o:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[CleverReach Mailing Integration Guideline](CleverReach/Mailing)<br/>[CleverReach Tagging Integration Guideline](CleverReach/Tagging)
+Inxmail|Professional|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:heavy_check_mark:Trigger FERGE|Currently in the dev-branch
 Optimizely Campaign|Closed Loop Smart Campaigns|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[EpiServer SC Integration Guideline](OptimizelyCampaign/SmartCampaigns)
 Optimizely Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:x:SendTest<br/>:heavy_check_mark:/:x:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[EpiServer MA Integration Guideline](OptimizelyCampaign/MarketingAutomation)
-
-### Print
-
-Integration|API|Type|Functionalities|Link
--|-|-|-|-
+<br/>**Print**|
 Deutsche Post|TriggerDialog|REST|:heavy_check_mark:/:o:Upload<br/>:heavy_check_mark:/:o:Broadcast|[TriggerDialog Integration Guideline](TriggerDialog)
 Bertelsmann|Campaign Automation|||Only on request
 Optilyz|S3|AWS-S3/REST|:heavy_check_mark:/:heavy_check_mark:ChooseAutomation<br/>:heavy_check_mark:/:heavy_check_mark:Upload|[Optilyz Integration Guideline](Optilyz/AWS)
 Optilyz|REST|REST|:heavy_check_mark:/:heavy_check_mark:ChooseAutomation<br/>:heavy_check_mark:/:heavy_check_mark:Upload|[Optilyz Integration Guideline](Optilyz/REST)
-
-
-### Mobile
-
-Integration|API|Type|Functionalities|Link
--|-|-|-|-
-Syniverse|SMS|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[Syniverse SMS Integration Guideline](Syniverse/SyniverseSMS)
+<br/>**Mobile**|
+Syniverse|SMS<br/>WhatsApp Business API|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:question:/:heavy_check_mark:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:heavy_check_mark: Response Download<br/>:heavy_check_mark:/:o:Trigger FERGE<br/>:heavy_check_mark:/:heavy_check_mark: Webhooks Support|[Syniverse Mobile Integration Guideline](Syniverse/SyniverseSMS)
 Syniverse|Number Verification|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Mobile Results Download|[Syniverse Mobile Validation Integration Guideline](Syniverse/SyniverseValidation)
 Syniverse|Wallet Download|REST|:heavy_check_mark:/:heavy_check_mark: Webhooks Trigger<br/>:heavy_check_mark:/:heavy_check_mark: Regular Batch Download|[Syniverse Wallet Download Integration Guideline](Syniverse/SyniverseWalletDownload)
 Syniverse|Wallet Notification|REST|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:x:/:x:SendTest<br/>:heavy_check_mark:/:heavy_check_mark:PreviewMessage<br/>:question:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:question:/:x: Response Download<br/>:question:/:x:Trigger FERGE|[Syniverse Wallet Notification Integration Guideline](Syniverse/SyniverseWalletNotification)
 Syniverse|Wallet Update|REST|:heavy_check_mark:/:heavy_check_mark: Update wallets|[Syniverse Wallet Update Integration Guideline](Syniverse/SyniverseWalletUpdate)
-
-### Database
-
-Integration|API|Type|Functionalities|Link
--|-|-|-|-
+<br/>**Database**|
 MSSQL / SQL Server|Local<br/>Domain<br/>PrivateCloud|PowerShell/.NET<br/>Bulk|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark: Data Results Download|[MSSQL Integration Guideline](MSSQL)
 sqlite|Local<br/>Network<br/>In-Memory|PowerShell/.NET/sqliteCLI|
-
-### File Transfer
-Integration|API|Type|Functionalities|Link
--|-|-|-|-
+<br/>**File Transfer**|
 WinSCP|SFTP<br/>FTP<br/>S3<br/>WebDAV<br/>SCP (SSH)|WinSCP .NET assembly|:x:/:x:GetMessages<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:o:/:o: Data Results Download|[WinSCP Integration Guideline](WinSCP)
 
 
