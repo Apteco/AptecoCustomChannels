@@ -279,7 +279,7 @@ switch ($dbtype) {
 
         $settings.add("postgresDll","Npgsql.dll")
         $settings.add("postgresSchema","apt")
-        $settings.add("postgresTypename","myrowtype")
+        $settings.add("postgresTypename","aptrowtype")
         $settings.add("postgresConnString",$postgresConnStringEncrypted)
 
      }

@@ -301,7 +301,8 @@ FROM (
 			,ROW_NUMBER() OVER (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
-		FROM apt."Test" --, json_to_record(t.properties) AS x(id text, name text);
+		FROM apt."Test"
+        WHERE object = 'subscriber'
 		) t1
 	WHERE rank = 1
 	) t2
@@ -321,7 +322,8 @@ FROM (
 			,ROW_NUMBER() OVER (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
-		FROM apt."Test" --, json_to_record(t.properties) AS x(id text, name text);
+		FROM apt."Test"
+        WHERE object = 'subscriber'
 		) t1
 	WHERE rank = 1
 	) t2
@@ -339,7 +341,7 @@ FROM (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
 		FROM apt."Test"
-		WHERE OBJECT = 'tags'
+		WHERE object = 'tags'
 		) t1
 	WHERE t1.rank = 1
 	) t2
@@ -359,6 +361,7 @@ FROM (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
 		FROM apt."Test"
+        WHERE object = 'subscriber'
 		) t1
 	WHERE rank = 1
 	) t2
@@ -378,6 +381,7 @@ FROM (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
 		FROM apt."Test"
+        WHERE object = 'subscriber'
 		) t1
 	WHERE rank = 1
 	) t2
@@ -399,6 +403,7 @@ FROM (
 				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
 				) AS rank
 		FROM apt."Test"
+        WHERE object = 'subscriber'
 		) t1
 	WHERE rank = 1
 	) t2
