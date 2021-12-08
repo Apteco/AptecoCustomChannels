@@ -15,7 +15,6 @@ Param(
 
 $debug = $true
 
-
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
 #-----------------------------------------------
@@ -23,7 +22,7 @@ $debug = $true
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\agnitasEMM"
+	    scriptPath= "C:\scripts"
         mode= "process"
 	    abc= "def"
 	    Username= "abc"
@@ -75,13 +74,13 @@ $modulename = "KTFERGE"
 . ".\bin\general_settings.ps1"
 
 # Setup the network security like SSL and TLS
-. ".\bin\load_networksettings.ps1"
-
-# Load the settings from the local json file
-. ".\bin\load_settings.ps1"
+#. ".\bin\load_networksettings.ps1"
 
 # Load functions and assemblies
 . ".\bin\load_functions.ps1"
+
+# Load the settings from the local json file
+. ".\bin\load_settings.ps1"
 
 # Setup the log and do the initial logging e.g. for input parameters
 . ".\bin\startup_logging.ps1"
@@ -100,7 +99,7 @@ $modulename = "KTFERGE"
 
 switch ($settings.dbtype) {
 
-    [psdb]::POSTGRES { 
+    { $_ -eq [psdb]::POSTGRES } { 
 
         # Load all subscribers
         . ".\bin\load_subscribers_postgres.ps1"
@@ -117,10 +116,8 @@ switch ($settings.dbtype) {
 
 }
 
-
 # Do the end stuff
 . ".\bin\end.ps1"
-
 
 #Write-Host -NoNewLine 'Press any key to continue...';
 #$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');

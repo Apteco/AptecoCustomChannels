@@ -5,6 +5,8 @@
     # LOAD SUBSCRIBER DATA FROM KLICKTIPP
     #-----------------------------------------------
     
+    Write-Log -message "Loading subscribers"
+
     $restParams = $defaultRestParams + @{
         "Method" = "Get"
         "Uri" = "$( $settings.base )/subscriber.json"
@@ -12,7 +14,9 @@
     
     # This call will only get the subscribers that have finished the DOI process
     $subscribersIndex = Invoke-RestMethod @restParams
-    
+
+    Write-Log -message "Got back $( $subscribersIndex.count ) subscribers"
+
     #Invoke-RestMethod -Uri $restParams.Uri -Method Get -Headers $headers -Verbose
     # Get Details
     $subscribers = [System.Collections.ArrayList]@()
@@ -27,7 +31,9 @@
         [void]$subscribers.Add($subscriber)
     
     }
-    
+
+    Write-Log -message "Loaded $( $subscribers.count ) subscribers detail data"
+
 
     #-----------------------------------------------
     # LOAD TAG DATA FROM KLICKTIPP
@@ -35,6 +41,7 @@
 
     # https://support.klicktipp.com/article/393-api-function-overview
 
+    Write-Log -message "Loading tags"
     
     $restParams = $defaultRestParams + @{
         "Method" = "Get"
@@ -44,6 +51,19 @@
     # This call will only get the tags
     $tagIndex = Invoke-RestMethod @restParams
     
+    # Get Details
+    $tags = [System.Collections.ArrayList]@()
+    $tagIndex.psobject.members | where { $_.MemberType -eq "NoteProperty" } | ForEach {
+        $tag = $_
+        [void]$tags.add([PSCustomObject]@{
+            "id" = $tag.Name
+            "name" = $tag.Value
+        })
+    }
+
+    Write-Log -message "Loaded $( $tags.count ) tags"
+
+    <#    
     # Get Details
     $tags = [System.Collections.ArrayList]@()
     $tagIndex | ForEach {
@@ -57,13 +77,15 @@
         [void]$tags.Add($tag)
     
     }
+    #>
     
 
     #-----------------------------------------------
     # LOAD FIELD DATA FROM KLICKTIPP
     #-----------------------------------------------
 
-    
+    Write-Log -message "Loading fields"
+
     $restParams = $defaultRestParams + @{
         "Method" = "Get"
         "Uri" = "$( $settings.base )/field.json"
@@ -72,7 +94,7 @@
     # This call will get the fields with their names
     $fieldIndex = Invoke-RestMethod @restParams
     
-
+    Write-Log -message "Loaded $( $fieldIndex.count ) fields"
 
 
     # TODO [x] get fields maybe and insert into postgresql
@@ -191,7 +213,16 @@
         #-----------------------------------------------
 
         $transaction = $connection.BeginTransaction()
-        $insertedTags = 0
+        $command = $connection.CreateCommand()
+        $command.CommandText = $insertStatementItems
+        [void]$command.Parameters.AddWithValue("@object", "tags")        
+        [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
+        [void]$command.Parameters.AddWithValue("@id", 0)
+        $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
+        $jsonParam.Value = ( $tagIndex | ConvertTo-Json -Compress -Depth 99 )
+        $command.Parameters.Add($jsonParam)
+
+        <#
         $tags | ForEach {
 
             $row = $_
@@ -215,9 +246,10 @@
             $insertedTags += $command.ExecuteNonQuery()
 
         }
+        #>
         $transaction.Commit()
-        Write-Log -message "Inserted $( $insertedTags ) items in total"
-        $insertedRows += $insertedTags
+        Write-Log -message "Inserted tags"
+        $insertedRows += 1
 
 
         #-----------------------------------------------
@@ -225,33 +257,17 @@
         #-----------------------------------------------
 
         $transaction = $connection.BeginTransaction()
-        $insertedFields = 0
-        $fieldIndex | ForEach {
-
-            $row = $_
-
-            # Prepare statement
-            $command = $connection.CreateCommand()
-            $command.CommandText = $insertStatementItems
-            
-            # Add all fields
-            [void]$command.Parameters.AddWithValue("@object", "subscriber")        
-            [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
-            [void]$command.Parameters.AddWithValue("@id", $row.id)
-
-            # Add json value
-            $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
-            $jsonParam.Value = ( $row | ConvertTo-Json -Compress -Depth 99 )
-            $command.Parameters.Add($jsonParam)
-
-            # Prepare and insert
-            [void]$command.Prepare()
-            $insertedFields += $command.ExecuteNonQuery()
-
-        }
+        $command = $connection.CreateCommand()
+        $command.CommandText = $insertStatementItems
+        [void]$command.Parameters.AddWithValue("@object", "fields")        
+        [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
+        [void]$command.Parameters.AddWithValue("@id", 0)
+        $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
+        $jsonParam.Value = ( $fieldIndex | ConvertTo-Json -Compress -Depth 99 )
+        $command.Parameters.Add($jsonParam)
         $transaction.Commit()
-        Write-Log -message "Inserted $( $insertedFields ) items in total"
-        $insertedRows += $insertedFields
+        Write-Log -message "Inserted fields"
+        $insertedRows += 1
 
     }
 
@@ -312,8 +328,23 @@ FROM (
 
 
 /* tags lookup */
+
+SELECT je.KEY AS Code
+	,je.value AS Description
+FROM (
+	SELECT *
+	FROM (
+		SELECT *
+			,ROW_NUMBER() OVER (
+				PARTITION BY id ORDER BY "ExtractTimestamp" DESC
+				) AS rank
+		FROM apt."Test"
+		WHERE OBJECT = 'tags'
+		) t1
+	WHERE t1.rank = 1
+	) t2
+	,json_each_text(t2.properties) je
     
-tbd
 
 /* manual tags */
 

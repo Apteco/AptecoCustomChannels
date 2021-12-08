@@ -125,6 +125,14 @@ if(Test-Path -LiteralPath "$( $logfile )" -IsValid ) {
 
 
 #-----------------------------------------------
+# LOAD DLL SETTINGS
+#-----------------------------------------------
+
+# Load some dll settings first
+. ".\bin\load_database_dll.ps1"
+
+
+#-----------------------------------------------
 # LOAD LOGGING MODULE NOW
 #-----------------------------------------------
 
@@ -264,7 +272,7 @@ $settings = [Hashtable]@{
 
 switch ($dbtype) {
 
-    [psdb]::POSTGRES { 
+    { $_ -eq [psdb]::POSTGRES } { 
 
         $postgresConnString = Read-Host -Prompt "Please enter the connection string similar like 'Host=localhost;Port=5432;Username=postgres;Password=xxx;Database=postgres'" 
         $postgresConnStringEncrypted = Get-PlaintextToSecure $postgresConnString
@@ -415,13 +423,14 @@ if ( !(Test-Path -Path "$( $libFolder )") ) {
 #
 ################################################
 
+
 #-----------------------------------------------
 # ADD DB SETTINGS
 #-----------------------------------------------
 
 switch ($dbtype) {
 
-    [psdb]::POSTGRES { 
+    { $_ -eq [psdb]::POSTGRES } { 
 
         $postgresDll = $settings.postgresDll
 
@@ -534,7 +543,7 @@ switch ($dbtype) {
 
 switch ($dbtype) {
 
-    [psdb]::POSTGRES { 
+    { $_ -eq [psdb]::POSTGRES } { 
 
         # TODO [ ] fill this with the right script
 
