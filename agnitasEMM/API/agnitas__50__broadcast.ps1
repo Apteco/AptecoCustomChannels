@@ -497,6 +497,14 @@ try {
 
     }
 
+    # log the return object
+    Write-Log -message "RETURN:"
+    $return.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    $( $param ) = '$( $return[$param] )'" -writeToHostToo $false
+    }
+    
+
     # return the results
     $return
 
