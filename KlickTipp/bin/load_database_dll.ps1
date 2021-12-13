@@ -27,6 +27,9 @@ If ( $configMode -and -not $settings) {
     
             $postgresDll = $libDlls | where { $_.Name -eq $settings.postgresDll } | select -first 1
             [Reflection.Assembly]::LoadFile( $postgresDll.FullName )
+
+            #[Reflection.Assembly]::LoadFile(( $libDlls | where { $_.Name -eq "System.Threading.Tasks.Extensions" } | select -first 1 ))
+            #[Reflection.Assembly]::LoadFile(( $libDlls | where { $_.Name -eq "System.Runtime.CompilerServices.Unsafe" } | select -first 1 ))
     
          }
     

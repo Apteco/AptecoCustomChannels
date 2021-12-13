@@ -63,3 +63,10 @@ Other notes
 - The reaction data of the subscriber cannot be mapped properly to automated mails and sms that went out
 - So the subscribers data will get downloaded automatically once a day in JSON format and put into a database that can be read from FastStats Designer
 
+# Hints
+
+## The npgsql driver does not work
+
+Here are some more hints on how to work out the right version: https://gist.github.com/gitfvb/cfc0a3d0be7bd66ef928df775324348d
+
+And uncommenting the lines in `.\bin\load_database_dll.ps1` under the section beginning with `{ $_ -eq [psdb]::POSTGRES } {` can help

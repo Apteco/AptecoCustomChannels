@@ -112,6 +112,7 @@
     # TODO [x] add rowtype to settings
     $schema = $settings.postgresSchema
     $typeName = $settings.postgresTypename
+    $table = $settings.postgresTablename
 
     $connection = [Npgsql.NpgsqlConnection]::new()
     $connection.ConnectionString = Get-SecureToPlaintext $settings.postgresConnString #"Host=localhost;Port=5432;Username=postgres;Password=xxx;Database=postgres;Client Encoding=UTF8;Encoding=UTF8"
@@ -161,7 +162,7 @@
     # Prepare command for inserting rows
     $insertStatementItems = @"
     INSERT INTO
-        $( $schema )."Test" ("id", "object", "ExtractTimestamp", "properties")
+        $( $schema ).$( $table ) ("id", "object", "ExtractTimestamp", "properties")
     VALUES
         (@id, @object, @extracttimestamp, @properties)
 "@

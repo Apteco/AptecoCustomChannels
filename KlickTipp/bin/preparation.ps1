@@ -30,7 +30,7 @@ $Cookie.Name = $login.session_name # Add the name of the cookie
 $Cookie.Value = $login.sessid # Add the value of the cookie
 $Cookie.Domain = $uri.DnsSafeHost
 
-$WebSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$WebSession = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
 $WebSession.Cookies.Add($Cookie)
 
 
