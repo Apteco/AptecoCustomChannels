@@ -279,16 +279,40 @@ $firstRow | Get-Member -MemberType NoteProperty | where { $_.Name -like "line#*"
 # PREPARE THE SIZE
 #-----------------------------------------------
 
-# TODO [ ] make the size adjustable through property
+# This program uses the size in the first row and not custom sizes for all recipients
+
+# TODO [x] make the size adjustable through property
 
 $size = $motifAlternative.raw.original_rect -split ", ",4
 $width = $size[2]
 $height = $size[3]
 
-$inputwidth = 2000 # TODO [ ] put this maybe into settings
-Write-log -message "Using $( $inputwidth ) width as reference for size calculation"
-$sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
-Write-log -message "Calculated the the size of $( $sizes.width )x$( $sizes.height )"
+# Check if sizes were given
+$widthInput = @( $firstRow | Get-Member -MemberType NoteProperty | where { $_.Name -like "width#" } )
+$heightInput = @( $firstRow | Get-Member -MemberType NoteProperty | where { $_.Name -like "height#" } )
+
+# Find the right size
+if ( $widthInput.Count -gt 0 ) {
+
+    # Use the width
+    $propName = $widthInput[0].Name
+    $inputwidth = $firstRow.$propName
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
+
+} elseif ( $heightInput.Count -gt 0 ) {
+
+    # Use the height
+    $propName = $heightInput[0].Name
+    $inputheight = $firstRow.$propName
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetHeight $inputheight
+    
+} else {
+    
+    # Use a default size
+    $inputwidth = 2000
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
+    
+}
 
 
 #-----------------------------------------------

@@ -257,10 +257,33 @@ $size = $motifAlternative.raw.original_rect -split ", ",4
 $width = $size[2]
 $height = $size[3]
 
-$inputwidth = 1000 # TODO [ ] put this maybe into settings
-Write-log -message "Using $( $inputwidth ) width as reference for size calculation"
-$sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
-Write-log -message "Calculated the the size of $( $sizes.width )x$( $sizes.height )"
+# Check if sizes were given
+$widthInput = @( $testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $_.Name -like "width#" } )
+$heightInput = @( $testRecipient.Personalisation | Get-Member -MemberType NoteProperty | where { $_.Name -like "height#" } )
+
+# Find the right size
+if ( $widthInput.Count -gt 0 ) {
+
+    # Use the width
+    $propName = $widthInput[0].Name
+    $inputwidth = $testRecipient.Personalisation.$propName
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
+
+} elseif ( $heightInput.Count -gt 0 ) {
+
+    # Use the height
+    $propName = $heightInput[0].Name
+    $inputheight = $testRecipient.Personalisation.$propName
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetHeight $inputheight
+    
+} else {
+    
+    # Use a default size
+    $inputwidth = 1000
+    $sizes = Calc-Imagesize -sourceWidth $width -sourceHeight $height -targetWidth $inputwidth
+    
+}
+
 
 # Create the picture and load as base64 string
 $picBase64 = $motifAlternative.createSinglePicture($lines, $sizes.width, $sizes.height, $true)
