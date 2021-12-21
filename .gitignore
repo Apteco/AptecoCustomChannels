@@ -31,3 +31,6 @@ _dev
 *.html
 *.xml
 *.part*
+*.dll
+*.pdb
+*.zip
