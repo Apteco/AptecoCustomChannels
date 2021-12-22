@@ -27,8 +27,14 @@
             "Method" = "Get"
             "Uri" = "$( $settings.base )/subscriber/$( $subscriberId ).json"
         }
-        $subscriber = Invoke-RestMethod @restParams
-        [void]$subscribers.Add($subscriber)
+        #$subscriber = Invoke-RestMethod @restParams
+        $subscriber = Invoke-WebRequest @restParams
+        
+        # Convert to correct encoding
+        $subscriberUtf8 = Convert-StringEncoding -string $subscriber.Content -inputEncoding ([Console]::OutputEncoding.HeaderName) -outputEncoding ([System.Text.Encoding]::UTF8.HeaderName)
+
+        # Add to array
+        [void]$subscribers.Add(( ConvertFrom-Json -InputObject $subscriberUtf8 ))
     
     }
 
@@ -49,11 +55,16 @@
     }
     
     # This call will only get the tags
-    $tagIndex = Invoke-RestMethod @restParams
-    
+    #$tagIndex = Invoke-RestMethod @restParams
+    $tagIndex = Invoke-WebRequest @restParams
+
+    # Convert to correct encoding
+    $tagIndexUtf8String = Convert-StringEncoding -string $tagIndex.Content -inputEncoding ([Console]::OutputEncoding.HeaderName) -outputEncoding ([System.Text.Encoding]::UTF8.HeaderName)
+    $tagIndexUtf8 = ConvertFrom-Json -InputObject $tagIndexUtf8String
+
     # Get Details
     $tags = [System.Collections.ArrayList]@()
-    $tagIndex.psobject.members | where { $_.MemberType -eq "NoteProperty" } | ForEach {
+    $tagIndexUtf8.psobject.members | where { $_.MemberType -eq "NoteProperty" } | ForEach {
         $tag = $_
         [void]$tags.add([PSCustomObject]@{
             "id" = $tag.Name
@@ -92,9 +103,14 @@
     }
     
     # This call will get the fields with their names
-    $fieldIndex = Invoke-RestMethod @restParams
+    #$fieldIndex = Invoke-RestMethod @restParams
+    $fieldIndex = Invoke-WebRequest @restParams
+
+    # Convert to correct encoding
+    $fieldIndexUtf8 = Convert-StringEncoding -string $fieldIndex.Content -inputEncoding ([Console]::OutputEncoding.HeaderName) -outputEncoding ([System.Text.Encoding]::UTF8.HeaderName)
+
     
-    Write-Log -message "Loaded $( $fieldIndex.count ) fields"
+    Write-Log -message "Loaded $( $fieldIndexUtf8.count ) fields"
 
 
     # TODO [x] get fields maybe and insert into postgresql
@@ -220,7 +236,7 @@
         [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
         [void]$command.Parameters.AddWithValue("@id", 0)
         $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
-        $jsonParam.Value = ( $tagIndex | ConvertTo-Json -Compress -Depth 99 )
+        $jsonParam.Value = ( $tags | ConvertTo-Json -Compress -Depth 99 )
         $command.Parameters.Add($jsonParam)
 
         <#
@@ -264,7 +280,7 @@
         [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
         [void]$command.Parameters.AddWithValue("@id", 0)
         $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
-        $jsonParam.Value = ( $fieldIndex | ConvertTo-Json -Compress -Depth 99 )
+        $jsonParam.Value = ( $fieldIndexUtf8 )
         $command.Parameters.Add($jsonParam)
         $transaction.Commit()
         Write-Log -message "Inserted fields"
