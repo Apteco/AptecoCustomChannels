@@ -220,6 +220,8 @@
             $insertedSubscribers += $command.ExecuteNonQuery()
 
         }
+
+        # Commit
         $transaction.Commit()
         Write-Log -message "Inserted $( $insertedSubscribers ) items in total"
         $insertedRows += $insertedSubscribers
@@ -229,12 +231,17 @@
         # LOADING TAGS ITEMS
         #-----------------------------------------------
 
+        # Create transaction and command
         $transaction = $connection.BeginTransaction()
         $command = $connection.CreateCommand()
         $command.CommandText = $insertStatementItems
+
+        # Add other columns
         [void]$command.Parameters.AddWithValue("@object", "tags")        
         [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
         [void]$command.Parameters.AddWithValue("@id", 0)
+
+        # Add json column
         $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
         $jsonParam.Value = ( $tags | ConvertTo-Json -Compress -Depth 99 )
         $command.Parameters.Add($jsonParam)
@@ -264,6 +271,12 @@
 
         }
         #>
+
+        # Prepare and insert
+        [void]$command.Prepare()
+        $insertedTags += $command.ExecuteNonQuery()
+        
+        # Commit
         $transaction.Commit()
         Write-Log -message "Inserted tags"
         $insertedRows += 1
@@ -273,15 +286,26 @@
         # LOADING FIELDS ITEMS
         #-----------------------------------------------
 
+        # Create transaction and command
         $transaction = $connection.BeginTransaction()
         $command = $connection.CreateCommand()
         $command.CommandText = $insertStatementItems
+
+        # Add other columns
         [void]$command.Parameters.AddWithValue("@object", "fields")        
         [void]$command.Parameters.AddWithValue("@extracttimestamp", $extractTimestamp)
         [void]$command.Parameters.AddWithValue("@id", 0)
+
+        # Add json column
         $jsonParam = [Npgsql.NpgsqlParameter]::new("@properties",[NpgsqlTypes.NpgsqlDbType]::json)
         $jsonParam.Value = ( $fieldIndexUtf8 )
         $command.Parameters.Add($jsonParam)
+
+        # Prepare and insert
+        [void]$command.Prepare()
+        $insertedTags += $command.ExecuteNonQuery()
+
+        # Commit
         $transaction.Commit()
         Write-Log -message "Inserted fields"
         $insertedRows += 1
