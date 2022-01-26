@@ -35,3 +35,6 @@ _dev
 *.dll
 *.pdb
 *.zip
+*.sqlite
+*.exe
+*.dll
