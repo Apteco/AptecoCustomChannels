@@ -32,3 +32,6 @@ _dev
 *.txt
 *.json
 *.db
+*.dll
+*.zip
+*.pdb
