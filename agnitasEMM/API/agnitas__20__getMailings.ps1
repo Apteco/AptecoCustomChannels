@@ -191,7 +191,7 @@ try {
             expression={ $_.toString() }
         }
     )
-    [void]$messages.AddRange(( $mailingsList | Select $columns ))
+    [void]$messages.AddRange(@( $mailingsList | Select $columns ))
 
 
 } catch {
