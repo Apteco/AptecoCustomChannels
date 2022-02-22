@@ -541,7 +541,7 @@ $partFiles | ForEach {
 
     # Check if the data contains seeds
     $seeds = [System.Collections.ArrayList]@()
-    $seeds.AddRange( $importRecipients.where($exp) )
+    $seeds.AddRange( $importRecipients.where( $exp ) )
     Write-Log -message "There are $( $seeds.Count ) seeds in this file. Deleting them online"
 
     # Remove seeds in Flexmail before upload, if present
