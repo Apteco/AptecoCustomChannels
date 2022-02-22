@@ -27,7 +27,8 @@ Function Create-Flexmail-Parameters {
         
         # Step 3. Form the header and add the Authorization attribute to it
         $script:headers = @{
-            Authorization = "Basic $encodedCredentials"
+            "Authorization" = "Basic $( $encodedCredentials )"
+            "Accept" = "application/hal+json"
         }
 
         
@@ -36,11 +37,7 @@ Function Create-Flexmail-Parameters {
         #-----------------------------------------------
 
         $script:apiRoot = $settings.baseREST
-        $script:contentType = "application/json; charset=utf-8" #"application/json"
-
-        $script:headers += @{
-
-        }
+        $script:contentType = "application/hal+json; charset=utf-8"
 
     }
     

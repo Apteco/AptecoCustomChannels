@@ -197,7 +197,7 @@ Do {
     $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
     $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
     $offset += $limit
-    $sourcesReturn.AddRange( $sourcesResponse )
+    $sourcesReturn.AddRange( $sourcesResponse._embedded.item )
 } while ( $sourcesResponse.count -eq $limit )
 
 

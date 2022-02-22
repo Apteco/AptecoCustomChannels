@@ -228,7 +228,7 @@ Do {
     $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
     $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
     $offset += $limit
-    [void]$sourcesReturn.AddRange( $sourcesResponse )
+    [void]$sourcesReturn.AddRange( $sourcesResponse._embedded.item )
 } while ( $sourcesResponse.count -eq $limit )
 
 # Mapping for existing variables
@@ -550,7 +550,7 @@ $partFiles | ForEach {
         $emailAddress = $seed.$emailFieldName
         $emailAddressEncoded = [uri]::EscapeDataString($emailAddress)
         $seedRecords = Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts?email=$( $emailAddressEncoded )&limit=500&offset=0" -Method Get -Headers $headers -Verbose -ContentType $contentType
-        $seedRecords | ForEach {
+        $seedRecords._embedded.item | ForEach {
             $seedRecord = $_
             Write-Log -message "Removing the seed with Flexmail ID $( $seedRecord.id )"
             Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts/$( $seedRecord.id )" -Method Delete -Headers $headers -Verbose -ContentType $contentType
