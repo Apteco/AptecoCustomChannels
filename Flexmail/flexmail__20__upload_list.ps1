@@ -109,6 +109,7 @@ if ( $settings.changeTLS ) {
 $logfile = $settings.logfile                    # Generic logfile variable
 $exp = { $_.Kunde_oder_Seed -ne "Kunde" }       # Expression to identify seeds, can be changed. In this case there is a virtual variable containing the string "Kunde", all records
                                                 # not equals Kunde are Seeds
+$writeJson = $true
 
 # append a suffix, if in debug mode
 if ( $debug ) {
@@ -227,7 +228,7 @@ Do {
     $url = "$( $apiRoot )/sources?limit=$( $limit )&offset=$( $offset )"
     $sourcesResponse = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType
     $offset += $limit
-    [void]$sourcesReturn.AddRange( $sourcesResponse )
+    [void]$sourcesReturn.AddRange( $sourcesResponse._embedded.item )
 } while ( $sourcesResponse.count -eq $limit )
 
 # Mapping for existing variables
@@ -263,8 +264,7 @@ if ( $listId -notin $sources.id ) {
 
 $url = "$( $apiRoot )/custom-fields"
 $customFieldsREST = Invoke-RestMethod -Uri $url -Method Get -Headers $script:headers -Verbose -ContentType $contentType # load via REST
-$customFields = $customFieldsREST | Select * -ExpandProperty name | select @{name="label";expression={ $_.value }}, * -ExcludeProperty name
-
+$customFields = $customFieldsREST._embedded.item | select @{name="label";expression={ $_.name }}, * -ExcludeProperty name
 
 
 #-----------------------------------------------
@@ -541,7 +541,7 @@ $partFiles | ForEach {
 
     # Check if the data contains seeds
     $seeds = [System.Collections.ArrayList]@()
-    $seeds.AddRange( $importRecipients.where($exp) )
+    $seeds.AddRange( $importRecipients.where( $exp ) )
     Write-Log -message "There are $( $seeds.Count ) seeds in this file. Deleting them online"
 
     # Remove seeds in Flexmail before upload, if present
@@ -550,7 +550,7 @@ $partFiles | ForEach {
         $emailAddress = $seed.$emailFieldName
         $emailAddressEncoded = [uri]::EscapeDataString($emailAddress)
         $seedRecords = Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts?email=$( $emailAddressEncoded )&limit=500&offset=0" -Method Get -Headers $headers -Verbose -ContentType $contentType
-        $seedRecords | ForEach {
+        $seedRecords._embedded.item | ForEach {
             $seedRecord = $_
             Write-Log -message "Removing the seed with Flexmail ID $( $seedRecord.id )"
             Invoke-RestMethod -Uri "$( $settings.baseREST )/contacts/$( $seedRecord.id )" -Method Delete -Headers $headers -Verbose -ContentType $contentType
@@ -648,6 +648,9 @@ $partFiles | ForEach {
 #>
 
     $uploadBodyJson = ConvertTo-Json -InputObject $recipients -Verbose -Depth 8 -Compress
+    if ( $writeJson ) {
+        Set-Content -Value $uploadBodyJson -Path "$( $f.FullName ).json" -Encoding UTF8
+    }
     try {
 
         $importRecords = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Verbose -ContentType $contentType -Body $uploadBodyJson

@@ -23,7 +23,7 @@ _dev
 # visual files
 *.png
 
-# others
+# text files
 *.part*
 *.lock
 *.csv
@@ -31,11 +31,14 @@ _dev
 *.xml
 *.txt
 *.json
+*.config
+
+# database files
 *.db
+*.sqlite
+
+# others
 *.dll
 *.pdb
 *.zip
-*.sqlite
 *.exe
-*.dll
-*.config
