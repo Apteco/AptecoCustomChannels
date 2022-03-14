@@ -234,6 +234,8 @@ $previewSettings = @{
 $uploadSettings = @{
     folder = $upload
     keyId = 3 # default is matching by email address, but can be changed later in the script
+    checkOptInBeforeUpload = $true  # this means to lead the current opt-ins first through emarsys,
+                                    # if this gets deactivated you are responsible to only deliver valid opt-ins OR use only NON-promotional mails, please see the upload script notes for more information
 }
 
 

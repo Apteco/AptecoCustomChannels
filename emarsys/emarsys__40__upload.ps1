@@ -58,6 +58,12 @@ https://dev.emarsys.com/docs/emarsys-api/b3A6MjQ4OTk5MDU-trigger-an-external-eve
     The maximum batch size is 1000 contacts per call.
 
 
+
+Transactional event-triggered messages are ignoring the opt-in, so please be sure to have the valid opt-in or to activate the setting "checkOptInBeforeUpload" to check the valid opt-in.
+Please see: https://help.emarsys.com/hc/de/articles/360019488957-Tips-Opt-in-f%C3%BCr-bestimmte-transaktionale-E-Mails-ignorieren-
+
+
+
 #>
 
 ################################################
@@ -240,6 +246,9 @@ try {
     # CREATE UPLOAD OBJECT
     #-----------------------------------------------
 
+    # Other settings
+    $batchSize = [int]100 # TODO [ ] put this into settings, shouldn't be more than 1000
+
     # Set identifiers
     $urnFieldName = $params.UrnFieldName
     $commkeyFieldName = $params.CommunicationKeyFieldName
@@ -255,75 +264,128 @@ try {
     $recipientBatches = [System.Collections.ArrayList]@()
     $recipients = [System.Collections.ArrayList]@()
     $i = 0
-    $dataCsv | ForEach {
 
-        # Use current row
-        $row = $_
+    $t1 = Measure-Command {
+        $dataCsv | ForEach {
 
-        # Use variant column
-        # if ( $variantColumnName -ne $null ) {
-        #     $variant = $row.$variantColumnName
-        # } else {
-        #     $variant = $null
-        # }
+            # Use current row
+            $row = $_
 
-        # Generate the correct URN, which could contain email and URN
-        # If ( $settings.upload.urnContainsEmail ) {
-        #     $urn = "$( $row.$urnFieldName )|$( $row.$emailFieldName )"
-        # } else {
-        #     $urn = $row.$urnFieldName
-        # }
+            # Use variant column
+            # if ( $variantColumnName -ne $null ) {
+            #     $variant = $row.$variantColumnName
+            # } else {
+            #     $variant = $null
+            # }
 
-        # Generate the receiver meta data
-        $entry = [PSCustomObject]@{
-            "external_id" = $row."$( $keyField.name )"
-            "trigger_id" = $row.$commkeyFieldName
-            "data" = [PSCustomObject]@{
-                "global" = [PSCustomObject]@{
-                    "first_name" = $row.first_name
-                    "last_name" = $row.last_name
+            # Generate the correct URN, which could contain email and URN
+            # If ( $settings.upload.urnContainsEmail ) {
+            #     $urn = "$( $row.$urnFieldName )|$( $row.$emailFieldName )"
+            # } else {
+            #     $urn = $row.$urnFieldName
+            # }
+            # Generate the receiver meta data
+            $entry = [PSCustomObject]@{
+                "external_id" = $row."$( $keyField.name )"
+                "trigger_id" = $row.$commkeyFieldName
+                "data" = [PSCustomObject]@{
+                    "global" = [PSCustomObject]@{
+                        "first_name" = $row.first_name
+                        "last_name" = $row.last_name
+                    }
+                    # "twig_variable1" = "first_value"
+                    # "twig_variable2" = "another_value"
                 }
-                # "twig_variable1" = "first_value"
-                # "twig_variable2" = "another_value"
+                # "attachment" = @(
+                #     [PSCustomObject]@{
+                #         "filename" = "example.pdf"
+                #         "data" = "ZXhhbXBsZQo=" 
+                #     }
+                # )
             }
-            # "attachment" = @(
-            #     [PSCustomObject]@{
-            #         "filename" = "example.pdf"
-            #         "data" = "ZXhhbXBsZQo=" 
-            #     }
-            # )
+
+            # Generate the custom receiver columns data
+            # $colMap | ForEach {
+            #     $source = $_.source
+            #     $target = $_.target
+            #     $entry.data | Add-Member -MemberType NoteProperty -Name $target -Value $row.$source
+            # }
+
+            # Changing the urn colum to the correct value
+            # If ( $settings.upload.urnContainsEmail ) {
+            #     $entry.data.($settings.upload.urnColumn) = $urn
+            # }
+
+            # Add recipient to array
+            # TODO [ ] put this 100 into an variable
+            If ( $i % $batchSize ) {
+                [void]$recipientBatches.Add($recipients)
+                $recipients = [System.Collections.ArrayList]@()
+                $i = 0
+            } else {
+                [void]$recipients.add($entry)
+                $i += 1
+            }
+
         }
 
-        # Generate the custom receiver columns data
-        # $colMap | ForEach {
-        #     $source = $_.source
-        #     $target = $_.target
-        #     $entry.data | Add-Member -MemberType NoteProperty -Name $target -Value $row.$source
-        # }
-
-        # Changing the urn colum to the correct value
-        # If ( $settings.upload.urnContainsEmail ) {
-        #     $entry.data.($settings.upload.urnColumn) = $urn
-        # }
-
-        # Add recipient to array
-        # TODO [ ] put this 100 into an variable
-        If ( $i % 100 ) {
-            [void]$recipientBatches.Add($recipients)
-            $recipients = [System.Collections.ArrayList]@()
-            $i = 0
-        } else {
-            [void]$recipients.add($entry)
-            $i += 1
-        }
+        # Add the last batch to the array
+        [void]$recipientBatches.Add($recipients)
 
     }
 
-    # Add the last batch to the array
-    [void]$recipientBatches.Add($recipients)
+
+    Write-Log -message "Added '$( $recipients.Count )' receivers batches to the queue in $( $t1.TotalSeconds ) seconds"
 
 
-    Write-Log -message "Added '$( $recipients.Count )' receivers batches to the queue"
+    #-----------------------------------------------
+    # CHECK OPTIN PER BATCH
+    #-----------------------------------------------
+
+    Write-Log -message "The settings 'checkOptInBeforeUpload' is set to '$( $settings.upload.checkOptInBeforeUpload )'"
+
+    $allowedBatches = [System.Collections.ArrayList]@()
+    $t2 = Measure-Command {
+        $recipientBatches | ForEach {
+
+            $recipientBatch = $_
+
+            If ( $settings.upload.checkOptInBeforeUpload -eq $false ) {
+
+                # Just add all entries 1:1, this flag needs to be actively set to false
+                
+                [void]$allowedBatches.Add( $recipientBatch )
+        
+            } else {
+        
+                # Max 1000 values per request in keyValues
+        
+                $body = [PSCustomObject]@{
+                    keyId = $settings.upload.keyId
+                    keyValues = @( $recipientBatch.external_id )
+                    #[System.Collections.ArrayList]@(
+                        #"florian.von.bracht@apteco.de"
+                        #"martin.clark@apteco.de"
+                    #)
+                    fields = [System.Collections.ArrayList]@(
+                        $settings.upload.keyId
+                        31  # fixed id for opt-in
+                    )
+                } | ConvertTo-Json -Depth 99
+        
+                $r = Invoke-emarsys -cred $cred -uri "$( $settings.base )contact/getdata" -method Post -body $body
+                
+                Write-log -message " Got this errors: ' $( $r.errors | ConvertTo-Json -Depth 99 -Compress ) '" -severity [LogSeverity]::WARNING
+
+                
+                $r.result
+        
+            }
+
+        }
+    }
+
+    Write-Log -message "Check out '$( $sends.Count )' consents in '$( $t2.TotalSeconds )' seconds"
 
     
     #-----------------------------------------------
@@ -331,7 +393,7 @@ try {
     #-----------------------------------------------
 
     # Measure the seconds in total
-    $t1 = Measure-Command {
+    $t3 = Measure-Command {
         $sends = [System.Collections.ArrayList]@()
         $recipientBatches | ForEach {
 
@@ -387,7 +449,7 @@ try {
 
         }
     }
-    Write-Log -message "Send out '$( $sends.Count )' messages in '$( $t1.TotalSeconds )' seconds"
+    Write-Log -message "Send out '$( $sends.Count )' messages in '$( $t3.TotalSeconds )' seconds"
 
     exit 0
 
