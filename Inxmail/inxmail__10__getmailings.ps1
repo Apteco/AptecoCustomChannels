@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,7 +20,7 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail"
+	    scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail"
     }
 }
 
@@ -145,7 +145,7 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 
 $apiRoot = $settings.base
-$contentType = "application/json; charset=utf-8"
+$contentType = "application/json;charset=utf-8"
 $auth = "$( Get-SecureToPlaintext -String $settings.login.authenticationHeader )"
 $auth
 $header = @{
@@ -177,7 +177,9 @@ if($settings.approved -eq $false){
 
             https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-mailing-collection
         #>
-        $mailings = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+        $mailingsRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+        $mailings = [System.Text.encoding]::UTF8.GetString($mailingsRaw.Content) | ConvertFrom-Json
+
 
         # Counting the number of mailings found for the log
         $numOfMailings = $mailings._embedded."inx:mailings".count
@@ -206,6 +208,7 @@ if($settings.approved -eq $false){
 #-----------------------------------------------
 # GET MAILINGS (APPROVED)
 #-----------------------------------------------
+
 if($settings.approved -eq $true){
     
     $totalNumOfMailingsApproved = 0
@@ -221,7 +224,12 @@ if($settings.approved -eq $true){
 
             https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-regular-mailing-collection
         #>
-        $mailingsApproved = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
+        $mailingsApprovedRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json;charset=utf-8" -Verbose
+        $mailingsApproved = [System.Text.encoding]::UTF8.GetString($mailingsApprovedRaw.Content) | ConvertFrom-Json
+        
+        # Convert to correct encoding
+        #$mailingsApproved = Convert-StringEncoding -string $mailingsApprovedRaw.Content -inputEncoding ([Console]::OutputEncoding.HeaderName) -outputEncoding ([System.Text.Encoding]::UTF8.HeaderName)
+
 
         $numOfMailingsApproved = $mailingsApproved._embedded."inx:regular-mailings".count
         $totalNumOfMailingsApproved += $numOfMailingsApproved

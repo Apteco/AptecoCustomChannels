@@ -125,7 +125,7 @@ Function Write-Log {
 
     # Put the string to host, too
     If ( $writeToHostToo ) {
-        Write-Host $message
+        Write-Host "$( $message )"
     }
 
 }

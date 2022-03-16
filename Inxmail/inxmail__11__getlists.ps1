@@ -12,7 +12,7 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -20,9 +20,10 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    scriptPath= "C:\Users\NLethaus\Documents\GitHub\CustomChannels\Inxmail"
+	    scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail"
     }
 }
+
 
 ################################################
 #
@@ -171,7 +172,9 @@ do{
     
         https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_mailing_lists_collection
     #>
-    $lists = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+    $listsRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+    $lists = [System.Text.encoding]::UTF8.GetString($listsRaw.Content) | ConvertFrom-Json
+
     
     # Counting the number of lists found for the log
     $numOfLists = $lists._embedded."inx:lists".count

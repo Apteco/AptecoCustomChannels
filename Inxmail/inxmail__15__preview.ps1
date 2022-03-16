@@ -185,20 +185,8 @@ $mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )mailings/$( $
 
 $arr = $params.MessageName -split " / ",2
 
-# TODO [x] use the split character from settings
-# TODO [x] check if list exists before using it
-
-$arr2 = $params.ListName -split $settings.nameConcatChar, 2
-try{
-    <#
-        https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_single_mailing_list
-    #>
-    $listExist = Invoke-Restmehod -Method Get -Uri "$( $apiRoot )lists/$( $arr2[0] )" -Header $header -ContentType "application/hal+json" -Verbose
-}catch{
-    "list cannot be found"
-}
-
-
+# TODO [ ] use the split character from settings
+# TODO [ ] check if list exists before using it
 
 # If a given local list exists in the params change endpoint to that list
 # Now recipients will be imported in the given list and not to the global inxmail list
@@ -226,7 +214,9 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
 # GET LIST DETAILS
 #-----------------------------------------------
 
-$listDetails = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )lists/$( $mailingDetails.listId )" -Header $header -ContentType "application/hal+json" -Verbose
+$listDetailsRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )lists/$( $mailingDetails.listId )" -Header $header -ContentType "application/hal+json" -Verbose
+$listDetails = [System.Text.encoding]::UTF8.GetString($listDetailsRaw.Content) | ConvertFrom-Json
+
 
 
 #-----------------------------------------------
@@ -248,7 +238,9 @@ $object = "attributes"
 $endpoint = "$( $apiRoot )$( $object )"
 
 # Get Inxmail attributes
-$attributesObject = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+$attributesObjectRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+$attributesObject = [System.Text.encoding]::UTF8.GetString($attributesObjectRaw.Content) | ConvertFrom-Json
+
 $attributes = $attributesObject._embedded."inx:attributes"
 $attributesNames = $attributes.name
 
@@ -336,8 +328,7 @@ do{
     $endpoint = $testProfilesRes._links.next.href
 }until($null -eq $testProfilesRes._links.next)
 
-
-$latestProfile = $testProfiles | Where-Object { $_.email -eq $testRecipient.Email } | Sort-Object id -Descending | Select-Object -first 1
+$latestProfile = $testProfiles | where { $_.email -eq $testRecipient.Email } | sort id -Descending | select -first 1
 
 #-----------------------------------------------
 # CREATE/UPDATE TEST PROFILE
@@ -379,7 +370,9 @@ try {
 
 
 # Get that new or updated profile
-$previewProfile = Invoke-RestMethod -Method Get -Uri $testProfile._links.self.href -Header $header -ContentType "application/hal+json" -Verbose 
+$previewProfileRaw = Invoke-WebRequest -Method Get -Uri $testProfile._links.self.href -Header $header -ContentType "application/hal+json" -Verbose
+$previewProfile = [System.Text.encoding]::UTF8.GetString($previewProfileRaw.Content) | ConvertFrom-Json
+
 #$profile.id
 
 #-----------------------------------------------
@@ -388,7 +381,9 @@ $previewProfile = Invoke-RestMethod -Method Get -Uri $testProfile._links.self.hr
 # https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_single_mailing_rendered_content
 # /mailings/{id}/renderedContent{?testProfileId,includeAttachments}
 
-$renderedRes = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )mailings/$( $mailingDetails.id )/renderedContent?testProfileId=$( $previewProfile.id )" -Header $header -ContentType "application/hal+json" -Verbose
+$renderedResRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )mailings/$( $mailingDetails.id )/renderedContent?testProfileId=$( $previewProfile.id )" -Header $header -ContentType "application/hal+json" -Verbose
+$renderedRes = [System.Text.encoding]::UTF8.GetString($renderedResRaw.Content) | ConvertFrom-Json
+
 
 
 ################################################

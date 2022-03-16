@@ -13,9 +13,8 @@ Param(
 # DEBUG SWITCH
 #-----------------------------------------------
 
-$debug = $true
+$debug = $false
 
-$niksGitFolder = $true
 
 #-----------------------------------------------
 # INPUT PARAMETERS, IF DEBUG IS TRUE
@@ -204,14 +203,14 @@ $props = $dataCsv | Get-Member -MemberType NoteProperty
 
 # Only add the granted column, if not present
 # TODO [ ] add and prove this logic, otherwise no tracking will be possible
-if ( $props.Name -notcontains $settings.upload.permissionColumnName ) {
-    $dataCsv = $dataCsv | Select-Object *, @{name="$( $settings.upload.permissionColumnName )";expression={ "GRANTED"  }}
+If ( $props.Name -notcontains $settings.upload.permissionColumnName ) {
+    $dataCsv = $dataCsv | Select *, @{name="$( $settings.upload.permissionColumnName )";expression={ "GRANTED"  }}
     $props = $dataCsv | Get-Member -MemberType NoteProperty
 }
 
 # add urn column always - it is needed later for response matching
 $urnFieldName = $params.UrnFieldName
-$dataCsv = $dataCsv | Select-Object *, @{name="urn";expression={ $_.$urnFieldName }}
+$dataCsv = $dataCsv | Select *, @{name="urn";expression={ $_.$urnFieldName }}
 
 # Redefine the properties now
 $props = $dataCsv | Get-Member -MemberType NoteProperty
@@ -255,7 +254,8 @@ $endpoint = "$( $apiRoot )$( $object )"
     
     Returns all the attributes that are already in Inxmail. ???
 #>
-$attributesObject = Invoke-RestMethod -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+$attributesObjectRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Headers $header -Verbose -ContentType $contentType
+$attributesObject = [System.Text.encoding]::UTF8.GetString($attributesObjectRaw.Content) | ConvertFrom-Json
 $attributes = $attributesObject._embedded."inx:attributes"
 $attributesNames = $attributes.name
 
@@ -303,7 +303,7 @@ $bodyJson = $null
 $body = $null
 
 # For each object in the CSV that was not in the attributes
-$colsInCsvButNotAttr | Where-Object { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
+$colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
 
     # Getting the Attribute Name
     $newAttributeName = $_.InputObject
@@ -402,7 +402,7 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
 # A certain method to correctly invoke
 $multipart = Prepare-MultipartUpload -string $csvString
 
-# The server is getting more Information over the format with prepare-multipart, making it easier for the server to read
+# Dem server gibt man Informationen mit über das Format, was es für den server leichter macht
 $object = "imports/recipients"
 $endpoint = "$( $apiRoot )$( $object )?listId=$( $listID )"
 
