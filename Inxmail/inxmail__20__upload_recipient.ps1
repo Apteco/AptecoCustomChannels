@@ -333,7 +333,7 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
     
     # Neue Liste wird hinzufügt
     $bodyBeta = @{
-        "name" = [datetime]::Now.ToString("MM.dd.yyyy-HH:mm:ss-ID:$( $arr[0] )Name:$( $arr[1] )")
+        "name" = [datetime]::Now.ToString("yyyyMMddHHmmss") #"$( [datetime]::Now.ToString("MM.dd.yyyy-HH:mm:ss") )_ID:$( $arr[0] )_Name:$( $arr[1] )"
         "type" = $settings.newList.type
         
         # TODO [x] put senderAddress and other info into settings and read from there

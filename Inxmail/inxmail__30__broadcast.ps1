@@ -22,22 +22,6 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        <#
-	    TransactionType= "Replace"
-        Password= "gutentag"
-        scriptPath= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing"
-        MessageName= "97 / Copy von VorlageVonNikolas240321"
-        EmailFieldName= "email"
-        SmsFieldName= ""
-        Path= "C:\Users\NLethaus\Documents\2021\InxmailFlorian\Inxmail\Mailing\PowerShell_16  VorlageVonNikolas240321_2bad7cca-1922-4ace-8e48-252f9afb8c75.txt"
-        ReplyToEmail= ""
-        Username= "absdede"
-        ReplyToSMS= ""
-        UrnFieldName= "Kunden ID"
-        ListName= "4 / testListe"
-        CommunicationKeyFieldName= "Communication Key"
-        #>
-
         CreatedNewList = "True"
         MessageName = "16 / VorlageVonNikolas240321"
         Username = "absdede"
@@ -240,22 +224,10 @@ $bodyJson = $body | ConvertTo-Json
 
     https://apidocs.inxmail.com/xpro/rest/v1/#copy-mailing
 #>
-$copiedMailing = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
+$copiedMailingRaw = Invoke-WebRequest -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
+$copiedMailing = [System.Text.encoding]::UTF8.GetString($copiedMailingRaw.Content) | ConvertFrom-Json
 
 Write-Log -message "Copied mailing '$( $mailingId )' with new id '$( $copiedMailing.id )' and name '$( $copiedMailing.name )' and type '$( $copiedMailing.type )'"
-
-
-#-----------------------------------------------------------------
-# GET COPIED MAILING
-#-----------------------------------------------------------------
-
-# TODO [x] is this call needed?
-# --> no it is not needed
-#$endpoint = "$( $apiRoot )/mailings/$( $copiedMailing.id )" #?embededded=inx:response-statistics,inx:sending-statistics"
-<#
-    https://apidocs.inxmail.com/xpro/rest/v1/#retrieve-single-regular-mailings
-#>
-$mailingsDetails = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType $contentType -Verbose
 
 
 #-----------------------------------------------------------------

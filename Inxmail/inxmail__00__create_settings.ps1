@@ -86,6 +86,13 @@ $settings = @{
     "approved" = $true
     "sendMailing" = $false
 
+    # New List settings
+    "newList" = [PSCustomObject]@{
+        "senderAddress" = "info@apteco.de"
+        "type" = "STANDARD"
+        "description" = "Dies ist eine automatisch erstellte Liste."
+    }
+
     # Detail settings for upload
     "upload" = [PSCustomObject]@{
         
