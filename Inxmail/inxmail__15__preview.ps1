@@ -318,7 +318,8 @@ $pageSize = 20
 $endpoint = "$( $apiRoot )test-profiles?pageSize=$( $pageSize )"
 do{
     try{
-        $testProfilesRes = Invoke-RestMethod -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
+        $testProfilesResRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
+        $testProfilesRes = [System.Text.encoding]::UTF8.GetString($testProfilesResRaw.Content) | ConvertFrom-Json
     }catch{
         "There are currently no test profiles"
     }
