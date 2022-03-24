@@ -320,8 +320,8 @@ $upload = @{
     standardMailingList = 0
     autoImportId = $autoImport
     archiveImportFile = $true
-    sleepTime = 8               # seconds to wait between the status checks of import
-    maxSecondsWaiting = 300     # seconds to wait at maximum for the import
+    sleepTime = 20               # seconds to wait between the status checks of import
+    maxSecondsWaiting = 900     # seconds to wait at maximum for the import
     archiveFolder = "/archive"
     uploadFolder = "/import"
 }
