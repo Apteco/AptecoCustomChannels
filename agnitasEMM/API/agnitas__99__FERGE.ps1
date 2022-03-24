@@ -343,6 +343,8 @@ try {
     $clicksFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_clicks.csv"
     $bouncesFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_bounces.csv"
     $unsubsFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_unsubscribes.csv" 
+    $blocksFile = "$( $settings.response.exportDirectory )\$( $timestamp.toString("yyyyMMddHHmmss") )_FERGE_blocks.csv" 
+
 
     $csvFiles | ForEach {
 
@@ -369,23 +371,32 @@ try {
             $opens = @( $csv | where { $_.EVENT -eq 2 } )
             $opens | select *, @{name="MessageType"; expression={ "Open" }} | Export-Csv -Path $opensFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
             Write-Log "  $( $opens.count ) opens"
-<#
-            # X = CLICK
+
+            # 1 = CLICK
             # TODO [ ] PUT CLICKS INTO ANOTHER COLUMN "CLICKDATE"
-            $clicks = @( $csv | where { $_.EVENT -eq 0 } )
+            $clicks = @( $csv | where { $_.EVENT -eq 1 } )
             $clicks | select *, @{name="MessageType"; expression={ "Click" }} | Export-Csv -Path $clicksFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
             Write-Log "  $( $clicks.count ) clicks"
 
-            # X = BOUNCE
-            $bounces = @( $csv | where { $_.EVENT -eq 0 } )
-            $bounces | select *, @{name="MessageType"; expression={ "Bounce" }} | Export-Csv -Path $bouncesFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
-            Write-Log "  $( $bounces.count ) bounces"
+            # 5 = SOFTBOUNCE
+            $softbounces = @( $csv | where { $_.EVENT -eq 5 } )
+            $softbounces | select *, @{name="MessageType"; expression={ "Bounce" }}, @{name="BounceType"; expression={ "SoftBounce" }} | Export-Csv -Path $bouncesFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $softbounces.count ) bounces"
 
-            # X = UNSUBSCRIPTION
-            $unsubs = @( $csv | where { $_.EVENT -eq 0 } )
+            # 6 = HARDBOUNCE
+            $hardbounces = @( $csv | where { $_.EVENT -eq 6 } )
+            $hardbounces | select *, @{name="MessageType"; expression={ "Bounce" }}, @{name="BounceType"; expression={ "HardBounce" }} | Export-Csv -Path $bouncesFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $hardbounces.count ) bounces"
+
+            # 3 = UNSUBSCRIPTION
+            $unsubs = @( $csv | where { $_.EVENT -eq 3 } )
             $unsubs | select *, @{name="MessageType"; expression={ "Unsubscription" }} | Export-Csv -Path $unsubsFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
             Write-Log "  $( $unsubs.count ) unsubscribes"
-            #>
+
+            # 7 = BLOCKLIST - No equivalent in PeopleStage
+            $blocks = @( $csv | where { $_.EVENT -eq 7 } )
+            $blocks | select *, @{name="MessageType"; expression={ "Blocked" }} | Export-Csv -Path $blocksFile -delimiter "`t" -encoding UTF8 -NoTypeInformation -append #-Verbose
+            Write-Log "  $( $blocks.count ) blocks"
 
             Write-Log "  Removing file after parsing" # TODO [ ] maybe put this to the end
             Remove-Item -path $csvFile.FullName -force
@@ -394,7 +405,7 @@ try {
 
     }
 
-    #exit 0
+    exit 0
     
     #-----------------------------------------------
     # UPDATE BROADCASTS IN RESPONSE DATABASE
