@@ -38,10 +38,36 @@ $debug = $false
 
 <#
 
+Documentation of Agnitas
 https://ws.agnitas.de/2.0/emmservices.wsdl
 https://emm.agnitas.de/manual/de/pdf/webservice_pdf_de.pdf
 
+If you are interested in using a separate ferge process, please have a look at
+https://github.com/Apteco/HelperScripts/tree/master/scripts/ferge_response_gathering
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! TO CAPTURE ALL LOG ENTRIES RENAME THE INTEGRATIONS FOLDER LIKE "C:\Program Files\Apteco\FastStats Email Response Gatherer x64\xIntegrations"
+! OTHERWISE FERGE WILL START A SUBPROCESS WHICH CANNOT BE CAPTURED
+!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Return codes
+Errorlevel return values :
+0 - Success
+1 - No configuration specfied
+2 - Invalid configuration
+3 - Error occurred retrieving responses (database)
+4 - Error occurred retrieving responses
+
 #>
+
+$errorDescriptions = [Hashtable]@{
+    "0" = "Success"
+    "1" = "No configuration specfied"
+    "2" = "Invalid configuration"
+    "3" = "Error occurred retrieving responses (database)"
+    "4" = "Error occurred retrieving responses"
+}
+
 
 ################################################
 #
@@ -408,52 +434,6 @@ try {
     exit 0
     
     #-----------------------------------------------
-    # UPDATE BROADCASTS IN RESPONSE DATABASE
-    #-----------------------------------------------
-
-    #CustomProvider=AGNITAS-BROADCAST
-    
-    #-----------------------------------------------
-    # LOAD BROADCAST DETAILS
-    #----------------------------------------------- 
-<#
-    # prepare query
-    # TODO [ ] put this file maybe into settings
-    $selectBroadcastsSQL = Get-Content -Path ".\sql\update_broadcast_details_provider.sql" -Encoding UTF8
-    $selectBroadcastsSQL = $selectBroadcastsSQL -replace "#PROVIDER#", $settings.providername
-
-    # load data
-    $broadcastsDetailDataTable = Query-SQLServer -connectionString "$( $mssqlConnectionString )" -query "$( $selectBroadcastsSQL )"
-
-
-    
-                #-----------------------------------------------
-                # UPDATE BROADCAST DETAILS
-                #----------------------------------------------- 
-
-                # prepare query
-                $updateBroadcastsSQL = Get-Content -Path "$( $updateBroadcastsSQLFile )" -Encoding UTF8
-                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#MAILINGID#", $mailingId
-                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCASTID#", $broadcastId
-                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#UPLOADED#", $overallRecipientCount
-                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#REJECTED#", $failedRecipientCount
-                $updateBroadcastsSQL = $updateBroadcastsSQL -replace "#BROADCAST#", $sentRecipientCount
-
-                # execute query
-                $result += NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcastsSQL )"
-
-                #-----------------------------------------------
-                # UPDATE BROADCAST - this allows FERGE to load the response data automatically
-                #----------------------------------------------- 
-
-                # prepare query
-                $updateBroadcasts2SQL = Get-Content -Path "$( $updateBroadcasts2SQLFile )" -Encoding UTF8
-                $updateBroadcasts2SQL = $updateBroadcasts2SQL -replace "#BROADCASTID#", $broadcastId
-
-                # execute query
-                NonQuery-SQLServer -connectionString "$( $mssqlConnectionString )" -command "$( $updateBroadcasts2SQL )"
-#>
-    #-----------------------------------------------
     # NEXT STEP - TRIGGER FERGE LOCALLY
     #-----------------------------------------------
     
@@ -468,6 +448,7 @@ try {
 
     if ( $settings.response.triggerFerge -and $fergeCsvFiles.count -gt 0 ) {
 
+        <#
         # Find FERGE with PATH
         try {
             $ferge = Get-Command -Name "EmailResponseGatherer64"
@@ -484,14 +465,45 @@ try {
             Start-Process -FilePath $ferge.Source -ArgumentList @("D:\Scripts\AgnitasEMM\ferge.xml") -nonewwindow -Wait
         }
         Write-Log -message "FERGE done in $( $timeForImport.TotalSeconds ) seconds"
-    
+        #>
+
+        Write-Log -message "Starting to load email responses"
+
+        $outputfile = "$( $settings.detailsSubfolder )\out__$( $timestamp.ToString("yyyyMMddHHmmss") ).txt"
+        $errorfile = "$( $settings.detailsSubfolder )\err__$( $timestamp.ToString("yyyyMMddHHmmss") ).txt"
+        
+        $of = Get-item -path $outputfile 
+        $ef = Get-item -path $errorfile
+
+        Write-Log -message "Writing verbose output to '$( $of.FullName )'"
+        Write-Log -message "Writing error output to '$( $ef.FullName )'"
+        
+        $t = Measure-Command {
+
+            Set-Location -Path "$( $scriptPath )"
+            $processArgs = [Hashtable]@{
+                "FilePath" = $ferge
+                "ArgumentList" = $gathererConfig
+                "Wait" = $true
+                "PassThru" = $true
+                "NoNewWindow" = $true
+                "RedirectStandardOutput" = $of.FullName #  [guid]::NewGuid().toString()
+                "RedirectStandardError" = $ef.FullName
+                #-windowstyle Hidden
+            }
+            $process = Start-Process @processArgs
+
+        }
+
+        Write-Log -message "Last exit code: $( $process.ExitCode ) - $( $errorDescriptions.Item([String]$process.ExitCode) )"
+        Write-Log -message "Needed $( [int]$t.TotalMinutes ) minutes and $( [int]$t.Seconds ) seconds"
     }
     
 
     #-----------------------------------------------
     # ASK TO CREATE A SCHEDULED TASK
     #-----------------------------------------------
-
+    <#
     # Only ask for task creation if in debug mode
     If ( $debug ) {
 
@@ -583,7 +595,7 @@ try {
         # TODO [ ] Check this one
         #. ".\bin\create_scheduled_task.ps1"
     }
-
+    #>
 
 } catch {
 
