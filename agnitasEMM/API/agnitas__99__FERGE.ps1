@@ -431,8 +431,7 @@ try {
 
     }
 
-    exit 0
-    
+
     #-----------------------------------------------
     # NEXT STEP - TRIGGER FERGE LOCALLY
     #-----------------------------------------------
@@ -441,6 +440,24 @@ try {
     #"C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseConfig.exe"
     #"C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
     #Start-Process -FilePath "C:\Program Files\Apteco\FastStats Email Response Gatherer x64\EmailResponseGatherer64.exe"
+
+    <#
+    Create a response gatherer config with the following parameters
+
+    CLICKDATECOLUMNNAME=TIMESTAMP
+    DELIVERYDATECOLUMNNAME=TIMESTAMP
+    CLICKURLCOLUMNNAME=LINK
+    EMAILCOLUMNNAME=EMAIL
+    EVENTTRIGGEREDDATECOLUMNNAME=TIMESTAMP
+    FILEPATTERN=*_FERGE_*
+    MESSAGENAMECOLUMNNAME=MAILING_NAME
+    TYPECOLUMNNAME=MessageType
+    URNCOLUMNNAME=CUSTOMER_ID
+    FTPURL=file://C:\FastStats\Scripts\agnitasEMM\API\export
+    ENCLOSER=DOUBLEQUOTE
+    SENDIDCOLUMNNAME=MAILING_ID
+    DELIMITER=TAB
+    #>
 
     $fergeCsvFiles = @( Get-Childitem -path "$( $settings.response.exportDirectory )" -Filter "*_FERGE_*.csv" )
 
@@ -472,11 +489,11 @@ try {
         $outputfile = "$( $settings.detailsSubfolder )\out__$( $timestamp.ToString("yyyyMMddHHmmss") ).txt"
         $errorfile = "$( $settings.detailsSubfolder )\err__$( $timestamp.ToString("yyyyMMddHHmmss") ).txt"
         
-        $of = Get-item -path $outputfile 
-        $ef = Get-item -path $errorfile
+        #$of = Get-item -path $outputfile 
+        #$ef = Get-item -path $errorfile
 
-        Write-Log -message "Writing verbose output to '$( $of.FullName )'"
-        Write-Log -message "Writing error output to '$( $ef.FullName )'"
+        Write-Log -message "Writing verbose output to '$( $outputfile )'"
+        Write-Log -message "Writing error output to '$( $errorfile )'"
         
         $t = Measure-Command {
 
@@ -487,8 +504,8 @@ try {
                 "Wait" = $true
                 "PassThru" = $true
                 "NoNewWindow" = $true
-                "RedirectStandardOutput" = $of.FullName #  [guid]::NewGuid().toString()
-                "RedirectStandardError" = $ef.FullName
+                "RedirectStandardOutput" = $outputfile #  [guid]::NewGuid().toString()
+                "RedirectStandardError" = $errorfile
                 #-windowstyle Hidden
             }
             $process = Start-Process @processArgs
