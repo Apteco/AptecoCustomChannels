@@ -1,14 +1,14 @@
-#-----------------------------------------------
-# CREATE A SUBCLASS FOR AUTOMATIONS
-#-----------------------------------------------
-
 <#
 $m = [Mailing]@{mailingId=123;mailingName="MailingName"}
 $m.toString()
+
 Good hints here: https://xainey.github.io/2016/powershell-classes-and-concepts/
+
 # Play around with different constructors
 ([Mailing]@{mailingId=123;mailingName="abc"}).toString()
 ([Mailing]::new("123 / abc")).toString()
+
+
 #>
 class Mailing {
 
@@ -28,12 +28,16 @@ class Mailing {
     <#
     Notes from: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_object_creation?view=powershell-7
     You can create an object from a hash table of properties and property values.
+
     The syntax is as follows:
+
     [<class-name>]@{
     <property-name>=<property-value>
     <property-name>=<property-value>
     }
+
     This method works only for classes that have a parameterless constructor. The object properties must be public and settable.
+
     #>
 
     Mailing () {
@@ -64,7 +68,8 @@ class Mailing {
             $this.nameConcatChar = $script:settings.nameConcatChar
         }
 
-        $stringParts = $mailingString -split [regex]::Escape($this.nameConcatChar.trim()),2
+        # Use the 2 in the split as a parameter so it only breaks the string on the first occurence
+        $stringParts = $mailingString -split $this.nameConcatChar.trim(),2,"simplematch"
         $this.mailingId = $stringParts[0].trim()
         $this.mailingName = $stringParts[1].trim()
         

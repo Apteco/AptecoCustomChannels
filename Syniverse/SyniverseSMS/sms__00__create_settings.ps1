@@ -1,3 +1,19 @@
+
+################################################
+#
+# INPUT
+#
+################################################
+
+
+#-----------------------------------------------
+# DEBUG SWITCH
+#-----------------------------------------------
+
+$debug = $true
+$configMode = $true
+
+
 ################################################
 #
 # TODO
@@ -21,39 +37,116 @@ User token requirement is dependent on how the company environment has been setu
 #
 ################################################
 
-# Load scriptpath
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+if ( $debug ) {
+    # Load scriptpath
+    if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
+        $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    } else {
+        $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    }
 } else {
-    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    $scriptPath = "$( $params.scriptPath )" 
 }
-
 Set-Location -Path $scriptPath
 
 
 ################################################
 #
-# SETTINGS
+# SETTINGS AND STARTUP
 #
 ################################################
 
 # General settings
-$functionsSubfolder = "functions"
-$settingsFilename = "settings.json"
+$modulename = "SYNSMSCREATESETTINGS"
+
+# Load other generic settings like process id, startup timestamp, ...
+. ".\bin\general_settings.ps1"
+
+# Setup the network security like SSL and TLS
+. ".\bin\load_networksettings.ps1"
+
+# Load functions and assemblies
+. ".\bin\load_functions.ps1"
+
 
 
 ################################################
 #
-# FUNCTIONS
+# START
 #
 ################################################
 
-# Load all PowerShell Code
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
+
+#-----------------------------------------------
+# ASK FOR SETTINGSFILE
+#-----------------------------------------------
+
+# Default file
+$settingsFileDefault = "$( $scriptPath )\settings.json"
+
+# Ask for another path
+$settingsFile = Read-Host -Prompt "Where do you want the settings file to be saved? Just press Enter for this default [$( $settingsFileDefault )]"
+
+# ALTERNATIVE: The file dialog is not working from Visual Studio Code, but is working from PowerShell ISE or "normal" PowerShell Console
+#$settingsFile = Set-FileName -initialDirectory "$( $scriptPath )" -filter "JSON files (*.json)|*.json"
+
+# If prompt is empty, just use default path
+if ( $settingsFile -eq "" -or $null -eq $settingsFile) {
+    $settingsFile = $settingsFileDefault
 }
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $settingsFile -IsValid ) {
+    Write-Host "SettingsFile '$( $settingsFile )' is valid"
+} else {
+    Write-Host "SettingsFile '$( $settingsFile )' contains invalid characters"
+}
+
+
+#-----------------------------------------------
+# ASK FOR LOGFILE
+#-----------------------------------------------
+
+# Default file
+$logfileDefault = "$( $scriptPath )\emm.log"
+
+# Ask for another path
+$logfile = Read-Host -Prompt "Where do you want the log file to be saved? Just press Enter for this default [$( $logfileDefault )]"
+
+# ALTERNATIVE: The file dialog is not working from Visual Studio Code, but is working from PowerShell ISE or "normal" PowerShell Console
+#$settingsFile = Set-FileName -initialDirectory "$( $scriptPath )" -filter "JSON files (*.json)|*.json"
+
+# If prompt is empty, just use default path
+if ( $logfile -eq "" -or $null -eq $logfile) {
+    $logfile = $logfileDefault
+}
+
+# Check if filename is valid
+if(Test-Path -LiteralPath $logfile -IsValid ) {
+    Write-Host "Logfile '$( $logfile )' is valid"
+} else {
+    Write-Host "Logfile '$( $logfile )' contains invalid characters"
+}
+
+
+#-----------------------------------------------
+# LOAD LOGGING MODULE NOW
+#-----------------------------------------------
+
+$settings = @{
+    "logfile" = $logfile
+}
+
+# Setup the log and do the initial logging e.g. for input parameters
+. ".\bin\startup_logging.ps1"
+
+
+#-----------------------------------------------
+# LOG THE NEW SETTINGS CREATION
+#-----------------------------------------------
+
+Write-Log -message "Creating a new settings file" -severity ( [Logseverity]::WARNING )
+
 
 
 ################################################
@@ -115,7 +208,88 @@ $channelIds = @{
 #-----------------------------------------------
 
 # connection string of response database
-$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_LumaYoga;User Id=faststats_service;Password=abc123;"
+#$mssqlConnectionString = "Data Source=777D0B7;Initial Catalog=RS_LumaYoga;User Id=faststats_service;Password=fa5t5tat5!;"
+
+# TODO [ ] load as securestring?
+$mssqlConnectionString = Read-Host "Please enter the connectionstring to the MSSQL response database like 'Data Source=777D0B7;Initial Catalog=RS_LumaYoga;User Id=faststats_service;Password=fa5t5tat5!;'"
+
+
+#-----------------------------------------------
+# ASK IF THERE IS A PROXY USED
+#-----------------------------------------------
+
+# ask for credentials if e.g. a proxy is used (normally without the prefixed domain)
+#$cred = Get-Credential
+#$proxyUrl = "http://proxy:8080"
+
+# TODO [ ] sometimes the proxy wants an additional content type or header -> do if this comes up
+
+# More useful links
+# https://stackoverflow.com/questions/13552227/using-proxy-automatic-configuration-from-ie-settings-in-net
+# https://stackoverflow.com/questions/20471486/how-can-i-make-invoke-restmethod-use-the-default-web-proxy/20472024  
+
+$proxyDecision = $Host.UI.PromptForChoice("Proxy usage", "Do you use a proxy for network authentication?", @('&Yes'; '&No'), 1)
+
+If ( $proxyDecision -eq "0" ) {
+
+    # Means yes and proceed
+
+    # Try a figure out the uri
+    $proxyUriSuggest = [System.Net.WebRequest]::GetSystemWebProxy().GetProxy("http://www.apteco.de")
+
+    # Ask for the uri
+    $proxyUriDecision = $Host.UI.PromptForChoice("Proxy uri", "I have figured out the url '$( $proxyUriSuggest.ToString() )'. Is that correct?", @('&Yes'; '&No'), 1)
+    If ( $proxyUriDecision -eq "0" ) {
+
+        # yes, correct
+        $proxyUri = $proxyUriSuggest.toString()
+
+    } else {
+
+        # no, not correct
+        $proxyUri = Read-Host "Please enter the proxy url like 'http://proxyurl:8080'"
+
+    }
+
+    # Next step, figure out credentials
+    $proxyCredentialsDecision = $Host.UI.PromptForChoice("Proxy credentials", "Remember the FastStats Service is normally running with another windows user. So do you want to use the current account user login?", @('&Yes'; '&No'), 1)
+    If ( $proxyCredentialsDecision -eq "0" ) {
+        
+        # yes, use default credentials
+        $proxyUseDefaultCredentials = $true
+        $proxyCredentials = @{}
+
+    } else {
+
+        # no, use other credentials
+        $proxyUseDefaultCredentials = $false
+
+        # Soap Password
+        $proxyUsername = Read-Host "Please enter the username for proxy authentication"
+        $proxyPassword = Read-Host -AsSecureString "Please enter the password for proxy authentication"
+        $proxyPasswordEncrypted = Get-PlaintextToSecure "$(( New-Object PSCredential "dummy",$proxyPassword).GetNetworkCredential().Password)"
+
+        $proxyCredentials = @{
+            "username" = $proxyUsername
+            "password" = $proxyPasswordEncrypted
+        }
+
+    }
+
+    $proxy = @{
+        "proxyUrl" = $proxyUri # ""|"http://proxyurl:8080"
+        #"useDefaultCredentials" = $false   # Do this by default if a proxy is used
+        "proxyUseDefaultCredentials" = $proxyUseDefaultCredentials
+        "credentials" = $proxyCredentials
+    }
+
+} else {
+    
+    # Leave the process here
+    
+    $proxy = @{}
+
+}
 
 
 #-----------------------------------------------
@@ -126,15 +300,20 @@ $settings = @{
 
     # General
     "base"="https://api.syniverse.com/"					# Default url
-    "changeTLS" = $true                      	        # should tls be changed on the system?
+    #"changeTLS" = $true                      	        # should tls be changed on the system?
     "nameConcatChar" = " | "               	            # character to concat mailing/campaign id with mailing/campaign name
     "logfile"="$( $scriptPath )\syn_sms.log"		    # path and name of log file
     "providername" = "synsms"                           # identifier for this custom integration, this is used for the response allocation
 
     # Proxy settings, if needed - will be automatically used
-    "useDefaultCredentials" = $false
-    "ProxyUseDefaultCredentials" = $false
-    "proxyUrl" = "" # ""|"http://proxyurl:8080"
+    #"useDefaultCredentials" = $false
+    #"ProxyUseDefaultCredentials" = $false
+    #"proxyUrl" = "" # ""|"http://proxyurl:8080"
+
+    # Network settings
+    "changeTLS" = $true
+    "proxy" = $proxy # Proxy settings, if needed - will be automatically used
+
 
     # Authentication
     "authentication" = $authentication
@@ -162,32 +341,42 @@ $settings = @{
 #
 ################################################
 
-#-----------------------------------------------
-# SAVE
-#-----------------------------------------------
+# rename settings file if it already exists
+If ( Test-Path -Path $settingsFile ) {
+    $backupPath = "$( $settingsFile ).$( $timestamp.ToString("yyyyMMddHHmmss") )"
+    Write-Log -message "Moving previous settings file to $( $backupPath )" -severity ( [Logseverity]::WARNING )
+    Move-Item -Path $settingsFile -Destination $backupPath
+} else {
+    Write-Log -message "There was no settings file existing yet"
+}
 
 # create json object
-$json = $settings | ConvertTo-Json -Depth 8 # -compress
+$json = $settings | ConvertTo-Json -Depth 99 # -compress
 
 # print settings to console
 $json
 
 # save settings to file
-$json | Set-Content -path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8
-
+$json | Set-Content -path $settingsFile -Encoding UTF8
 
 ################################################
 #
-# CHECK SOME FOLDERS
+# CREATE FOLDERS IF NEEDED
 #
 ################################################
-
-#-----------------------------------------------
-# CHECK RESULTS FOLDER
-#-----------------------------------------------
 
 $uploadsFolder = $settings.uploadsFolder
-if ( !(Test-Path -Path $uploadsFolder) ) {
-    #Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+if ( !(Test-Path -Path "$( $uploadsFolder )") ) {
+    Write-Log -message "Upload '$( $uploadsFolder )' does not exist. Creating the folder now!"
     New-Item -Path "$( $uploadsFolder )" -ItemType Directory
 }
+
+
+################################################
+#
+# WAIT FOR KEY
+#
+################################################
+
+Write-Host -NoNewLine 'Press any key to continue...';
+$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');

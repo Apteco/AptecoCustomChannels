@@ -37,9 +37,6 @@ if ( $debug ) {
 
 <#
 
-TODO [ ] more logging
-TODO [ ] replace mssql with already existent functions of EpiServer
-
 #>
 
 ################################################
@@ -48,6 +45,8 @@ TODO [ ] replace mssql with already existent functions of EpiServer
 #
 ################################################
 
+# if debug is on a local path by the person that is debugging will load
+# else it will use the param (input) path
 if ( $debug ) {
   # Load scriptpath
   if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
@@ -61,160 +60,154 @@ if ( $debug ) {
 Set-Location -Path $scriptPath
 
 
+
 ################################################
 #
 # SETTINGS
 #
 ################################################
 
-# General settings
-$functionsSubfolder = "functions"
-$settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
-$processId = [guid]::NewGuid()
-$timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
+$script:moduleName = "SYNSMS-GET-MAILINGS"
 
-# Load settings
-$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+try {
 
-# Allow only newer security protocols
-# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-if ( $settings.changeTLS ) {
-  $AllProtocols = @(    
-      [System.Net.SecurityProtocolType]::Tls12
-      #[System.Net.SecurityProtocolType]::Tls13,
-      ,[System.Net.SecurityProtocolType]::Ssl3
-  )
-  [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-}
+    # Load general settings
+    . ".\bin\general_settings.ps1"
 
-# more settings
-$logfile = $settings.logfile
-$mssqlConnectionString = $settings.responseDB
+    # Load settings
+    . ".\bin\load_settings.ps1"
 
+    # Load network settings
+    . ".\bin\load_networksettings.ps1"
 
-# append a suffix, if in debug mode
-if ( $debug ) {
-  $logfile = "$( $logfile ).debug"
-}
+    # Load functions
+    . ".\bin\load_functions.ps1"
 
+    # Start logging
+    . ".\bin\startup_logging.ps1"
 
-################################################
-#
-# FUNCTIONS
-#
-################################################
+    # Load preparation ($cred)
+    . ".\bin\preparation.ps1"
 
-# TODO [ ] add mssql assemblies or extend it
-Add-Type -AssemblyName System.Data #, System.Text.Encoding
+} catch {
 
-# Load all PowerShell Code
-"Loading..."
-Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | ForEach {
-    . $_.FullName
-    "... $( $_.FullName )"
-}
-<#
-# Load all exe files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
-$libExecutables | ForEach {
-    "... $( $_.FullName )"
+    Write-Log -message "Got exception during start phase" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+    Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
     
+    throw $_.exception  
+
+    exit 1
+
 }
-# Load dll files in subfolder
-$libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
-$libExecutables | ForEach {
-    "Loading $( $_.FullName )"
-    [Reflection.Assembly]::LoadFile($_.FullName) 
-}
-#>
 
 
 ################################################
 #
-# LOG INPUT PARAMETERS
+# PROGRAM
 #
 ################################################
 
-# Start the log
-Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $moduleName )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
+$messages = [System.Collections.ArrayList]@()
+try {
 
-# Check if params object exists
-if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-  $paramsExisting = $true
-} else {
-  $paramsExisting = $false
-}
+  ################################################
+  #
+  # TRY
+  #
+  ################################################
 
-# Log the params, if existing
-if ( $paramsExisting ) {
-  $params.Keys | ForEach-Object {
-      $param = $_
-      Write-Log -message "    $( $param )= ""$( $params[$param] )"""
+  #-----------------------------------------------
+  # LOAD TEMPLATES FROM MSSQL
+  #-----------------------------------------------
+
+  $mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
+  $mssqlConnection.ConnectionString = $mssqlConnectionString
+
+  $mssqlConnection.Open()
+
+  Write-Log -message "Establishing connection to MSSQL database now"
+
+  # define query -> currently the age of the date in the query has to be less than 12 hours
+  $mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
+
+  # execute command
+  $mssqlCommand = $mssqlConnection.CreateCommand()
+  $mssqlCommand.CommandText = $mssqlQuery
+  $mssqlResult = $mssqlCommand.ExecuteReader()
+      
+  # load data
+  $mssqlTable = [System.Data.DataTable]::new()
+  $mssqlTable.Load($mssqlResult)
+  
+  Write-Log -message "Loaded $( $mssqlTable.Rows.Count ) templates from MSSQL. Closing the database connection now"
+
+  # Close connection
+  $mssqlConnection.Close()
+
+  Write-Log -message "Connection closed"
+
+
+  #-----------------------------------------------
+  # TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
+  #-----------------------------------------------
+
+  Write-Log -message "Transforming the result for PeopleStage"
+
+  $mailings = [System.Collections.ArrayList]@()
+  $mssqlTable.Rows | foreach {
+
+      # Load data
+      $template = $_
+
+      # Create mailing objects
+      [void]$mailings.Add([Mailing]@{
+          mailingId=$template.CreativeTemplateId
+          mailingName=$template.Name
+      })
+
   }
-}
-
-
-################################################
-#
-# CHECK MSSQL FOR TEMPLATES
-#
-################################################
-
-#-----------------------------------------------
-# LOAD TEMPLATES FROM MSSQL
-#-----------------------------------------------
-
-$mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
-$mssqlConnection.ConnectionString = $mssqlConnectionString
-
-$mssqlConnection.Open()
-
-"Trying to load the data from MSSQL"
-
-# define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
-
-# execute command
-$mssqlCommand = $mssqlConnection.CreateCommand()
-$mssqlCommand.CommandText = $mssqlQuery
-$mssqlResult = $mssqlCommand.ExecuteReader()
     
-# load data
-$mssqlTable = new-object System.Data.DataTable
-$mssqlTable.Load($mssqlResult)
-    
-# Close connection
-$mssqlConnection.Close()
+  # Transform the mailings array into the needed output format
+    $columns = @(
+        @{
+            name="id"
+            expression={ $_.mailingId }
+        }
+        @{
+            name="name"
+            expression={ $_.toString() }
+        }
+    )
+    [void]$messages.AddRange(@( $mailings | Select $columns ))
+
+    Write-Log -message "Loaded $( $messages.Count ) templates for PeopleStage"
 
 
-#-----------------------------------------------
-# TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
-#-----------------------------------------------
+} catch {
 
-$mailings = [System.Collections.ArrayList]@()
-$mssqlTable | foreach {
+  ################################################
+  #
+  # ERROR HANDLING
+  #
+  ################################################
 
-    # Load data
-    $template = $_
+  Write-Log -message "Got exception during execution phase" -severity ( [LogSeverity]::ERROR )
+  Write-Log -message "  Type: '$( $_.Exception.GetType().Name )'" -severity ( [LogSeverity]::ERROR )
+  Write-Log -message "  Message: '$( $_.Exception.Message )'" -severity ( [LogSeverity]::ERROR )
+  Write-Log -message "  Stacktrace: '$( $_.ScriptStackTrace )'" -severity ( [LogSeverity]::ERROR )
+  
+  throw $_.exception
 
-    # Create mailing objects
-    [void]$mailings.Add([Mailing]@{
-        mailingId=$template.CreativeTemplateId
-        mailingName=$template.Name
-    })
+} finally {
+
+  ################################################
+  #
+  # RETURN
+  #
+  ################################################
+
+  $messages
 
 }
-
-$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
-
-
-###############################
-#
-# RETURN MESSAGES
-#
-###############################
-
-return $messages
