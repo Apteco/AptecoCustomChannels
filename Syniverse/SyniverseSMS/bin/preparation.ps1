@@ -31,7 +31,7 @@ if ( $settings.rowsPerUpload ) {
 $successStates = @('DELIVERED', 'FAILED', 'CLICKTHRU') # took out SENT because DELIVERED and FAILED or optionally CLICKTHRU will follow on those
 
 # Setting how often the status should be written to the log
-$mod = 3
+$mod = 200
 
 
 #-----------------------------------------------
