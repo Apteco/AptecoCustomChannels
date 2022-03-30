@@ -232,14 +232,14 @@ $creativeTemplateLinks = [Regex]::Matches($creativeTemplateText, $regexForLinks)
 
 Write-Log -message "Loading the csv file"
 
-$data = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+$data = @( Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8 )
 
 
 #-----------------------------------------------
 # PREPARE DATA TO UPLOAD
 #-----------------------------------------------
 
-$parsedData = @()
+$parsedData = [System.Collections.ArrayList]@()
 $data | ForEach {
 
     $row = $_
@@ -263,13 +263,11 @@ $data | ForEach {
         $txt = $txt -replace [regex]::Escape("{{$( $token )}}"), $row.$token
     }
 
-    # create new object with data
-    $newRow = New-Object PSCustomObject
-    $newRow | Add-Member -MemberType NoteProperty -Name "mdn" -Value $row."$( $params.SmsFieldName )"
-    $newRow | Add-Member -MemberType NoteProperty -Name "message" -Value $txt
-    
     # add to array
-    $parsedData += $newRow
+    [void]$parsedData.add([PSCustomObject]@{
+        "mdn" = $row."$( $params.SmsFieldName )"
+        "message" = $txt
+    })
 
 }
 
@@ -350,8 +348,6 @@ $notificationErrors | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFold
 # RETURN VALUES TO PEOPLESTAGE
 #
 ################################################
-
-# TODO [ ] check return results
 
 # count the number of successful upload rows
 $recipients = $notificationResponses.Count # ( $importResults | where { $_.Result -eq 0 } ).count

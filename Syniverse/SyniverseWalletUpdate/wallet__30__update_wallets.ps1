@@ -23,16 +23,16 @@ if ( $debug ) {
     $params = [hashtable]@{
         "TransactionType" = "Replace"
         "Password" = "b"
-        "scriptPath" = "D:\Scripts\Syniverse\WalletUpdate"
-        "MessageName" = "abcde5 | Apteco Demo"
+        "scriptPath" = "D:\Scripts\Syniverse\WalletUpdate_v2"
+        "MessageName" = "all | Use all wallet campaigns - no filter"
         "EmailFieldName" = "Email"
         "SmsFieldName" = "WalletUrl"
-        "Path" = "d:\faststats\Publish\Handel\system\Deliveries\abcde5  Apteco Demo_9fd79edf-6bd3-45ff-8dc1-5fb78e0cd3ba.txt"
+        "Path" = "C:\Users\Florian\Documents\GitHub\AptecoCustomChannels\Syniverse\SyniverseWalletUpdate\PowerShell_all  Use all wallet campaigns - no filter_c5f92c51-08e9-4db0-b1f0-b9670cefc0d4.txt"
         "ReplyToEmail" = ""
         "Username" = "a"
         "ReplyToSMS" = ""
         "UrnFieldName" = "Kunden ID"
-        "ListName" = "abcde5 | Apteco Demo"
+        "ListName" = "all | Use all wallet campaigns - no filter"
         "CommunicationKeyFieldName" = "Communication Key"
     }
 }
@@ -45,6 +45,7 @@ if ( $debug ) {
 
 <#
 
+# TODO [ ] implement rate limiting of vibes
 
 #>
 
@@ -75,50 +76,39 @@ Set-Location -Path $scriptPath
 
 # General settings
 $functionsSubfolder = "functions"
-$libSubfolder = "lib"
+#$libSubfolder = "lib"
 $settingsFilename = "settings.json"
 $moduleName = "SYNWALUPDATE"
 $processId = [guid]::NewGuid()
-
+$timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 # Load settings
-#$settings = Get-Content -Path "$( $scriptPath )\settings.json" -Encoding UTF8 -Raw | ConvertFrom-Json
-$settings = @{
-    nameConcatChar = " | "
-    logfile = "wallets.log"
+$settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+# TODO [x] change this path back
+
+# Allow only newer security protocols
+# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
+if ( $settings.changeTLS ) {
+    $AllProtocols = @(    
+        [System.Net.SecurityProtocolType]::Tls12
+        #[System.Net.SecurityProtocolType]::Tls13,
+        ,[System.Net.SecurityProtocolType]::Ssl3
+    )
+    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 }
-
-# TODO [ ] put all settings back into settings.json
-
-$walletIds = @("abcde5")
-$baseUrl = "https://public-api.cm.syniverse.eu"
-$companyId = "<companyId>"
-$token = "<token>"
-$mssqlConnectionString = "Data Source=localhost;Initial Catalog=RS_Handel;User Id=faststats_service;Password=abc123;"
 
 # Current timestamp
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
-# Allow only newer security protocols
-# hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
-#if ( $settings.changeTLS ) {
-    $AllProtocols = @(    
-        [System.Net.SecurityProtocolType]::Tls12
-        #[System.Net.SecurityProtocolType]::Tls13,
-        #,[System.Net.SecurityProtocolType]::Ssl3
-    )
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-#}
-
 # more settings
 $logfile = $settings.logfile
+#$mssqlConnectionString = $settings.responseDB
+
 
 # append a suffix, if in debug mode
 if ( $debug ) {
-    $logfile = "$( $logfile ).debug"
+  $logfile = "$( $logfile ).debug"
 }
-
-
 
 
 ################################################
@@ -127,7 +117,7 @@ if ( $debug ) {
 #
 ################################################
 
-Add-Type -AssemblyName System.Data  #, System.Text.Encoding
+#Add-Type -AssemblyName System.Data  #, System.Text.Encoding
 
 # Load all PowerShell Code
 "Loading..."
@@ -153,7 +143,6 @@ $libExecutables | ForEach {
 #>
 
 
-
 ################################################
 #
 # LOG INPUT PARAMETERS
@@ -163,8 +152,10 @@ $libExecutables | ForEach {
 # Start the log
 Write-Log -message "----------------------------------------------------"
 Write-Log -message "$( $modulename )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
     $paramsExisting = $true
@@ -174,9 +165,10 @@ if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
 
 # Log the params, if existing
 if ( $paramsExisting ) {
+    Write-Log -message "Got these params object:"
     $params.Keys | ForEach-Object {
         $param = $_
-        Write-Log -message "    $( $param ): $( $params[$param] )"
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
     }
 }
 
@@ -186,6 +178,18 @@ if ( $paramsExisting ) {
 # PROGRAM
 #
 ################################################
+
+
+#-----------------------------------------------
+# CHECK RESULTS FOLDER
+#-----------------------------------------------
+
+$uploadsFolder = $settings.uploadsFolder
+if ( !(Test-Path -Path $uploadsFolder) ) {
+    Write-Log -message "Upload $( $uploadsFolder ) does not exist. Creating the folder now!"
+    New-Item -Path "$( $uploadsFolder )" -ItemType Directory
+}
+
 
 #-----------------------------------------------
 # UPDATE SINGLE WALLET SILENTLY
@@ -202,32 +206,67 @@ The only fields that will be updated on the Wallet object are: tokens, locations
 #>
 
 #-----------------------------------------------
-# PREPARE
+# AUTHENTICATION + HEADERS
 #-----------------------------------------------
 
-$contentType = "application/json" 
-
+$baseUrl = $settings.base
+$contentType = $settings.contentType
 $headers = @{
-    "Authorization"="Basic $( $token )"
+    "Authorization"="Basic $( Get-SecureToPlaintext -String $settings.login.accesstoken )"
     "X-API-Version"="2"
-    "int-companyid"=$companyId 
+    "int-companyid"=$settings.companyId
 }
 
-$campaignId = $params.MessageName -split $settings.nameConcatChar | select -First 1
+
+#-----------------------------------------------
+# LOAD WALLET CAMPAIGN + LOAD DETAILS
+#-----------------------------------------------
+
+$chosenCampaign = [Mailing]::new($params.MessageName)
+#$campaignId = $params.MessageName -split $settings.nameConcatChar | select -First 1
+$campaignId = $chosenCampaign.mailingId
+
+# Details not needed at the moment
+<#
+if ( $campaignId -ne "all" ) {
+
+    $param = @{
+        "Uri" = "$( $baseUrl )/companies/$( $settings.companyId )/campaigns/wallet/$( $campaignId )"
+        "ContentType" = $contentType
+        "Method" = "Get"
+        "Headers" = $headers
+        "Verbose" = $true
+    }
+    $walletDetails = Invoke-RestMethod @param
+}
+#>
 
 #-----------------------------------------------
 # READ FILE
 #-----------------------------------------------
 
-$dataWallets = Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8
+$data = @( Import-Csv -Path "$( $params.Path )" -Delimiter "`t" -Encoding UTF8 )
 
-Write-Log -message "Got a file with no of rows: $( $dataWallets.Count )"
+Write-Log -message "Got a file with no of rows: $( $data.Count )"
+
+
+#-----------------------------------------------
+# FILTER ENTRIES BY CHOSEN WALLET CAMPAIGN
+#-----------------------------------------------
+
+if ( $campaignId -ne "all" ) {
+    $dataWallets = $data | where { $_."$( $params.SmsFieldName )" -like "*$( $campaignId )*" }
+} else {
+    $dataWallets = $data
+}
+
+Write-Log -message "Filtered file down to $( $dataWallets.Count ) because of wallet campaign '$( $campaignId )'"
 
 
 #-----------------------------------------------
 # READ CURRENT TOKENS FROM MSSQL
 #-----------------------------------------------
-
+<#
 Write-Log -message "Loading tokens $( $params.MessageName )"
 
 $mssqlConnection = New-Object System.Data.SqlClient.SqlConnection
@@ -254,100 +293,158 @@ $mssqlTable.Load($mssqlResult)
 $mssqlConnection.Close()
 
 Write-Log -message "Got no of wallet tokens: $( $mssqlTable.rows.count )"
+#>
+
+#-----------------------------------------------
+# PREPARE DATA TO UPLOAD
+#-----------------------------------------------
+
+
+# Check which meta fields to upload
+$excludeFields = [System.Collections.ArrayList]@()
+( $settings.upload.excludeFields.psobject.Members | where { $_.Membertype -eq "NoteProperty" -and $_.Value -eq $false } ) | ForEach {
+    $fieldToExclude = $_.Name
+    [void]$excludeFields.Add($params.$fieldToExclude)
+}
+Write-Log -message "Will exclude the fields $( $excludeFields -join "," ) from upload"
+
+# Prepare the data
+$parsedData = [System.Collections.ArrayList]@()
+$dataWallets | ForEach {
+
+    $row = $_   
+    $tokens = [PSCustomObject]::new()
+
+    # See, which tokens have changed
+    $row.psobject.Members | where { $_.membertype -like 'noteproperty' -and $_.Name -notin @($params.SmsFieldName) -and $_.Name -notin $excludeFields } | ForEach {
+        
+        $tokenKey = $_.Name
+        $newValue = $row."$( $tokenKey )"
+
+        #if ( $row."$( $tokenKey )" ) { # if the field from the campaign is setted
+            #if ( $row."$( $tokenKey )" -ne $tokens."$( $tokenKey )" ) { # if the values are different
+               
+                # new value
+                #$newValue = $row."$( $tokenKey )"
+
+        switch ( $newValue.Substring(0,1) ) {
+            <#
+            # add value
+            "+" {
+                $newItem | Add-Member -MemberType NoteProperty -Name $tokenKey -Value ( [double]$newValue + [double]$tokens."$( $tokenKey )")
+            }
+
+            # subtract value
+            "-" {
+                $newItem | Add-Member -MemberType NoteProperty -Name $tokenKey -Value ( [double]$newValue - [double]$tokens."$( $tokenKey )")
+            }
+            #>
+            # replace value
+            default {
+                $tokens | Add-Member -MemberType NoteProperty -Name $tokenKey -Value $newValue
+            }                
+        }
+            #}
+        #}
+    }
+
+    # add to array
+    [void]$parsedData.add([PSCustomObject]@{
+        "mdn" = $row."$( $params.SmsFieldName )"
+        "tokens" = $tokens
+    })
+
+}
+
+Write-Log -message "Prepared $( $parsedData.Count ) records to upload"
+
+# Filenames
+$tempFolder = "$( $uploadsFolder )\$( $processId )"
+New-Item -ItemType Directory -Path $tempFolder
+Write-Log -message "Will save files to temporary directory '$( $tempFolder )'"
+
+# Export data to upload
+$parsedData | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\upload.json" -Encoding UTF8 #-Delimiter "`t" -NoTypeInformation
 
 
 #-----------------------------------------------
 # UPDATE WALLETS
 #-----------------------------------------------
 
-$results = @()
-$dataWallets | ForEach { #| where { $_."first_name" -eq "Florian" }
+$updateResponses = [System.Collections.ArrayList]@()
+$parsedData | ForEach {
 
     $row = $_
-    $rowId = $row."$( $params.SmsFieldName )" #$row."$( $params.UrnFieldName )"
-
-    $newItem = New-Object -TypeName PSCustomObject
-
-    # Get Tokens for that wallet/urn
-    $tokenRow = $mssqlTable.Rows | where { $_.url -eq $rowId }  #$data.Tables.rows | where { [int]$_.Urn -eq [int]$rowId }
-    $tokens = $tokenRow.tokens | ConvertFrom-Json  #$tokenRow.value | ConvertFrom-Json 
-
-    # See, which tokens have changed
-    $tokens.psobject.Members | where-object membertype -like 'noteproperty' | ForEach {
-    
-        $tokenKey = $_.Name
-        if ( $row."$( $tokenKey )" ) { # if the field from the campaign is setted
-            if ( $row."$( $tokenKey )" -ne $tokens."$( $tokenKey )" ) { # if the values are different
-               
-                # new value
-                $newValue = $row."$( $tokenKey )"
-
-                switch ( $newValue.Substring(0,1) ) {
-                    
-                    # add value
-                    "+" {
-                        $newItem | Add-Member -MemberType NoteProperty -Name $tokenKey -Value ( [double]$newValue + [double]$tokens."$( $tokenKey )")
-                    }
-
-                    # subtract value
-                    "-" {
-                        $newItem | Add-Member -MemberType NoteProperty -Name $tokenKey -Value ( [double]$newValue - [double]$tokens."$( $tokenKey )")
-                    }
-
-                    # replace value
-                    default {
-                        $newItem | Add-Member -MemberType NoteProperty -Name $tokenKey -Value $newValue
-                    }                
-                }
-            }
-        }
-    }
+    $rowId = $row.mdn
 
     # prepare the tokens to be updated
     $updateBody = @{
-               "tokens"=$newItem               
-               "locations"=@(@{
-                    "latitude" = 49.774040
-                    "longitude" = 7.164084
-                    "relevant_text"="Visit Someone"
-               },@{
-                    "latitude" = 51.521304
-                    "longitude" = -0.144838
-                    "relevant_text"="Visit RIBA in London"
-               })
-               "message"=@{
-                     "template"="Enjoy your update"
-                     "header"="Enjoy your update"
-                     #"image_url":"http://www.google.com/wallet.jpg"
-                  }
-                "google_wallet"= @{
-                    "messages"= @(,
-                    @{
-                        "header"= "Enjoy your update"
-                        "body"= "Enjoy your update"
-                        "action_uri"= "https://www.apteco.com"
-                        #"image_uri": "http://www.vibes.com/sites/all/themes/vibes/images/logo.png"
-                    }
-                )
-                }
-           } | ConvertTo-Json -Depth 8 -Compress
+               
+        # Change the fields/token
+        # A table with first class fields can be found here https://developer.vibes.com/display/APIs/Wallet+Manager+First+Class+Fields
+        "tokens"=$row.tokens
+        
+        # Add locations if you wish to trigger them by lat/long
+        <#               
+        "locations"=@(@{
+            "latitude" = 49.774040
+            "longitude" = 7.164084
+            "relevant_text"="Visit Someone"
+        },@{
+            "latitude" = 51.521304
+            "longitude" = -0.144838
+            "relevant_text"="Visit RIBA in London"
+        })
+        #>
+
+        # Add another message in the same update
+        <#
+        "message"=@{
+                "template"="Enjoy your update"
+                "header"="Enjoy your update"
+                #"image_url":"http://www.google.com/wallet.jpg"
+            }
+        "google_wallet"= @{
+            "messages"= @(,
+            @{
+                "header"= "Enjoy your update"
+                "body"= "Enjoy your update"
+                "action_uri"= "https://www.apteco.com"
+                #"image_uri": "http://www.vibes.com/sites/all/themes/vibes/images/logo.png"
+            }
+        )
+        }
+        #>
+
+    } | ConvertTo-Json -Depth 20 -Compress
 
     # log  
-    Write-Log -message "Update wallet $( $row.WalletUrl ) with: $( $updateBody )"
+    #Write-Log -message "Update wallet $( $row.WalletUrl ) with: $( $updateBody )"
 
     # update via REST API
     $walletItemDetailUrl = "$( $baseUrl )$( $rowId )"
-    $updateResponse = Invoke-RestMethod -ContentType $contentType -Method Put -Uri $walletItemDetailUrl -Headers $headers -Body $updateBody -Verbose
+    $updateParams = @{
+        ContentType = $contentType
+        Method = "Put"
+        Uri = $walletItemDetailUrl
+        Headers = $headers
+        Body = $updateBody
+        Verbose = $true
+    }
+    $updateResponse = Invoke-RestMethod @updateParams
 
-    $results += $updateResponse
+    # Add to array
+    [void]$updateResponses.add($updateResponse)
 
     # remove body information
     $updateBody = @{}
     
 }
 
+$updateResponses | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\response.json" -Encoding UTF8
+#$uploadErrors | ConvertTo-Json -Depth 20 | Set-Content -Path "$( $tempFolder )\errors.json" -Encoding UTF8
 
-Write-Log -message "Done!"
+Write-Log -message "Updated $( $updateResponses.count ) wallets"
 
 
 ################################################
@@ -356,13 +453,11 @@ Write-Log -message "Done!"
 #
 ################################################
 
-# TODO [ ] check return results
-
 # count the number of successful upload rows
-$recipients = $results.count # ( $importResults | where { $_.Result -eq 0 } ).count
+$recipients = $updateResponses.count # ( $importResults | where { $_.Result -eq 0 } ).count
 
 # There is no id reference for the upload in Epi
-$transactionId = 0 #$recipientListID
+$transactionId = $processId
 
 # return object
 [Hashtable]$return = @{
@@ -373,6 +468,13 @@ $transactionId = 0 #$recipientListID
     
     # General return value to identify this custom channel in the broadcasts detail tables
     "CustomProvider" = $settings.providername
+    "ProcessId" = $processId
+
+    # More information about the different status of the import
+    #"RecipientsIgnored" = 
+    #"RecipientsQueued" = $queued
+    #"RecipientsSent" = 
+    "RecipientsFailed" = $uploadErrors.Count
 
 }
 

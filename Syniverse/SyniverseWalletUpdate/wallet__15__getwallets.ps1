@@ -8,7 +8,6 @@ Param(
     [hashtable] $params
 )
 
-
 #-----------------------------------------------
 # DEBUG SWITCH
 #-----------------------------------------------
@@ -23,7 +22,7 @@ $debug = $false
 if ( $debug ) {
     $params = [hashtable]@{
 	    Password= "def"
-	    scriptPath= "D:\Scripts\Syniverse\SMS"
+	    scriptPath= "D:\Scripts\Syniverse\WalletNotification"
 	    Username= "abc"
     }
 }
@@ -70,12 +69,13 @@ Set-Location -Path $scriptPath
 # General settings
 $functionsSubfolder = "functions"
 $settingsFilename = "settings.json"
-$moduleName = "GETMAILINGS"
+$moduleName = "GETWALLETCAMPAIGN"
 $processId = [guid]::NewGuid()
 $timestamp = [datetime]::Now.ToString("yyyyMMddHHmmss")
 
 # Load settings
 $settings = Get-Content -Path "$( $scriptPath )\$( $settingsFilename )" -Encoding UTF8 -Raw | ConvertFrom-Json
+# TODO [x] change this path back
 
 # Allow only newer security protocols
 # hints: https://www.frankysweb.de/powershell-es-konnte-kein-geschuetzter-ssltls-kanal-erstellt-werden/
@@ -90,7 +90,7 @@ if ( $settings.changeTLS ) {
 
 # more settings
 $logfile = $settings.logfile
-$mssqlConnectionString = $settings.responseDB
+#$mssqlConnectionString = $settings.responseDB
 
 
 # append a suffix, if in debug mode
@@ -101,12 +101,11 @@ if ( $debug ) {
 
 ################################################
 #
-# FUNCTIONS
+# FUNCTIONS & ASSEMBLIES
 #
 ################################################
 
-# TODO [ ] add mssql assemblies or extend it
-Add-Type -AssemblyName System.Data #, System.Text.Encoding
+#Add-Type -AssemblyName System.Data  #, System.Text.Encoding
 
 # Load all PowerShell Code
 "Loading..."
@@ -114,6 +113,7 @@ Get-ChildItem -Path ".\$( $functionsSubfolder )" -Recurse -Include @("*.ps1") | 
     . $_.FullName
     "... $( $_.FullName )"
 }
+
 <#
 # Load all exe files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.exe") 
@@ -121,6 +121,7 @@ $libExecutables | ForEach {
     "... $( $_.FullName )"
     
 }
+
 # Load dll files in subfolder
 $libExecutables = Get-ChildItem -Path ".\$( $libSubfolder )" -Recurse -Include @("*.dll") 
 $libExecutables | ForEach {
@@ -138,76 +139,96 @@ $libExecutables | ForEach {
 
 # Start the log
 Write-Log -message "----------------------------------------------------"
-Write-Log -message "$( $moduleName )"
-Write-Log -message "Got a file with these arguments: $( [Environment]::GetCommandLineArgs() )"
-
+Write-Log -message "$( $modulename )"
+Write-Log -message "Got a file with these arguments:"
+[Environment]::GetCommandLineArgs() | ForEach {
+    Write-Log -message "    $( $_ -replace "`r|`n",'' )"
+}
 # Check if params object exists
 if (Get-Variable "params" -Scope Global -ErrorAction SilentlyContinue) {
-  $paramsExisting = $true
+    $paramsExisting = $true
 } else {
-  $paramsExisting = $false
+    $paramsExisting = $false
 }
 
 # Log the params, if existing
 if ( $paramsExisting ) {
-  $params.Keys | ForEach-Object {
-      $param = $_
-      Write-Log -message "    $( $param )= ""$( $params[$param] )"""
-  }
+    Write-Log -message "Got these params object:"
+    $params.Keys | ForEach-Object {
+        $param = $_
+        Write-Log -message "    ""$( $param )"" = ""$( $params[$param] )"""
+    }
 }
 
 
 ################################################
 #
-# CHECK MSSQL FOR TEMPLATES
+# GET WALLETS
 #
 ################################################
 
 #-----------------------------------------------
-# LOAD TEMPLATES FROM MSSQL
+# AUTHENTICATION + HEADERS
 #-----------------------------------------------
 
-$mssqlConnection = [System.Data.SqlClient.SqlConnection]::new()
-$mssqlConnection.ConnectionString = $mssqlConnectionString
-
-$mssqlConnection.Open()
-
-"Trying to load the data from MSSQL"
-
-# define query -> currently the age of the date in the query has to be less than 12 hours
-$mssqlQuery = Get-Content -Path ".\sql\getmessages.sql" -Encoding UTF8
-
-# execute command
-$mssqlCommand = $mssqlConnection.CreateCommand()
-$mssqlCommand.CommandText = $mssqlQuery
-$mssqlResult = $mssqlCommand.ExecuteReader()
-    
-# load data
-$mssqlTable = new-object System.Data.DataTable
-$mssqlTable.Load($mssqlResult)
-    
-# Close connection
-$mssqlConnection.Close()
+$baseUrl = $settings.base
+$contentType = $settings.contentType
+$headers = @{
+    "Authorization"="Basic $( Get-SecureToPlaintext -String $settings.login.accesstoken )"
+    "X-API-Version"="2"
+    "int-companyid"=$settings.companyId
+}
 
 
 #-----------------------------------------------
-# TRANSFORM MSSQL RESULT INTO PSCUSTOMOBJECT
+# LOAD WALLET DETAILS
 #-----------------------------------------------
 
-$templates = @()
-$mssqlTable | ForEach {
+Write-Log "Loading available wallets"
 
-    $currentRow = $_
+$walletDetails = [System.Collections.ArrayList]@()
 
-    $row = New-Object PSCustomObject
+$param = @{
+    "Uri" = "$( $baseUrl )/companies/$( $settings.companyId )/campaigns/wallet"
+    "ContentType" = $contentType
+    "Method" = "Get"
+    "Headers" = $headers
+    "Verbose" = $true
+}
+$walletDetails = Invoke-RestMethod @param
 
-    $row | Add-Member -MemberType NoteProperty -Name "id" -Value $currentRow.CreativeTemplateId
-    $row | Add-Member -MemberType NoteProperty -Name "name" -Value $currentRow.Name
+Write-Log "Loaded $( $wallets.count ) wallets through the API"
 
-    $templates += $row
+#-----------------------------------------------
+# BUILD MAILING OBJECTS
+#-----------------------------------------------
+
+$mailings = [System.Collections.ArrayList]@()
+
+# Add first element to allow to choose all wallets
+# TODO [x] add an "all element"
+
+[void]$mailings.Add([Mailing]@{
+    mailingId="all"
+    mailingName="Use all wallet campaigns - no filter"
+})
+
+
+# Add specific wallets
+$walletDetails | foreach {
+
+    # Load data
+    $campaign = $_
+
+    # Create mailing objects
+    [void]$mailings.Add([Mailing]@{
+        mailingId=$campaign.wallet_id
+        mailingName=$campaign.Name
+    })
 
 }
 
+$messages = $mailings | Select @{name="id";expression={ $_.mailingId }}, @{name="name";expression={ $_.toString() }}
 
 
 ###############################
@@ -216,4 +237,4 @@ $mssqlTable | ForEach {
 #
 ###############################
 
-return $templates
+return $messages
