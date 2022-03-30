@@ -1,5 +1,6 @@
 # settings files
 *.json*
+*.ini
 
 # logfiles
 *.log
@@ -11,6 +12,7 @@
 
 # specific folders
 Flexmail/responses
+KlickTipp/*
 
 # specific files
 last_request.xml
@@ -37,8 +39,10 @@ _dev
 *.db
 *.sqlite
 
-# others
+# binary files
 *.dll
-*.pdb
 *.zip
 *.exe
+
+# others
+*.pdb
