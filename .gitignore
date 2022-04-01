@@ -23,3 +23,9 @@ _dev
 *.part*
 *.txt
 *.xml
+*.sqlite
+*.dll
+*.exe
+*.pdb
+*.config
+*.zip
