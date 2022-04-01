@@ -4,7 +4,7 @@
 #-----------------------------------------------
 
 $rabatteSubfolder = "rabatte"
-$mssqlConnectionString = $settings.connectionString
+$mssqlConnectionString = Get-SecureToPlaintext $settings.connectionString
 
 # the enviroment variable fills from the designer user defined variables
 $rabattGUID = $processId.Guid -replace "-"

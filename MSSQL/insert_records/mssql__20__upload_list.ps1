@@ -21,18 +21,17 @@ $debug = $true
 
 if ( $debug ) {
     $params = [hashtable]@{
-	    TransactionType = 'Replace'
+        TransactionType = 'Replace'
         Password = 'b'
-        scriptPath = 'E:\Apteco\Scripts\rabatt_zuordnung_v2'
+        scriptPath = 'D:\Scripts\mssql'
         MessageName = '0 | Rabatte zuordnen'
-        EmailFieldName = 'email'
+        EmailFieldName = 'E-Mail'
         SmsFieldName = ''
-        Path = '\\APTECO\Publish\Handel\system\Deliveries\PowerShell_0  Rabatte zuordnen_b7a3e63b-6864-4a77-a779-d2796e979dc3.txt'
+        Path = 'd:\faststats\Publish\Handel\system\Deliveries\PowerShell_0  Rabatte zuordnen_7e1c6f94-cab9-4fe5-b9f1-762439594f19.txt'
         ReplyToEmail = ''
         Username = 'a'
         ReplyToSMS = ''
-        PreviewMessageScript = ''
-        UrnFieldName = 'KU-Id'
+        UrnFieldName = 'Kunden ID'
         ListName = '0 | Rabatte zuordnen'
         CommunicationKeyFieldName = 'Communication Key'
     }
@@ -158,8 +157,8 @@ try {
 
     Write-Log -message "Using: $( $fileItem.FullName )"
     #Write-Log -message "Connection String: $( $settings.connectionString )"
-    Write-Log -message "Default Days valid: $( $settings.defaultValidDays )"
-    Write-Log -message "Default Days for Redeem: $( $settings.defaultDaysRedeem )"
+    #Write-Log -message "Default Days valid: $( $settings.defaultValidDays )"
+    #Write-Log -message "Default Days for Redeem: $( $settings.defaultDaysRedeem )"
 
 
     #-----------------------------------------------
@@ -203,7 +202,7 @@ try {
         $campaignSql = Replace-Tokens -InputString $campaignSql -Replacements $campaignSqlReplacement
 
         # load data
-        $campaignMetadata = Query-SQLServer -connectionString "$( $mssqlConnectionString )" -query "$( $campaignSql )"
+        $campaignMetadata = @( Query-SQLServer -connectionString "$( $mssqlConnectionString )" -query "$( $campaignSql )" )
 
         # load variables from result
         $campaignID = $campaignMetadata[0].ID
@@ -226,14 +225,14 @@ try {
     }
 
     Write-Log -message "Load campaign metadata in $( $t.totalSeconds ) seconds"
-
+    
 
     ################################################
     #
     # INSERT CUSTOMERS
     #
     ################################################
-
+<#
     $t = Measure-Command {
 
 
@@ -260,14 +259,14 @@ try {
     }
 
     Write-Log -message "Added $( $customerMssqlResult ) customer rows in $( $t.totalSeconds ) seconds"
-
+#>
 
     ################################################
     #
     # INSERT CAMPAIGN RUN METADATA
     #
     ################################################
-
+<#
     $t = Measure-Command {
 
         # only add data, if query was more than 0 rows
@@ -308,7 +307,7 @@ try {
     }
 
     Write-Log -message "Inserted campaign metadata rows in $( $t.totalSeconds ) seconds"
-
+#>
 
 
     ################################################
@@ -316,7 +315,7 @@ try {
     # INSERT RABATTE
     #
     ################################################
-
+<#
     $t = Measure-Command {
 
         # only add data, if query was more than 0 rows
@@ -350,7 +349,7 @@ try {
     }
 
     Write-Log -message "Inserted rabatte rows in $( $t.totalSeconds ) seconds"
-
+#>
 
 
     ################################################

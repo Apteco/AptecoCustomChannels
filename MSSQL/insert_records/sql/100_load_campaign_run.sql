@@ -20,7 +20,7 @@
     ,[Command].value('(/DeliveryCommand/BroadcastActionDetails/Run)[1]', 'bigint') AS Run
 	/*,[Command].value('(/DeliveryCommand/BroadcastActionDetails/StepId)[1]', 'bigint') AS StepId*/
     ,[Status]
-   FROM [dbo].[vDeliveryCommands]
+   FROM [faststats_schema].[vDeliveryCommands] /* sometimes dbo */
    WHERE [Command].value('(/DeliveryCommand/BroadcastActionDetails/FilePath)[1]', 'varchar(max)') LIKE '%#FILE#'
    ) AS DeliveryCommands
   INNER JOIN [dbo].[FS_Decode_Deliveries] AS Deliveries ON Deliveries.DeliveryStepId = DeliveryCommands.ExternalId
