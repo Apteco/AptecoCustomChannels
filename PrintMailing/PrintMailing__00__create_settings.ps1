@@ -206,9 +206,9 @@ $mail = @{
 $settings = @{
 
     # General settings
-    "nameConcatChar" =   " / "
     "logfile" = $logfile                                    # logfile
-    "providername" = "printmailauto"                        # identifier for this custom integration, this is used for the response allocation
+    "nameConcatChar" =   " | "
+    "providername" = "printMailingAutomation"                        # identifier for this custom integration, this is used for the response allocation
 
     # Security settings
     "aesFile" = "$( $scriptPath )\aes.key"
