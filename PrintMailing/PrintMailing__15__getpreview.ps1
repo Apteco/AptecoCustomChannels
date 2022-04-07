@@ -406,7 +406,7 @@ $jwt = Create-JwtToken -headers $settings.headers -payload $settings.defaultPayl
 
 $uri = [uri]$settings.base 
 $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
-$authUri = "$( $hostUri )?partnersystem=$( $jwt )"
+$authUri = "https://print-mailing.deutschepost.de/planen?partnersystem=$( $jwt )" #"$( $hostUri )?partnersystem=$( $jwt )"
 $authUri
 
 
@@ -418,7 +418,7 @@ Write-Log -message "Sending an email with login details to $( $testData.Email )"
 
 $splattedArguments = @{
     "to" = $testData.Email # Use the email of the current logged in user
-    "subject" = "[TRIGGERDIALOG] Login" # TODO [ ] put this text into the settings
+    "subject" = "[PMA] Login" # TODO [ ] put this text into the settings
     "body" = "Hallo `nhier ist der Link zum Login: $( $authUri )" # TODO [ ] put this text into the settings
 }
 $emailSuccess = Send-Mail @splattedArguments # note the @ instead of $
