@@ -95,8 +95,9 @@ $uri = [uri]$settings.base
 $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
 
-$authUri = "$( $hostUri )?partnersystem=$( $jwt )"
+$authUri = "https://print-mailing.deutschepost.de/planen?partnersystem=$( $jwt )" #"$( $hostUri )?partnersystem=$( $jwt )"
 $authUri
+
 
 #-----------------------------------------------
 # OPEN IN DEFAULT BROWSER
