@@ -1,4 +1,17 @@
 ﻿
+
+################################################
+#
+# NOTES
+#
+################################################
+
+<#
+
+Changelog: https://print-mailing-api.deutschepost.de/apidocs/partnersystems/index.html#section-partnersystems-changelog
+
+#>
+
 ################################################
 #
 # START
@@ -221,10 +234,10 @@ $settings = @{
     "contentType" = "application/json;charset=utf-8"
 
     # Triggerdialog settings
-    # UAT https://dm-uat.deutschepost.de/gateway
-    # Production https://dm.deutschepost.de/gateway
-    "base" = "https://dm-uat.deutschepost.de/gateway"
     "customerId" = ""
+    # UAT https://uat.print-mailing-api-test.deutschepost.de
+    # Production https://print-mailing-api.deutschepost.de
+    "base" = "https://uat.print-mailing-api-test.deutschepost.de"
     "createCampaignsWithDate" = $true
 
     # default payload - will be filled with other values when in preview window    

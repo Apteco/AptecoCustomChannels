@@ -66,7 +66,7 @@ Function Get-TriggerDialogSession {
             
             $expire = [datetime]::ParseExact($sessionContent.expire,"yyyyMMddHHmmss",[CultureInfo]::InvariantCulture)
 
-            if ( $expire -gt [datetime]::Now ) {
+            if ( $expire -gt [datetime]::Now -or $sessionContent.sessionId -eq "null") {
 
                 $createNewSession = $false
                 $Script:sessionId = $sessionContent.sessionId
@@ -74,6 +74,7 @@ Function Get-TriggerDialogSession {
             }
 
         }
+
         
         #-----------------------------------------------
         # FILE DOES NOT EXIST OR DATE IS NOT VALID -> CREATE SESSION
@@ -121,10 +122,21 @@ Function Get-LoginViaCredentials {
         "partnerSystemCustomerIdExt"= $settings.authentication.partnerSystemCustomerIdExt
         "authenticationSecret"= Get-SecureToPlaintext -String $settings.authentication.authenticationSecret
         "locale"= "de"
-    }    
+    }
     $bodyJson = ConvertTo-Json -InputObject $body -Depth 99
     
-    $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/credentialsbased" -Headers @{ "accept" = $settings.contentType } -ContentType $settings.contentType -Body $bodyJson -Verbose 
+    $params = [hashtable]@{
+        Uri = "$( $settings.base )/user/authentication/partnersystem/credentialsbased"
+        Headers = @{
+            "accept" = $settings.contentType
+        }
+        ContentType = $settings.contentType
+        Verbose = $true
+        Method = "Post"
+        Body = $bodyJson
+    }
+
+    $cred = Invoke-RestMethod @params
     return $cred.jwtToken
     
     #$jwtDecoded = Decode-JWT -token $cred.jwtToken -secret $settings.authentication.authenticationSecret
@@ -138,7 +150,18 @@ Function Get-LoginViaToken {
     }
     $bodyJson = $body | ConvertTo-Json -Depth 99
     
-    $cred = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/authentication/partnersystem/tokenbased" -Headers @{"accept" = $settings.contentType} -ContentType $settings.contentType -Body $bodyJson -Verbose
+    $params = [hashtable]@{
+        Uri = "$( $settings.base )/user/authentication/partnersystem/tokenbased"
+        Headers = @{
+            "accept" = $settings.contentType
+        }
+        ContentType = $settings.contentType
+        Body = $bodyJson
+        Verbose = $true
+        Method = "Post"
+    }
+
+    $cred = Invoke-RestMethod @params
     return $cred.jwtToken
     
 }
@@ -367,7 +390,7 @@ Function Invoke-TriggerDialog {
         # HEADER + CONTENTTYPE + BASICS
         #-----------------------------------------------
 
-        $uri = $settings.base
+        $uri = "$( $settings.base )/automation"
 
         $defaultParams = @{
             Headers = $headers

@@ -144,21 +144,17 @@ $customerId = $settings.customerId
 # LOAD AND CHECK STATUS OF CAMPAIGN
 #-----------------------------------------------
 
-#$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
-#$campaignDetails = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/longtermcampaigns?customerId=$( $customerId )" -Verbose -Headers $headers -ContentType $contentType
 $campaignDetails = Invoke-TriggerDialog -customerId $customerId -headers $headers -path "longtermcampaigns"
 if ( ( $campaignDetails | where { $_.id -eq $message.campaignId } ).campaignState.id -ne 120 ) {
     Write-Log -message "Campaign is not active yet" -severity ( [LogSeverity]::ERROR )
     throw [System.IO.InvalidDataException] "Campaign is not active yet"
 }
-#exit 0
 
 
 #-----------------------------------------------
 # LOAD EXISTING FIELDS
 #-----------------------------------------------
 
-#$variableDefinitions = Invoke-RestMethod -Method Get -Uri "$( $settings.base )/mailings/$( $message.mailingId )/variabledefinitions?customerId=$( $customerId )" -Headers $headers -ContentType $contentType -Verbose
 $variableDefinitions = Invoke-TriggerDialog -customerId $customerId -path "mailings/$( $message.mailingId )/variabledefinitions" -headers $headers
 
 
@@ -173,9 +169,6 @@ $file = Get-Item -Path $params.Path
 $filename = $file.Name -replace $file.Extension
 
 # Load data from file
-#$dataCsv = @()
-#$dataCsv += import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8
-
 $dataCsv = [System.Collections.ArrayList]@( import-csv -Path $params.Path -Delimiter "`t" -Encoding UTF8 )
 Write-Log -message "Loaded $( $dataCsv.Count ) records"
 
@@ -323,33 +316,6 @@ Write-Log -message "Queued $( $recipients.Count ) records in $( $chunks ) chunks
 # Exporting the correlation IDs for later
 $results | Export-Csv -Path "$( $settings.upload.uploadsFolder )\$( $timestamp.ToString("yyyyMMdd_HHmmss") )_$( $processId.guid ).csv" -Delimiter "`t" -NoTypeInformation -Encoding UTF8
 
-
-#-----------------------------------------------
-# UPLOAD DATA
-#-----------------------------------------------
-<#
-$body = @{
-    "campaignId" = $message.campaignId #$campaign.id
-    "customerId" = $customerId
-    "recipients" = $recipients
-}
-
-#$bodyJson = $body | ConvertTo-Json -Depth 8
-try {
-
-    #$newCustomers = Invoke-RestMethod -Method Post -Uri "$( $settings.base )/recipients" -Verbose -Headers $headers -ContentType $contentType -Body $bodyJson
-    $newCustomers = Invoke-TriggerDialog -customerId $customerId -path "recipients" -method Post -headers $headers -body $body -returnRawObject
-
-} catch {
-    $errorMessage = ParseErrorForResponseBody -err $_
-    $errorMessage.errors | ForEach {
-        Write-Log -severity ( [LogSeverity]::ERROR ) -message "$( $_.errorCode ) : $( $_.errorMessage )"
-    }
-    Throw [System.IO.InvalidDataException]
-}
-
-Write-Log -message "Uploaded successfully with id $( $newCustomers.correlationId )"
-#>
 
 ################################################
 #

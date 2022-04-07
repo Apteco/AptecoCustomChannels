@@ -94,9 +94,8 @@ $jwt = Create-JwtToken -headers $settings.headers -payload $settings.defaultPayl
 $uri = [uri]$settings.base 
 $hostUri = $uri.AbsoluteUri -replace $uri.AbsolutePath
 
-# https://dm.deutschepost.de?partnersystem={YOUR-SIGNED-JWT}.
+
 $authUri = "$( $hostUri )?partnersystem=$( $jwt )"
-#$authUri = "$( $hostUri )/campaign/editLongTermCampaign/34364?partnersystem=$( $jwt )"
 $authUri
 
 #-----------------------------------------------
