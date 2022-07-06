@@ -30,3 +30,4 @@ EpiServerCampaign/MarketingAutomation/recipientlists.json
 *.xml
 *.sqlite
 *.zip
+*.json.*
