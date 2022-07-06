@@ -23,3 +23,10 @@ EpiServerCampaign/MarketingAutomation/recipientlists.json
 *.txt
 *.part*
 *.json
+*.exe
+*.pdb
+*.dll
+*.config
+*.xml
+*.sqlite
+*.zip
