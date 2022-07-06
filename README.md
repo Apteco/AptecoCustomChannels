@@ -24,7 +24,7 @@ Mailingwork|Standard|REST
 Mailingwork|Campaign|REST
 CleverReach||REST
 EpiServer Campaign|Closed Loop Smart Campaigns|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:heavy_check_mark:/:o:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:question:/:x:Broadcast<br/>:heavy_check_mark:/:x: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[EpiServer SC Integration Guideline](EpiServerCampaign/SmartCampaigns)
-EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:question:/:x:SendTest<br/>:question:/:x:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:question:/:x: Response Download<br/>:question:/:x:Trigger FERGE|[EpiServer MA Integration Guideline](EpiServerCampaign/MarketingAutomation)
+EpiServer Campaign|Marketing Automation/<br/>Transactional Mailings|SOAP|:heavy_check_mark:/:heavy_check_mark:GetMessages<br/>:heavy_check_mark:/:x:SendTest<br/>:heavy_check_mark:/:x:PreviewMessage<br/>:x:/:x:PreviewMessagePersonalised<br/>:heavy_check_mark:/:heavy_check_mark:Upload<br/>:heavy_check_mark:/:heavy_check_mark:Broadcast<br/>:heavy_check_mark:/:o: Response Download<br/>:heavy_check_mark:/:x:Trigger FERGE|[EpiServer MA Integration Guideline](EpiServerCampaign/MarketingAutomation)
 
 
 ### Print
