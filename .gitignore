@@ -1,6 +1,6 @@
 # settings files
-settings.json
-session.json
+*settings.json*
+*session.json*
 
 # logfiles
 *.log
@@ -20,3 +20,12 @@ _dev
 *.debug
 *.txt
 *.csv
+*.json
+*.part*
+*.dll
+*.config
+*.pdb
+*.exe
+*.xml
+*.zip
+*.sqlite
