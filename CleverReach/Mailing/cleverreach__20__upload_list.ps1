@@ -450,6 +450,7 @@ if ( !$createNewGroup -and $params.deactivate -eq "true") {
     $upload = @()
     do {
 
+        # Get a list of all active receivers to deactivate them
         $url = "$( $groupsUrl )/$( $groupId )/receivers?pagesize=$( $settings.upload.rowsPerUpload )&page=$( $page )&detail=$( $detailLevel )&type=active" # active|inactive
         $result = Invoke-RestMethod -Method Get -Uri $url -Headers $header -Verbose
 
@@ -494,6 +495,37 @@ if ( !$createNewGroup -and $params.deactivate -eq "true") {
 
 
 #-----------------------------------------------
+# DOWNLOAD A LIST OF MANUAL DEACTIVATION AND UNSUBSCRIBES TO EXCLUDE THEM
+#-----------------------------------------------
+
+$object = "receivers"
+$endpoint = "$( $apiRoot )$( $object )/filter.json" #/v3/receivers/filter.json
+
+$deactivatedBody = [PSCustomObject]@{
+    "groups" = [Array]@(
+        "$( $groupId )"
+    )
+    "rules" = [Array]@(
+        [PSCustomObject]@{
+            "field" = "deactivated"
+            "logic" = "bg"
+            "condition" = "1"
+        }
+    )
+    "orderby" = "activated desc"
+    "detail" = 0
+    "pagesize" = 250
+    "page" = 0
+}
+
+$deactivatedBodyJson = ConvertTo-Json -InputObject $deactivatedBody -Depth 99
+
+$exclusion = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $deactivatedBodyJson -ContentType $contentType -Verbose 
+
+$cleanedDataCsv = $dataCsv | where { $_.email -notin $exclusion.email }
+
+
+#-----------------------------------------------
 # TRANSFORM UPLOAD DATA
 #-----------------------------------------------
 
@@ -516,9 +548,9 @@ $endpoint = "$( $apiRoot )$( $object ).json/$( $groupId )/receivers/upsertplus"
 $globalAtts = $globalAttributes | where { $_.name -in $csvAttributesNames.Name }
 $uploadObject = @()
 # TODO [ ] implement the upload in chunks rather than mod like for ELAINE transactional implementation
-For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
+For ($i = 0 ; $i -lt $cleanedDataCsv.count ; $i++ ) {
     
-    $currentRecord = $dataCsv[$i]
+    $currentRecord = $cleanedDataCsv[$i]
 
     $uploadEntry = [PSCustomObject]@{
         email = $currentRecord.email
@@ -562,12 +594,13 @@ For ($i = 0 ; $i -lt $dataCsv.count ; $i++ ) {
 
     # Batch upload every n records or at the end
     #if ( $i % $settings.upload.rowsPerUpload -or ($i - 1) -eq $dataCsv.count) {
-    if ( ($i + 1) % $settings.upload.rowsPerUpload -eq 0 -or ($i + 1) -eq $dataCsv.count ) {
+    if ( ($i + 1) % $settings.upload.rowsPerUpload -eq 0 -or ($i + 1) -eq $cleanedDataCsv.count ) {
 
-        $bodyJson = $uploadObject | ConvertTo-Json
+        $bodyJson = ConvertTo-Json -InputObject $uploadObject -Depth 99
         $bodyJson | Set-Content -path "$( $tempFolder )\$( $i ).json" -Encoding UTF8
         $upload += Invoke-RestMethod -Uri $endpoint -Method Post -Headers $header -Body $bodyJson -ContentType $contentType -Verbose 
         $uploadObject = @()
+        
     }
 
 }
