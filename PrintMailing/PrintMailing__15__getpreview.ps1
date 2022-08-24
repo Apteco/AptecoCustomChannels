@@ -22,7 +22,7 @@ $debug = $false
 
 if ( $debug ) {
     $params = [hashtable]@{
-        scriptPath = 'D:\Scripts\TriggerDialog\v2'
+        scriptPath = 'D:\Scripts\PMA\v2'
         TestRecipient = '{"Email":"testrecipient@example.com","Sms":null,"Personalisation":{"Test":"Contentobjekt","Kunden ID":"Kunden ID","Anrede":"Anrede","Vorname":"Vorname","Nachname":"Nachname","Strasse":"Strasse","PLZ":"PLZ","Ort":"Ort","TTT":"GGG","Geburtsdatum":"Geburtsdatum","Communication Key":"ab0ba429-4be7-45b7-bcc5-de9eaa72e23b"}}'
         MessageName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
         ListName = '41125 / 36145 / 2020-12-22_00:36:52 / Entwurf / EDIT'
@@ -257,7 +257,7 @@ switch ( $message.campaignOperation ) {
         }
         $newVariables = Invoke-TriggerDialog -method Post -customerId $customerId -path  "mailings/$( $newMailing.id )/variabledefinitions" -Headers $headers -Body $body
         #$newVariables | Out-GridView
-        Write-Log "Generated $( $newVariables.count ) fields in TriggerDialog"
+        Write-Log "Generated $( $newVariables.count ) fields in PMA"
         
         <#
         id createdOn                changedOn                version label             sortOrder dataType                     addressVariableId addressVariableMappingConfirmed selected
@@ -277,7 +277,7 @@ switch ( $message.campaignOperation ) {
         # OUTPUT RESULT TO HTML
         #-----------------------------------------------
         
-        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $newCampaign.id )' und der Mailing-ID '$( $newMailing.id )' erstellt.<br/>Dabei wurden $( $newVariables.count ) Variablen erstellt: $( ($newVariables.label -join ", ") )"
+        $htmlTxt = "In PMA wurde eine Kampagne mit der ID '$( $newCampaign.id )' und der Mailing-ID '$( $newMailing.id )' erstellt.<br/>Dabei wurden $( $newVariables.count ) Variablen erstellt: $( ($newVariables.label -join ", ") )"
 
 
     }
@@ -340,24 +340,28 @@ switch ( $message.campaignOperation ) {
 
 
         #-----------------------------------------------
-        # PUT NEW FIELDS TO TRIGGERDIALOG
+        # PUT NEW FIELDS TO PMA
         #-----------------------------------------------
         
-        $body = @{
-            "customerId" = $customerId
-            "updateVariableDefRequestRepList" = $newVariableDefinitions
-        }
-        $updatedVariables = Invoke-TriggerDialog -method Put -customerId $customerId -path  "mailings/$( $message.mailingId )/variabledefinitions" -Headers $headers -Body $body
+        If ($addCols.Count -gt 0 -or $removeCols.Count -gt 0) {
+            $body = @{
+                "customerId" = $customerId
+                "updateVariableDefRequestRepList" = $newVariableDefinitions
+            }
+            $updatedVariables = Invoke-TriggerDialog -method Put -customerId $customerId -path  "mailings/$( $message.mailingId )/variabledefinitions" -Headers $headers -Body $body
 
-        #$updatedVariables | Out-GridView
-        Write-Log "Updated $( $updatedVariables.count ) fields in TriggerDialog"
-        
+            #$updatedVariables | Out-GridView
+            Write-Log "Updated $( $updatedVariables.count ) fields in PMA"
+        } else {
+            Write-Log "No need for updating fields in PMA"
+
+        }
 
         #-----------------------------------------------
         # WRAP UP FOR THE CURRENT STATUS
         #-----------------------------------------------
         
-        $htmlTxt = "In TriggerDialog wurde eine Kampagne mit der ID '$( $message.campaignId )' und der Mailing-ID '$( $message.mailingId )' angepasst.<br/>Dabei wurden $( $addCols.label.count ) neue Variablen erstellt: $( ($addCols.label -join ", ") )"
+        $htmlTxt = "In PMA wurde eine Kampagne mit der ID '$( $message.campaignId )' und der Mailing-ID '$( $message.mailingId )' angepasst.<br/>Dabei wurden $( $addCols.label.count ) neue Variablen erstellt: $( ($addCols.label -join ", ") )"
         if ( $changeCampaignName ) {
             $htmlTxt += "<br/>Die Kampagnen wurde von $( $message.campaignName ) in '$( $campaignName )' umbenannt."
         }
