@@ -515,7 +515,7 @@ Function Invoke-TriggerDialog {
 
             # Try the call
             try {
-                $pageResult = Invoke-RestMethod @params
+                $pageResult = Invoke-RestMethod @params -TimeoutSec 90
             } catch {
                 $errorMessage = ParseErrorForResponseBody -err $_
                 $errorMessage.errors | ForEach {
