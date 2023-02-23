@@ -164,7 +164,7 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 
 $apiRoot = $settings.base
-$contentType = "application/json; charset=utf-8"
+$contentType = "application/json;charset=utf-8"
 $auth = "$( Get-SecureToPlaintext -String $settings.login.authenticationHeader )"
 $header = @{
     "Authorization" = $auth
@@ -176,7 +176,8 @@ $header = @{
 #-----------------------------------------------
 
 $mailingId = $params.MessageName -split " / ",2
-$mailingDetails = Invoke-RestMethod -Method Get -Uri "$( $apiRoot )mailings/$( $mailingId[0] )" -Header $header -ContentType "application/hal+json" -Verbose
+$mailingDetailsRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )mailings/$( $mailingId[0] )" -Header $header -ContentType "application/hal+json;charset=utf-8" -Verbose
+$mailingDetails = [System.Text.encoding]::UTF8.GetString($mailingDetailsRaw.Content) | ConvertFrom-Json
 
 
 #-----------------------------------------------
@@ -202,8 +203,8 @@ if ($params.ListName -eq "" -or $null -eq $params.ListName -or $params.MessageNa
     # existing list
 
     # Splitting the ListName with "/" in order to get the listID
-    # TODO [x] use the split character from settings
-    $listNameSplit = $params.ListName -Split $settings.nameConcatChar,2
+    # TODO [ ] use the split character from settings
+    $listNameSplit = $params.ListName.Split(" / "),2
     $listID = $listNameSplit[0]
 
 
@@ -268,8 +269,13 @@ $differences = Compare-Object -ReferenceObject $attributesNames -DifferenceObjec
 #$colsInAttrButNotCsv = $differences | Where-Object { $_.SideIndicator -eq "<=" } 
 $colsInCsvButNotAttr = $differences | Where-Object { $_.SideIndicator -eq "=>" }
 
-Write-Log -message "Attributes to create: $( $colsInCsvButNotAttr -join "," )"
+$newAttributesList = $colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } 
 
+If ( $newAttributesList.Count -gt 0 ) {
+    Write-Log -message "Attributes to create: $( $colsInCsvButNotAttr -join "," )"
+} else {
+    Write-Log -message "No attributes to create"
+}
 
 #------------------------------------------------------
 # CREATE GLOBAL/LOCAL ATTRIBUTES THAT ARE NOT IN CSV
@@ -284,7 +290,7 @@ $bodyJson = $null
 $body = $null
 
 # For each object in the CSV that was not in the attributes
-$colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.InputObject  } | ForEach-Object {
+$newAttributesList | ForEach-Object {
 
     # Getting the Attribute Name
     $newAttributeName = $_.InputObject
@@ -308,51 +314,47 @@ $colsInCsvButNotAttr | where { @( $settings.upload.emailColumnName, $settings.up
 
 }   
 
-
 #-----------------------------------------------
 # GET ALL TEST PROFILES
 #-----------------------------------------------
 
-# TODO [x] paging
-$pageSize = 20
-$endpoint = "$( $apiRoot )test-profiles?pageSize=$( $pageSize )"
-do{
-    try{
-        $testProfilesResRaw = Invoke-WebRequest -Method Get -Uri $endpoint -Header $header -ContentType "application/hal+json" -Verbose
-        $testProfilesRes = [System.Text.encoding]::UTF8.GetString($testProfilesResRaw.Content) | ConvertFrom-Json
-    }catch{
-        "There are currently no test profiles"
-    }
-    $testProfiles += $testProfilesRes._embedded.'inx:test-profiles'
+# TODO [ ] paging
+$testProfilesResRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )test-profiles" -Header $header -ContentType "application/hal+json" -Verbose
+$testProfilesRes = [System.Text.encoding]::UTF8.GetString($testProfilesResRaw.Content) | ConvertFrom-Json
 
-
-    $endpoint = $testProfilesRes._links.next.href
-}until($null -eq $testProfilesRes._links.next)
+$testProfiles = $testProfilesRes._embedded.'inx:test-profiles'
 
 $latestProfile = $testProfiles | where { $_.email -eq $testRecipient.Email } | sort id -Descending | select -first 1
+
 
 #-----------------------------------------------
 # CREATE/UPDATE TEST PROFILE
 #-----------------------------------------------
 
+# Exclude some properties that we don't need
+$personalisationObj = [PSCustomObject]@{}
+$testRecipient.Personalisation.PSObject.Properties | where { @( $settings.upload.emailColumnName, $settings.upload.permissionColumnName ) -notcontains  $_.Name -and $_.MemberType -eq "NoteProperty" } | % { $personalisationObj | Add-Member -MemberType NoteProperty -Name $_.Name -Value $_.Value }
+
+# Create the body
 $body = @{
     "email" = $testRecipient.Email
     "trackingPermission" = $true
-    "attributes" = $testRecipient.Personalisation
+    "attributes" = $personalisationObj
     "description" = "Description"
 }
 
+# Try to update the test profile
 try {
 
     # Choose if update or create
     if ( $latestProfile ) {
         $verb = "Patch"
         $uri = $latestProfile._links.self.href
-        $contentType = "application/merge-patch+json"
+        $contentType = "application/merge-patch+json;charset=utf-8"
     } else {
         $verb = "Post"
         $uri = "$( $apiRoot )test-profiles" 
-        $contentType = "application/hal+json"
+        $contentType = "application/hal+json;charset=utf-8"
         $body.add("listId", 1 ) # Add global list id, if new profile
     }
 
@@ -369,12 +371,12 @@ try {
 
 }
 
-
 # Get that new or updated profile
 $previewProfileRaw = Invoke-WebRequest -Method Get -Uri $testProfile._links.self.href -Header $header -ContentType "application/hal+json" -Verbose
 $previewProfile = [System.Text.encoding]::UTF8.GetString($previewProfileRaw.Content) | ConvertFrom-Json
 
 #$profile.id
+
 
 #-----------------------------------------------
 # RENDER MAILING
@@ -382,7 +384,20 @@ $previewProfile = [System.Text.encoding]::UTF8.GetString($previewProfileRaw.Cont
 # https://apidocs.inxmail.com/xpro/rest/v1/#_retrieve_single_mailing_rendered_content
 # /mailings/{id}/renderedContent{?testProfileId,includeAttachments}
 
-$renderedResRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )mailings/$( $mailingDetails.id )/renderedContent?testProfileId=$( $previewProfile.id )" -Header $header -ContentType "application/hal+json" -Verbose
+try {
+
+
+    $renderedResRaw = Invoke-WebRequest -Method Get -Uri "$( $apiRoot )mailings/$( $mailingDetails.id )/renderedContent?testProfileId=$( $previewProfile.id )" -Header $header -ContentType "application/hal+json" -Verbose
+
+} catch {
+
+    $e = ParseErrorForResponseBody($_)
+    Write-Log -message ( $e | ConvertTo-Json -Depth 20 )
+    throw $_.exception
+
+}
+
+
 $renderedRes = [System.Text.encoding]::UTF8.GetString($renderedResRaw.Content) | ConvertFrom-Json
 
 

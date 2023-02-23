@@ -160,7 +160,7 @@ if ( $paramsExisting ) {
 #-----------------------------------------------
 
 $apiRoot = $settings.base
-$contentType = "application/hal+json"
+$contentType = "application/hal+json;charset=utf-8"
 $auth = "$( Get-SecureToPlaintext -String $settings.login.authenticationHeader )"
 $header = @{
     "Authorization" = $auth

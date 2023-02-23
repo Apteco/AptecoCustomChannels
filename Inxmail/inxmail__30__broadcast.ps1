@@ -234,7 +234,6 @@ Write-Log -message "Copied mailing '$( $mailingId )' with new id '$( $copiedMail
 # SCHEDULE/SEND A MAILING 
 #-----------------------------------------------------------------
 
-
 if ( $sendMailing -eq $true ) {
 
     #-----------------------------------------------------------------
