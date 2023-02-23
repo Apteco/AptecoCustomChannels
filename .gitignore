@@ -32,3 +32,4 @@ _dev
 *.pdb
 *.config
 *.zip
+*.json.*
